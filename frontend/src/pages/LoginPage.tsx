@@ -38,7 +38,7 @@ const LoginPage = () => {
                 <span className="nav-logo-icon" />
                 <span className="nav-logo">ai-помощник</span>
               </div>
-              <Link to="/register" className="nav-btn">Регистрация</Link>
+              <Link to="/main-register" className="nav-btn">Регистрация</Link>
             </div>
           <div className="top-btn top-btn-info">Информация</div>
       <Link to="/login" className="top-btn top-btn-login">Вход</Link>
@@ -95,7 +95,7 @@ const LoginPage = () => {
         <div className="form-footer">
           <span className="footer-line" />
           <span className="footer-text">Нет аккаунта?</span>
-          <Link to="/register" className="footer-link">Регистрация</Link>
+          <Link to="/main-register" className="footer-link">Регистрация</Link>
           <span className="footer-line" />
         </div>
       </form>

@@ -1,4 +1,4 @@
-.reg-page {
+.mr-page {
   position: relative;
   width: 100%;
   height: 1117px;
@@ -8,12 +8,11 @@
   font-family: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.reg-page * { box-sizing: border-box; }
-.reg-page input,
-.reg-page button { outline: 0; }
+.mr-page * { box-sizing: border-box; }
+.mr-page input,
+.mr-page button { outline: 0; }
 
-/* ===== ВСЕ МОЛНИИ ОДНИМ СЛОЕМ (PNG из экспорта регистрации) ===== */
-.reg-bolts {
+.mr-bolts {
   position: absolute;
   top: 0;
   left: 50%;
@@ -115,8 +114,7 @@
     125px 125px, 125px 125px;
 }
 
-/* Зелёная стрелка */
-.reg-chevron {
+.mr-chevron {
   position: absolute;
   width: 248px;
   height: 147px;
@@ -126,8 +124,7 @@
   z-index: 2;
 }
 
-/* ===== НАВБАРЫ ===== */
-.reg-nav-green {
+.mr-nav-green {
   position: absolute;
   width: 1657px;
   height: 125px;
@@ -139,31 +136,43 @@
   z-index: 3;
 }
 
-.reg-nav-black {
+.mr-nav-black {
   position: absolute;
   width: 1608px;
   height: 80px;
   top: 53px;
+  left: 50%;
+  transform: translateX(-50%);
   background: #0b0b0b;
   border-radius: 100px;
-  box-shadow: 0 0 50px -10px rgba(151, 71, 255, 0.08);
+  box-shadow: 0 0 50px 0 rgba(151, 71, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 100px 0 43px;
   z-index: 4;
-  left: 50%;
-  transform: translateX(-50%);
 }
 
-.reg-nav-logo {
+.mr-nav-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mr-nav-logo-icon {
+  width: 27px;
+  height: 27px;
+  background: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png) no-repeat center / 100% 100%;
+}
+
+.mr-nav-logo {
   color: #ffffff;
   font-family: BrokenLed, Poppins, sans-serif;
   font-size: 20px;
   line-height: 20px;
 }
 
-.reg-nav-btn {
+.mr-nav-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,8 +186,7 @@
   text-transform: capitalize;
 }
 
-/* Кнопки "Информация" и "Вход" */
-.reg-top-btn {
+.mr-top-btn {
   position: absolute;
   top: 73px;
   height: 40px;
@@ -195,11 +203,10 @@
   z-index: 5;
 }
 
-.reg-top-info { left: calc(50% + 294px); }
-.reg-top-login { left: calc(50% + 459px); }
+.mr-top-info { left: calc(50% + 294px); }
+.mr-top-login { left: calc(50% + 459px); }
 
-/* ===== КАРТОЧКА ===== */
-.reg-card {
+.mr-card {
   position: absolute;
   width: 630px;
   height: 660px;
@@ -212,14 +219,13 @@
   z-index: 6;
 }
 
-/* ===== ФОРМА ===== */
-.reg-form {
+.mr-form {
   position: absolute;
   inset: 0;
   z-index: 7;
 }
 
-.reg-title {
+.mr-title {
   position: absolute;
   top: 352px;
   left: 50%;
@@ -231,7 +237,7 @@
   white-space: nowrap;
 }
 
-.reg-field-group {
+.mr-field-group {
   position: absolute;
   left: calc(50% - 176.5px);
   width: 353px;
@@ -240,17 +246,17 @@
   gap: 6px;
 }
 
-.reg-field-1 { top: 406px; }
-.reg-field-2 { top: 517px; }
-.reg-field-3 { top: 625px; }
+.mr-field-email    { top: 406px; }
+.mr-field-password { top: 517px; }
+.mr-field-confirm  { top: 625px; }
 
-.reg-field-label {
+.mr-field-label {
   font-size: 14px;
   line-height: 18px;
   color: #000000;
 }
 
-.reg-field-box {
+.mr-field-box {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -262,7 +268,7 @@
   border-radius: 10px;
 }
 
-.reg-field-input {
+.mr-field-input {
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -273,10 +279,31 @@
   color: #000000;
 }
 
-.reg-field-input::placeholder { color: rgba(0, 0, 0, 0.5); }
-.reg-field-input:disabled { opacity: 0.6; cursor: not-allowed; }
+.mr-field-input::placeholder { color: rgba(0, 0, 0, 0.5); }
+.mr-field-input:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.reg-submit {
+/* Кнопка-глаз для показа/скрытия пароля */
+.mr-eye-btn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mr-eye-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.mr-eye-icon {
+  display: block;
+  width: 17px;
+  height: 13px;
+  margin: 3px 0 0 1px;
+  background: url(https://static.codia.ai/image/2026-09-30/FgzNZ6n5sx.png) no-repeat center / 100% 100%;
+}
+
+.mr-submit {
   position: absolute;
   top: 747px;
   left: calc(50% - 176.5px);
@@ -292,11 +319,11 @@
   cursor: pointer;
 }
 
-.reg-submit:hover:not(:disabled) { background: #1a1a1a; }
-.reg-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+.mr-submit:hover:not(:disabled) { background: #1a1a1a; }
+.mr-submit:disabled { opacity: 0.7; cursor: not-allowed; }
 
-/* Футер: "Уже есть аккаунт? Войти" */
-.reg-footer {
+
+.mr-footer {
   position: absolute;
   top: 879px;
   left: calc(50% - 176.5px);
@@ -306,19 +333,19 @@
   gap: 6px;
 }
 
-.reg-footer-line {
+.mr-footer-line {
   flex: 1;
   border-top: 1px solid #d8dadc;
 }
 
-.reg-footer-text {
+.mr-footer-text {
   font-size: 14px;
   line-height: 18px;
   color: rgba(0, 0, 0, 0.7);
   white-space: nowrap;
 }
 
-.reg-footer-link {
+.mr-footer-link {
   font-size: 14px;
   font-weight: 600;
   line-height: 18px;
@@ -327,39 +354,28 @@
   white-space: nowrap;
 }
 
-.reg-footer-link:hover { text-decoration: underline; }
+.mr-footer-link:hover { text-decoration: underline; }
 
-.reg-nav-logo-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.reg-nav-logo-icon {
-  width: 27px;
-  height: 27px;
-  background: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png) no-repeat center / 100% 100%;
-}
-
-.reg-page,
-.reg-page input,
-.reg-page button,
-.reg-field-label,
-.reg-field-input,
-.reg-submit,
-.reg-footer-text,
-.reg-footer-link,
-.reg-nav-btn,
-.reg-top-btn {
+/* ===== ШРИФТЫ ===== */
+.mr-page,
+.mr-page input,
+.mr-page button,
+.mr-field-label,
+.mr-field-input,
+.mr-submit,
+.mr-footer-text,
+.mr-footer-link,
+.mr-nav-btn,
+.mr-top-btn {
   font-family: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.reg-title,
-.reg-nav-logo {
+.mr-title,
+.mr-nav-logo {
   font-family: BrokenLed, Poppins, sans-serif;
 }
 
-.reg-stripe {
+.mr-stripe {
   position: absolute;
   width: 153px;
   height: 0;
@@ -369,19 +385,19 @@
   text-decoration: none;
 }
 
-.reg-stripe-left  { top: 841px; left: calc(50% - 178px); }
-.reg-stripe-right { top: 841px; left: calc(50% + 28px); }
+.mr-stripe-left  { top: 841px; left: calc(50% - 178px); }
+.mr-stripe-right { top: 841px; left: calc(50% + 28px); }
 
-.reg-stripe-active {
+.mr-stripe-active {
   border-top-color: #6f7070;
   cursor: default;
 }
 
-a.reg-stripe {
+a.mr-stripe {
   cursor: pointer;
   transition: opacity 0.2s;
 }
 
-a.reg-stripe:hover {
+a.mr-stripe:hover {
   opacity: 0.55;
 }

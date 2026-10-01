@@ -93,6 +93,13 @@ const RegisterPage = () => {
           {isLoading ? 'Создание...' : 'Создать аккаунт'}
         </button>
 
+        <Link
+          to="/main-register"
+          className="reg-stripe reg-stripe-left"
+          title="Вернуться к шагу 1: почта и пароль"
+        />
+        <span className="reg-stripe reg-stripe-right reg-stripe-active" />
+
         <div className="reg-footer">
           <span className="reg-footer-line" />
           <span className="reg-footer-text">Уже есть аккаунт?</span>

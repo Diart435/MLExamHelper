@@ -11,6 +11,7 @@ import TestsPage from './pages/TestsPage';
 import ResultsPage from './pages/ResultsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import RegisterPage from './pages/RegisterPage';
+import MainRegistrationPage from './pages/MainRegistrationPage';
 
 // Компонент для защиты роутов
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
@@ -29,6 +30,7 @@ function App() {
       <Routes>
         {/* Публичный роут */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/main-register" element={<MainRegistrationPage />} />
         <Route path="/register" element={<RegisterPage />} />
         {/* Защищенные роуты внутри общего Layout */}
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
