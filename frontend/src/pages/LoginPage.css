@@ -1,0 +1,384 @@
+:root {
+  --font: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+input, button { outline: 0; }
+
+.main-container {
+  position: relative;
+  width: 100%;
+  height: 1117px;
+  min-height: 100vh;
+  background: linear-gradient(112.92deg, #ffffff 0%, #be9ff6 39.1%, #ffffff 99.19%);
+  overflow: hidden;
+  font-family: var(--font);
+}
+
+/* ===== ВСЕ МОЛНИИ ОДНИМ СЛОЕМ (координаты из Figma) ===== */
+.bolts {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1728px;
+  height: 1117px;
+  z-index: 1;
+  background-repeat: no-repeat;
+  background-image:
+    url(https://static.codia.ai/image/2026-09-30/hXYseTgie9.png),
+    url(https://static.codia.ai/image/2026-09-30/1c7uSBUeOy.png),
+    url(https://static.codia.ai/image/2026-09-30/Di7nBHR7Wm.png),
+    url(https://static.codia.ai/image/2026-09-30/qbnABu1Ofg.png),
+    url(https://static.codia.ai/image/2026-09-30/AJjNB6zzA7.png),
+    url(https://static.codia.ai/image/2026-09-30/4YNNk1O1Ln.png),
+    url(https://static.codia.ai/image/2026-09-30/0qwdverB4s.png),
+    url(https://static.codia.ai/image/2026-09-30/WE7mNz4Njz.png),
+    url(https://static.codia.ai/image/2026-09-30/YZFWrPzO85.png),
+    url(https://static.codia.ai/image/2026-09-30/ijpTjbowTd.png),
+    url(https://static.codia.ai/image/2026-09-30/8XYzA2bLT4.png),
+    url(https://static.codia.ai/image/2026-09-30/oxXknqGWK9.png),
+    url(https://static.codia.ai/image/2026-09-30/HW7xRgwqK5.png),
+    url(https://static.codia.ai/image/2026-09-30/YB48BMD1HV.png),
+    url(https://static.codia.ai/image/2026-09-30/Ej0aS3Kavs.png),
+    url(https://static.codia.ai/image/2026-09-30/mKRRBXObZB.png),
+    url(https://static.codia.ai/image/2026-09-30/n32TXoi3tF.png),
+    url(https://static.codia.ai/image/2026-09-30/s2oTWpXb8d.png),
+    url(https://static.codia.ai/image/2026-09-30/ogLbXemxUh.png),
+    url(https://static.codia.ai/image/2026-09-30/yyOaNhBJ04.png),
+    url(https://static.codia.ai/image/2026-09-30/nuqsNv6B2E.png),
+    url(https://static.codia.ai/image/2026-09-30/rGqCDewt3X.png),
+    url(https://static.codia.ai/image/2026-09-30/VYbV2giwBW.png),
+    url(https://static.codia.ai/image/2026-09-30/iaLywztGBh.png),
+    url(https://static.codia.ai/image/2026-09-30/6fd7djGd7i.png),
+    url(https://static.codia.ai/image/2026-09-30/OiP8ATDfTE.png),
+    url(https://static.codia.ai/image/2026-09-30/to38BpAa3S.png),
+    url(https://static.codia.ai/image/2026-09-30/71aGN1mWsF.png),
+    url(https://static.codia.ai/image/2026-09-30/hMmDV6SREs.png),
+    url(https://static.codia.ai/image/2026-09-30/mSpr5D9b0L.png),
+    url(https://static.codia.ai/image/2026-09-30/oVCGYBHsdA.png),
+    url(https://static.codia.ai/image/2026-09-30/mNjNr69mpk.png),
+    url(https://static.codia.ai/image/2026-09-30/ncXqNzP881.png),
+    url(https://static.codia.ai/image/2026-09-30/yiW3P0KhrB.png),
+    url(https://static.codia.ai/image/2026-09-30/JsMhZ7Rsi3.png),
+    url(https://static.codia.ai/image/2026-09-30/08P32Q4qRg.png),
+    url(https://static.codia.ai/image/2026-09-30/H2sammYPpt.png),
+    url(https://static.codia.ai/image/2026-09-30/O8BgyByQgy.png),
+    url(https://static.codia.ai/image/2026-09-30/nwKq9aBNuA.png),
+    url(https://static.codia.ai/image/2026-09-30/LULYDWOEvB.png),
+    url(https://static.codia.ai/image/2026-09-30/YfpKbpqLuM.png),
+    url(https://static.codia.ai/image/2026-09-30/GKzKaB4XFn.png),
+    url(https://static.codia.ai/image/2026-09-30/qCpChKPbdS.png),
+    url(https://static.codia.ai/image/2026-09-30/Zwt5eK0ao8.png),
+    url(https://static.codia.ai/image/2026-09-30/24BWHMOW1y.png),
+    url(https://static.codia.ai/image/2026-09-30/40kbmB445F.png),
+    url(https://static.codia.ai/image/2026-09-30/O9TZmVULyZ.png),
+    url(https://static.codia.ai/image/2026-09-30/9DNMypGBhs.png),
+    url(https://static.codia.ai/image/2026-09-30/puvw0fREJB.png),
+    url(https://static.codia.ai/image/2026-09-30/SKfo67aKYn.png),
+    url(https://static.codia.ai/image/2026-09-30/RcbEi0b33F.png),
+    url(https://static.codia.ai/image/2026-09-30/XUZZSZYn9s.png),
+    url(https://static.codia.ai/image/2026-09-30/Xr06FncTw2.png),
+    url(https://static.codia.ai/image/2026-09-30/JTSsJMJd31.png),
+    url(https://static.codia.ai/image/2026-09-30/Kz0RhBgz4N.png),
+    url(https://static.codia.ai/image/2026-09-30/uT5LaFv0Bf.png),
+    url(https://static.codia.ai/image/2026-09-30/iPygwjRVpi.png),
+    url(https://static.codia.ai/image/2026-09-30/DODs7b1ssy.png),
+    url(https://static.codia.ai/image/2026-09-30/YC1W0cX6zf.png),
+    url(https://static.codia.ai/image/2026-09-30/qAYNGPCvrt.png),
+    url(https://static.codia.ai/image/2026-09-30/OiMo16iZzP.png),
+    url(https://static.codia.ai/image/2026-09-30/yWaa0Spkz1.png),
+    url(https://static.codia.ai/image/2026-09-30/tcNz2dXPcv.png);
+  background-position:
+    161px -471px, 362px -422px, 36px -408px, 334px -278px, 8px -264px,
+    217px -228px, 1158px -120px, 1500px -111px, 161px -66px, 1375px -48px,
+    362px -35px, 36px -21px, 1005px 87px, 1347px 96px, 1214px 123px,
+    334px 127px, 1556px 132px, 8px 141px, 225px 173px, 1158px 280px,
+    1158px 285px, 497px 289px, 1500px 289px, 1500px 294px, 171px 303px,
+    1375px 339px, 372px 352px, 1375px 352px, 46px 366px, 824px 325px,
+    1033px 343px, 699px 388px, 1005px 487px, 344px 496px, 1347px 496px,
+    18px 510px, 553px 532px, 671px 532px, 1214px 523px, 1556px 532px,
+    227px 546px, 880px 568px, 1041px 640px, 818px 641px, 1158px 685px,
+    497px 694px, 1500px 694px, 171px 708px, 693px 686px, 372px 739px,
+    1375px 739px, 46px 753px, 1033px 730px, 673px 892px, 1005px 892px,
+    344px 901px, 1347px 901px, 18px 915px, 890px 924px, 1222px 924px,
+    561px 933px, 1564px 933px, 235px 947px;
+  background-size:
+    207px 207px, 125px 125px, 125px 125px, 207px 207px, 207px 207px,
+    125px 125px, 207px 207px, 207px 207px, 207px 207px, 125px 125px,
+    125px 125px, 125px 125px, 207px 207px, 207px 207px, 125px 125px,
+    207px 207px, 125px 125px, 207px 207px, 125px 125px, 207px 207px,
+    207px 207px, 207px 207px, 207px 207px, 207px 207px, 207px 207px,
+    125px 125px, 125px 125px, 125px 125px, 125px 125px, 207px 207px,
+    125px 125px, 125px 125px, 207px 207px, 207px 207px, 207px 207px,
+    207px 207px, 125px 125px, 207px 207px, 125px 125px, 125px 125px,
+    125px 125px, 125px 125px, 125px 125px, 207px 207px, 207px 207px,
+    207px 207px, 207px 207px, 207px 207px, 125px 125px, 125px 125px,
+    125px 125px, 125px 125px, 125px 125px, 207px 207px, 207px 207px,
+    207px 207px, 207px 207px, 207px 207px, 125px 125px, 125px 125px,
+    125px 125px, 125px 125px, 125px 125px;
+}
+
+/* Зелёная стрелка */
+.chevron {
+  position: absolute;
+  width: 248px;
+  height: 147px;
+  top: 109px;
+  left: calc(50% - 124px);
+  background: url(https://static.codia.ai/image/2026-09-30/9AZUn4D6PM.png) no-repeat center / 100% 100%;
+  z-index: 2;
+}
+
+/* ===== НАВБАРЫ ===== */
+.nav-green {
+  position: absolute;
+  width: 1657px;
+  height: 125px;
+  top: 29px;
+  left: calc(50% - 828.5px);
+  background: linear-gradient(90deg, #c8fec7 0%, #ffffff 48.08%, #be9ff6 100%);
+  border-radius: 100px;
+  box-shadow: 0 0 50px -10px rgba(151, 71, 255, 0.08);
+  z-index: 3;
+}
+
+.nav-black {
+  position: absolute;
+  width: 1608px;
+  height: 80px;
+  left: 50%;
+  top: 53px;
+  background: #0b0b0b;
+  border-radius: 100px;
+  box-shadow: 0 0 50px -10px rgba(151, 71, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 100px 0 43px;
+  z-index: 4;
+  transform: translateX(-50%);
+}
+
+.nav-logo {
+  color: #ffffff;
+  font-family: BrokenLed, var(--font);
+  font-size: 20px;
+  line-height: 20px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  height: 40px;
+  background: #925ff0;
+  border-radius: 40px;
+  color: #ffffff;
+  font-size: 16px;
+  letter-spacing: -0.05em;
+  text-transform: capitalize;
+  text-decoration: none;
+}
+
+/* Кнопки "Информация" и "Вход" */
+.top-btn {
+  position: absolute;
+  top: 73px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  background: #925ff0;
+  border-radius: 40px;
+  color: #ffffff;
+  font-size: 16px;
+  letter-spacing: -0.05em;
+  text-decoration: none;
+  z-index: 5;
+}
+
+.top-btn-info { left: calc(50% + 294px); }
+.top-btn-login { left: calc(50% + 459px); }
+
+/* ===== КАРТОЧКА (координаты из экспорта: 549 / 279) ===== */
+.card {
+  position: absolute;
+  width: 630px;
+  height: 660px;
+  left: calc(50% - 315px);
+  top: 279px;
+  background: linear-gradient(0deg, rgba(238, 255, 238, 0.37), rgba(238, 255, 238, 0.37)), #ffffff;
+  border: 11px solid #c8fec7;
+  border-radius: 48px;
+  box-shadow: 0 17px 17.6px rgba(0, 0, 0, 0.25);
+  z-index: 6;
+}
+
+/* ===== ФОРМА (координаты из экспорта) ===== */
+.login-form {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+}
+
+.form-title {
+  position: absolute;
+  top: 405px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: BrokenLed, var(--font);
+  font-size: 30px;
+  line-height: 30px;
+  color: #413838;
+  white-space: nowrap;
+}
+
+.field-group {
+  position: absolute;
+  left: calc(50% - 176.5px);
+  width: 353px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-email { top: 460px; }
+.field-password { top: 567px; }
+
+.field-label {
+  font-size: 14px;
+  line-height: 18px;
+  color: #000000;
+}
+
+.field-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 353px;
+  height: 56px;
+  padding: 0 16px;
+  background: #ffffff;
+  border: 1px solid #d8dadc;
+  border-radius: 10px;
+}
+
+.field-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 16px;
+  color: #000000;
+}
+
+.field-input::placeholder { color: rgba(0, 0, 0, 0.5); }
+.field-input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.eye-btn {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.eye-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.eye-icon {
+  display: block;
+  width: 17px;
+  height: 13px;
+  margin: 3px 0 0 1px;
+  background: url(https://static.codia.ai/image/2026-09-30/FgzNZ6n5sx.png) no-repeat center / 100% 100%;
+}
+
+.submit-btn {
+  position: absolute;
+  top: 682px;
+  left: calc(50% - 176.5px);
+  width: 353px;
+  height: 56px;
+  background: #000000;
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit-btn:hover:not(:disabled) { background: #1a1a1a; }
+.submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+/* Футер: линии + "Нет аккаунта? Регистрация" (top: 775) */
+.form-footer {
+  position: absolute;
+  top: 775px;
+  left: calc(50% - 176.5px);
+  width: 353px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-line {
+  flex: 1;
+  border-top: 1px solid #d8dadc;
+}
+
+.footer-text {
+  font-size: 14px;
+  line-height: 18px;
+  color: rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+}
+
+.footer-link {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  color: rgba(0, 0, 0, 0.7);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.footer-link:hover { text-decoration: underline; }
+
+.nav-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-logo-icon {
+  width: 27px;
+  height: 27px;
+  background: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png) no-repeat center / 100% 100%;
+}
+
+.main-container,
+.main-container input,
+.main-container button,
+.field-label,
+.field-input,
+.submit-btn,
+.footer-text,
+.footer-link,
+.nav-btn,
+.top-btn {
+  font-family: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.form-title,
+.nav-logo {
+  font-family: BrokenLed, Poppins, sans-serif;
+}
