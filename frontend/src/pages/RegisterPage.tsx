@@ -5,18 +5,38 @@ import './RegisterPage.css';
 const RegisterPage = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [subjects, setSubjects] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    if (!firstName.trim() || !lastName.trim()) {
+      alert('Имя и фамилия обязательны для заполнения!');
+      return;
+    }
     setIsLoading(true);
     try {
-      // ЗАГЛУШКА (позже замени на apiClient.post('/auth/register', ...))
+      // Имитация задержки сети
       await new Promise((resolve) => setTimeout(resolve, 800));
-      console.log('Данные регистрации:', { firstName, lastName, subjects });
+
+      const email = sessionStorage.getItem('pendingEmail') || '';
+
+      const newUser = {
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        role: 'Студент'
+      };
+
+      const existingUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+      existingUsers.push(newUser);
+      localStorage.setItem('mock_users', JSON.stringify(existingUsers));
+
+      sessionStorage.removeItem('pendingEmail');
+      sessionStorage.removeItem('pendingPassword');
+
       alert(`Аккаунт успешно создан!\nДобро пожаловать, ${firstName}!`);
       navigate('/login');
     } catch (error) {
@@ -32,16 +52,20 @@ const RegisterPage = () => {
       <div className="reg-bolts" />
       <div className="reg-chevron" />
       <div className="reg-nav-green" />
-        <div className="reg-nav-black">
-          <div className="reg-nav-logo-wrap">
-            <span className="reg-nav-logo-icon" />
-            <span className="reg-nav-logo">ai-помощник</span>
-          </div>
-          <span className="reg-nav-btn">Регистрация</span>
-        </div>
-      <div className="reg-top-btn reg-top-info">Информация</div>
-      <Link to="/login" className="reg-top-btn reg-top-login">Вход</Link>
+      
+      <div className="reg-nav-black">
+        <button 
+          className="reg-nav-logo-btn" 
+          type="button" 
+          onClick={() => navigate('/welcome')}
+        >
+          <span className="reg-nav-logo-icon" />
+          <span className="reg-nav-logo">ai-помощник</span>
+        </button>
+      </div>
+
       <div className="reg-card" />
+      
       <form className="reg-form" onSubmit={handleSubmit}>
         <span className="reg-title">Регистрация</span>
 
@@ -70,20 +94,6 @@ const RegisterPage = () => {
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               required
-              disabled={isLoading}
-            />
-          </div>
-        </div>
-
-        <div className="reg-field-group reg-field-3">
-          <span className="reg-field-label">Интересующие вас предметы</span>
-          <div className="reg-field-box">
-            <input
-              className="reg-field-input"
-              type="text"
-              placeholder="Математика, физика..."
-              value={subjects}
-              onChange={(e) => setSubjects(e.target.value)}
               disabled={isLoading}
             />
           </div>

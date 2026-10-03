@@ -156,7 +156,7 @@ input, button { outline: 0; }
   align-items: center;
   justify-content: space-between;
   padding: 0 100px 0 43px;
-  z-index: 4;
+  z-index: 20;
   transform: translateX(-50%);
 }
 
@@ -381,4 +381,49 @@ input, button { outline: 0; }
 .form-title,
 .nav-logo {
   font-family: BrokenLed, Poppins, sans-serif;
+}
+
+.nav-logo-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  transition: transform 0.2s ease;
+  z-index: 21;
+}
+
+.nav-logo-btn:hover {
+  transform: scale(1.05);
+}
+
+.nav-logo-btn:active {
+  transform: scale(0.98);
+}
+
+/* Белая иконка */
+.nav-logo-icon {
+  width: 28px;
+  height: 26px;
+  background: #ffffff; /* БЕЛАЯ иконка */
+  flex-shrink: 0;
+  mask-image: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png);
+  -webkit-mask-image: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png);
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
+
+/* Текст логотипа */
+.nav-logo {
+  font-family: 'BrokenLed', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #ffffff; /* БЕЛЫЙ текст */
 }

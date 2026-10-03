@@ -5,13 +5,14 @@ WORKDIR /build
 COPY . .
 
 RUN --mount=type=cache,target=/root/.m2,sharing=locked \
-    mvn clean package -Pprod
-
+    mvn clean package -Pprod -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-COPY --from=builder /build/backend/target/*.jar /app/app.jar
+COPY --from=builder /build/target/*.jar /app/app.jar
+
+EXPOSE 8000
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

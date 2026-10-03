@@ -48,14 +48,15 @@ const MainRegistrationPage = () => {
 
       <div className="mr-nav-green" />
       <div className="mr-nav-black">
-        <div className="mr-nav-logo-wrap">
+        <button 
+          className="mr-nav-logo-btn" 
+          type="button" 
+          onClick={() => navigate('/welcome')}
+        >
           <span className="mr-nav-logo-icon" />
           <span className="mr-nav-logo">ai-помощник</span>
-        </div>
-        <span className="mr-nav-btn">Регистрация</span>
+        </button>
       </div>
-      <div className="mr-top-btn mr-top-info">Информация</div>
-      <Link to="/login" className="mr-top-btn mr-top-login">Вход</Link>
 
       <div className="mr-card" />
 

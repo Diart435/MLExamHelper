@@ -150,7 +150,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 100px 0 43px;
-  z-index: 4;
+  z-index: 20;
 }
 
 .mr-nav-logo-wrap {
@@ -400,4 +400,64 @@ a.mr-stripe {
 
 a.mr-stripe:hover {
   opacity: 0.55;
+}
+
+.mr-nav-black {
+  position: absolute;
+  width: 1608px;
+  height: 80px;
+  top: 53px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0b0b0b;
+  border-radius: 100px;
+  box-shadow: 0 0 50px 0 rgba(151, 71, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 100px 0 43px;
+  z-index: 20;
+}
+
+.mr-nav-logo-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  transition: transform 0.2s ease;
+  z-index: 21;
+}
+
+.mr-nav-logo-btn:hover {
+  transform: scale(1.05);
+}
+
+.mr-nav-logo-btn:active {
+  transform: scale(0.98);
+}
+
+.mr-nav-logo-icon {
+  width: 28px;
+  height: 26px;
+  background: #ffffff;
+  flex-shrink: 0;
+  mask-image: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png);
+  -webkit-mask-image: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png);
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
+
+.mr-nav-logo {
+  font-family: 'BrokenLed', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #ffffff;
 }

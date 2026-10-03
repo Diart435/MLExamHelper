@@ -12,7 +12,6 @@
 .reg-page input,
 .reg-page button { outline: 0; }
 
-/* ===== ВСЕ МОЛНИИ ОДНИМ СЛОЕМ (PNG из экспорта регистрации) ===== */
 .reg-bolts {
   position: absolute;
   top: 0;
@@ -115,7 +114,6 @@
     125px 125px, 125px 125px;
 }
 
-/* Зелёная стрелка */
 .reg-chevron {
   position: absolute;
   width: 248px;
@@ -126,7 +124,6 @@
   z-index: 2;
 }
 
-/* ===== НАВБАРЫ ===== */
 .reg-nav-green {
   position: absolute;
   width: 1657px;
@@ -177,7 +174,6 @@
   text-transform: capitalize;
 }
 
-/* Кнопки "Информация" и "Вход" */
 .reg-top-btn {
   position: absolute;
   top: 73px;
@@ -198,7 +194,6 @@
 .reg-top-info { left: calc(50% + 294px); }
 .reg-top-login { left: calc(50% + 459px); }
 
-/* ===== КАРТОЧКА ===== */
 .reg-card {
   position: absolute;
   width: 630px;
@@ -212,7 +207,6 @@
   z-index: 6;
 }
 
-/* ===== ФОРМА ===== */
 .reg-form {
   position: absolute;
   inset: 0;
@@ -295,7 +289,6 @@
 .reg-submit:hover:not(:disabled) { background: #1a1a1a; }
 .reg-submit:disabled { opacity: 0.7; cursor: not-allowed; }
 
-/* Футер: "Уже есть аккаунт? Войти" */
 .reg-footer {
   position: absolute;
   top: 879px;
@@ -384,4 +377,64 @@ a.reg-stripe {
 
 a.reg-stripe:hover {
   opacity: 0.55;
+}
+
+.reg-nav-black {
+  position: absolute;
+  width: 1608px;
+  height: 80px;
+  top: 53px;
+  background: #0b0b0b;
+  border-radius: 100px;
+  box-shadow: 0 0 50px -10px rgba(151, 71, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 100px 0 43px;
+  z-index: 20;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.reg-nav-logo-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  transition: transform 0.2s ease;
+  z-index: 21;
+}
+
+.reg-nav-logo-btn:hover {
+  transform: scale(1.05);
+}
+
+.reg-nav-logo-btn:active {
+  transform: scale(0.98);
+}
+
+.reg-nav-logo-icon {
+  width: 28px;
+  height: 26px;
+  background: #ffffff;
+  flex-shrink: 0;
+  mask-image: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png);
+  -webkit-mask-image: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png);
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
+
+.reg-nav-logo {
+  font-family: 'BrokenLed', sans-serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: #ffffff;
 }

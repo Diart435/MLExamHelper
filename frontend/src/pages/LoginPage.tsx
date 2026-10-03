@@ -16,10 +16,9 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // ЗАГЛУШКА
       await new Promise((resolve) => setTimeout(resolve, 800));
-      setToken('mock_jwt_token_' + Date.now());
-      navigate('/courses');
+      setToken('mock_jwt_token_' + Date.now(), 'Андрей Каранда', 'Студент');
+      navigate('/menu');
     } catch (error) {
       console.error('Ошибка при входе:', error);
       alert('Неверная почта или пароль.');
@@ -31,21 +30,21 @@ const LoginPage = () => {
   return (
     <div className="main-container">
       <div className="bolts" />
-        <div className="chevron" />
-          <div className="nav-green" />
-            <div className="nav-black">
-              <div className="nav-logo-wrap">
-                <span className="nav-logo-icon" />
-                <span className="nav-logo">ai-помощник</span>
-              </div>
-              <Link to="/main-register" className="nav-btn">Регистрация</Link>
-            </div>
-          <div className="top-btn top-btn-info">Информация</div>
-      <Link to="/login" className="top-btn top-btn-login">Вход</Link>
+      <div className="chevron" />
+      <div className="nav-green" />
+      
+      <div className="nav-black">
+        <button 
+          className="nav-logo-btn"
+          onClick={() => navigate('/welcome')}
+        >
+          <span className="nav-logo-icon" />
+          <span className="nav-logo">ai-помощник</span>
+        </button>
+      </div>
 
       <div className="card" />
 
-      {/* Форма */}
       <form className="login-form" onSubmit={handleSubmit}>
         <span className="form-title">Авторизация</span>
 
