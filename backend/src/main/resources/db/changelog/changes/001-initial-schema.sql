@@ -23,12 +23,12 @@ COMMENT ON TABLE users IS 'Пользователи системы';
 -- 2. Таблица courses (Учебные курсы)
 -- =============================================================================
 CREATE TABLE courses (
-    course_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id    UUID NOT NULL,
-    title       VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    course_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_id           UUID NOT NULL,
+    title              VARCHAR(255) NOT NULL,
+    course_description TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_courses_owner FOREIGN KEY (owner_id) 
         REFERENCES users (user_id) ON DELETE CASCADE
@@ -40,13 +40,13 @@ COMMENT ON TABLE courses IS 'Учебные курсы';
 -- 3. Таблица materials (Учебные материалы: файлы/ссылки/видео)
 -- =============================================================================
 CREATE TABLE materials (
-    material_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    course_id   UUID NOT NULL,
-    type        VARCHAR(50) NOT NULL, -- file, link, video, web
-    title       VARCHAR(255) NOT NULL,
-    source_uri  TEXT NOT NULL,       -- путь в S3/MinIO или URL
-    status      VARCHAR(50) NOT NULL DEFAULT 'queued', -- queued, processing, ready, error
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    material_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id       UUID NOT NULL,
+    type_material   VARCHAR(50) NOT NULL, -- file, link, video, web
+    title           VARCHAR(255) NOT NULL,
+    source_uri      TEXT NOT NULL,       -- путь в S3/MinIO или URL
+    status_material VARCHAR(50) NOT NULL DEFAULT 'queued', -- queued, processing, ready, error
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_materials_course FOREIGN KEY (course_id) 
         REFERENCES courses (course_id) ON DELETE CASCADE
@@ -60,7 +60,7 @@ COMMENT ON TABLE materials IS 'Учебные материалы (файлы/с�
 CREATE TABLE material_chunks (
     chunk_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     material_id UUID NOT NULL,
-    text        TEXT NOT NULL,       -- текст чанка (400-800 токенов)
+    text_chunk  TEXT NOT NULL,       -- текст чанка (400-800 токенов)
     page_number INT,                 -- номер страницы (для PDF/DOCX)
     heading     VARCHAR(255),        -- заголовок/раздел
     embedding   vector(1536),        -- векторное представление (размерность 1536)
@@ -82,6 +82,7 @@ CREATE TABLE tests (
     mode               VARCHAR(50) NOT NULL DEFAULT 'training', -- training, exam
     time_limit_minutes INT,          -- лимит времени (в минутах)
     created_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status_test        VARCHAR(50) NOT NULL, --статус теста
 
     CONSTRAINT fk_tests_course FOREIGN KEY (course_id) 
         REFERENCES courses (course_id) ON DELETE CASCADE
@@ -95,8 +96,8 @@ COMMENT ON TABLE tests IS 'Сгенерированные тесты';
 CREATE TABLE test_questions (
     question_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     test_id         UUID NOT NULL,
-    type            VARCHAR(50) NOT NULL, -- single_choice, multi_choice, true_false, open_answer
-    text            TEXT NOT NULL,
+    type_question   VARCHAR(50) NOT NULL, -- single_choice, multi_choice, true_false, open_answer
+    text_question   TEXT NOT NULL,
     options         JSONB,               -- варианты ответов (для закрытых вопросов)
     answer_key      JSONB,               -- эталонный правильный ответ / ключи
     key_points      JSONB,               -- критерии/пункты оценки для открытых вопросов
@@ -169,24 +170,3 @@ CREATE INDEX idx_answers_attempt ON attempt_answers(attempt_id);
 -- Векторный HNSW индекс для косинусного поиска по эмбеддингам
 CREATE INDEX idx_chunks_embedding ON material_chunks 
 USING hnsw (embedding vector_cosine_ops);
-
--- =============================================================================
--- Функция и триггеры автоматического обновления updated_at
--- =============================================================================
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_users_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_courses_updated_at
-    BEFORE UPDATE ON courses
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
