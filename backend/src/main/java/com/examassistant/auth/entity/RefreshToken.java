@@ -1,9 +1,6 @@
 package com.examassistant.auth.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.OffsetDateTime;
@@ -18,6 +15,7 @@ import java.util.UUID;
 @Table(name = "refresh_tokens")
 public class RefreshToken {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(nullable = false, updatable = false)
     private UUID id;
 

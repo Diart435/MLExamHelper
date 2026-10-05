@@ -61,7 +61,7 @@ public class AuthController {
     })
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@Valid @RequestBody RefreshRequest request){
-        return ResponseEntity.ok(authService.refresh(request));
+        return ResponseEntity.ok(authService.refresh(request.getRefreshToken()));
     }
 
     @Operation(
@@ -76,7 +76,7 @@ public class AuthController {
     })
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
-        authService.logout(request);
+        authService.logout(request.getRefreshToken());
         return ResponseEntity.noContent().build();
     }
 }

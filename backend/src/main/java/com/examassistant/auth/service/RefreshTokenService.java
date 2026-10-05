@@ -2,6 +2,8 @@ package com.examassistant.auth.service;
 
 import com.examassistant.auth.entity.RefreshToken;
 import com.examassistant.auth.repository.RefreshTokenRepository;
+import com.examassistant.common.exception.InvalidTokenException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +12,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class RefreshTokenService {
 
     private final RefreshTokenRepository repository;
@@ -38,31 +41,36 @@ public class RefreshTokenService {
     }
 
     @Transactional
+    public void revokeAllByUserId(UUID userId) {
+        log.info("Cleaned {} tokens", repository.revokeAllByUserId(userId));
+    }
+
+    @Transactional
+    public void revokeByToken(String token) {
+        RefreshToken stored = repository.findByToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Token not found"));
+        stored.setRevoked(true);
+        repository.save(stored);
+    }
+
+    @Transactional(readOnly = true)
     public RefreshToken validate(String token) {
-        RefreshToken entity = repository.findByToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Refresh token not found"));
+        RefreshToken stored = repository.findByToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Token not found"));
 
-        if (entity.isRevoked()) {
-            repository.deleteByUserId(entity.getUserId());
-            throw new IllegalStateException("Refresh token was already used");
+        if (stored.isRevoked()) {
+            throw new InvalidTokenException("Token revoked");
         }
 
-        if (entity.getExpiresAt().isBefore(OffsetDateTime.now())) {
-            repository.delete(entity);
-            throw new IllegalArgumentException("Refresh token expired");
+        if (stored.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            throw new InvalidTokenException("Token expired");
         }
 
-        return entity;
+        return stored;
     }
 
     @Transactional
-    public void revoke(RefreshToken token) {
-        token.setRevoked(true);
-        repository.save(token);
-    }
-
-    @Transactional
-    public void revokeAllForUser(UUID userId) {
-        repository.deleteByUserId(userId);
+    public void deleteExpired() {
+        log.info("Deleted {} expired tokens",repository.deleteExpired(OffsetDateTime.now()));
     }
 }

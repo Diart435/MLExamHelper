@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/001-initial-schema.sql
   - include:
       file: db/changelog/changes/002-refresh-tokens.sql
+  - include:
+      file: db/changelog/changes/003-event-publications.sql

@@ -1,6 +1,8 @@
 package com.examassistant.common;
 
 import com.examassistant.common.DTO.ApiError;
+import com.examassistant.common.exception.InvalidTokenException;
+import com.examassistant.common.exception.UserNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,6 +21,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiError> handleConflict(IllegalStateException ex, WebRequest req){
         return build(HttpStatus.CONFLICT, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler({InvalidTokenException.class, UserNotFoundException.class})
+    public ResponseEntity<ApiError> handleNotFound(IllegalStateException ex, WebRequest req){
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 
     @ExceptionHandler(Exception.class)
