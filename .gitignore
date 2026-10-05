@@ -16,6 +16,14 @@ mvnw.cmd
 frontend/dist/
 frontend/build/
 
+tests/.venv/
+tests/__pycache__/
+tests/.pytest_cache/
+.hypothesis/
+.pytest_cache/
+tests/.env.qa
+
+
 *.class
 *.jar
 *.war
