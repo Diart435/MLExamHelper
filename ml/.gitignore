@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+data/*.pdf
+!data/.gitkeep
+!data/sample.pdf
+notebooks/.ipynb_checkpoints/
+CLAUDE.md
