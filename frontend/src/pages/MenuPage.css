@@ -366,13 +366,15 @@
 
 .cabinet-outlet {
   position: absolute;
-  top: 108px;
-  left: 452px;
-  width: calc(100% - 452px);
-  height: calc(100% - 108px);
+  top: 75px;                       /* вплотную под верхней планкой */
+  left: 300px;                     /* ровно ширина сайдбара */
+  width: calc(100% - 300px);       /* растянут до правого края окна */
+  height: calc(100% - 75px);       /* от планки до низа окна */
   overflow-y: auto;
-  padding: 40px 50px;
+  padding: 0;          /* слева 0 — карточка вплотную к сайдбару */
   box-sizing: border-box;
+  z-index: 20;
+  display: block;
 }
 
 .welcome-title {

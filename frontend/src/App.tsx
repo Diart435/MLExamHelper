@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MainRegistrationPage from './pages/MainRegistrationPage';
 import MainPage from './pages/MainPage';
+import SettingsPage from './pages/SettingsPage';
 import CoursesPage from './pages/CoursesPage';
 import MaterialsPage from './pages/MaterialsPage';
 import TestsPage from './pages/TestsPage';
@@ -29,10 +30,11 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/main-register" element={<MainRegistrationPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/welcome" element={<WelcomePage/>}/>
+        <Route path="/welcome" element={<WelcomePage />} />
 
         <Route element={<ProtectedRoute><CabinetLayout /></ProtectedRoute>}>
           <Route path="/menu" element={<MainPage />} />
+          <Route path="/menu/settings" element={<SettingsPage />} />
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/:courseId/materials" element={<MaterialsPage />} />
           <Route path="/tests/:testId" element={<TestsPage />} />

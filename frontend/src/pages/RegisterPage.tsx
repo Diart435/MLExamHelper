@@ -18,13 +18,15 @@ const RegisterPage = () => {
     }
     setIsLoading(true);
     try {
-      // Имитация задержки сети
       await new Promise((resolve) => setTimeout(resolve, 800));
 
+      // ДОСТАЁМ ДАННЫЕ С ПЕРВОГО ШАГА
       const email = sessionStorage.getItem('pendingEmail') || '';
+      const password = sessionStorage.getItem('pendingPassword') || ''; 
 
       const newUser = {
         email: email,
+        password: password,
         firstName: firstName,
         lastName: lastName,
         role: 'Студент'

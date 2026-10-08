@@ -2,43 +2,50 @@ import { create } from 'zustand';
 
 interface AuthState {
   token: string | null;
-  isAuthenticated: boolean;
-  userName: string | null;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
   userRole: string | null;
-  
-  setToken: (token: string, name?: string, role?: string) => void; // Обновлена сигнатура
+  isAuthenticated: boolean;
+  setToken: (token: string, email: string, firstName: string, lastName: string, role: string) => void;
+  updateUser: (firstName?: string, lastName?: string, email?: string) => void;
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  token: localStorage.getItem('access_token'),
-  isAuthenticated: !!localStorage.getItem('access_token'),
-  userName: localStorage.getItem('user_name') || null,
-  userRole: localStorage.getItem('user_role') || null,
-  
-  setToken: (token: string, name?: string, role?: string) => {
-    localStorage.setItem('access_token', token);
-    
-    if (name) localStorage.setItem('user_name', name);
-    if (role) localStorage.setItem('user_role', role);
-    
-    set({ 
-      token, 
-      isAuthenticated: true, 
-      userName: name || localStorage.getItem('user_name'), 
-      userRole: role || localStorage.getItem('user_role') 
+export const useAuthStore = create<AuthState>((set, get) => ({
+  token: null,
+  email: null,
+  firstName: null,
+  lastName: null,
+  userRole: null,
+  isAuthenticated: false,
+
+  setToken: (token, email, firstName, lastName, role) =>
+    set({
+      token,
+      email,
+      firstName,
+      lastName,
+      userRole: role,
+      isAuthenticated: true,
+    }),
+
+  updateUser: (newFirstName, newLastName, newEmail) => {
+    const state = get();
+    set({
+      firstName: newFirstName ?? state.firstName,
+      lastName: newLastName ?? state.lastName,
+      email: newEmail ?? state.email,
     });
   },
-  
-  logout: () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user_name');
-    localStorage.removeItem('user_role');
-    set({ 
-      token: null, 
-      isAuthenticated: false, 
-      userName: null, 
-      userRole: null 
-    });
-  },
+
+  logout: () =>
+    set({
+      token: null,
+      email: null,
+      firstName: null,
+      lastName: null,
+      userRole: null,
+      isAuthenticated: false,
+    }),
 }));

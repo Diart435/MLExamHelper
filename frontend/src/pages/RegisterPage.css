@@ -147,7 +147,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 100px 0 43px;
+  padding: 0 43px 0 100px;
   z-index: 4;
   left: 50%;
   transform: translateX(-50%);
@@ -390,7 +390,7 @@ a.reg-stripe:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 100px 0 43px;
+  padding: 0 43px 0 100px;
   z-index: 20;
   left: 50%;
   transform: translateX(-50%);
@@ -433,8 +433,9 @@ a.reg-stripe:hover {
 }
 
 .reg-nav-logo {
-  font-family: 'BrokenLed', sans-serif;
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
   font-size: 22px;
   font-weight: 600;
   color: #ffffff;
+  line-height: 1;
 }

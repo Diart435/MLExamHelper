@@ -4,13 +4,15 @@ import '../pages/MenuPage.css';
 
 const CabinetLayout = () => {
   const logout = useAuthStore((state) => state.logout);
-
-  const userName = useAuthStore((state) => state.userName) || 'Пользователь';
+  const firstName = useAuthStore((state) => state.firstName) || 'Пользователь';
+  const lastName = useAuthStore((state) => state.lastName) || '';
   const userRole = useAuthStore((state) => state.userRole) || 'Студент';
   
   const navigate = useNavigate();
 
-  const getInitials = (name: string | null) => {
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  const getInitials = (name: string) => {
     if (!name) return 'П';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
@@ -19,7 +21,7 @@ const CabinetLayout = () => {
     return name.substring(0, 2).toUpperCase();
   };
 
-  const userInitials = getInitials(userName);
+  const userInitials = getInitials(fullName);
 
   const handleLogout = () => {
     logout();
@@ -50,7 +52,7 @@ const CabinetLayout = () => {
         <div className="user-profile-block v15_934">
           <div className="avatar-bg-circle" />
           <div className="avatar-circle v15_935">{userInitials}</div>
-          <h2 className="user-name v15_940">{userName}</h2>
+          <h2 className="user-name v15_940">{fullName}</h2>
           <p className="user-role v15_939">{userRole}</p>
         </div>
 
@@ -63,7 +65,7 @@ const CabinetLayout = () => {
             }
           >
             <span className="icon-home" />
-            Главная
+            Курсы
           </NavLink>
           <NavLink
             to="/courses"
@@ -93,20 +95,27 @@ const CabinetLayout = () => {
             Мой прогресс
           </NavLink>
         </nav>
-        <div className="settings-block v15_959">
-            <div className="settings-wrapper">
-                <div className="settings-white-area">
-                <div className="bump green top-left" />
-                <div className="bump green top-right" />
+       <div className="settings-block v15_959">
+          <div className="settings-wrapper">
+            <div className="settings-white-area">
+              <div className="bump green top-left" />
+              <div className="bump green top-right" />
 
-                <button className="settings-pill v15_961" type="button">
-                    <span className="icon-sun" />
-                    Настройки
-                </button>
-                <div className="bump green bottom-left" />
-                <div className="bump green bottom-right" />
-                </div>
+              {/* ← ЗДЕСЬ БЫЛА ПРОБЛЕМА. Теперь NavLink, как у остальных */}
+              <NavLink
+                to="/menu/settings"
+                className={({ isActive }) =>
+                  `settings-pill v15_961${isActive ? ' menu-item-active' : ''}`
+                }
+              >
+                <span className="icon-sun" />
+                Настройки
+              </NavLink>
+
+              <div className="bump green bottom-left" />
+              <div className="bump green bottom-right" />
             </div>
+          </div>
         </div>
       </aside>
 

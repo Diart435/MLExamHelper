@@ -1,0 +1,183 @@
+/* Контейнер контента настроек */
+.settings-content-wrapper {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  position: relative;
+  z-index: 10;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* Общие стили для всех секций */
+.settings-section {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #000000;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+/* Шапка настроек */
+.settings-header-section {
+  min-height: 130px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0;
+  padding: 30px 40px;
+
+  background-color: #FFFFFF;
+
+  /* Одна и та же звезда в двух слоях — даёт зигзаг */
+  background-image: url('./assets/star.png');
+
+  background-repeat: repeat, repeat;
+  background-size: 59px 59px, 59px 59px;
+
+  /* Слой 1: звёзды вверху. Слой 2: те же звёзды сдвинуты на полшага вправо и на 50px вниз */
+  background-position: 0 0, 132px 50px;
+}
+
+.settings-title {
+  font-family: 'BrokenLed', sans-serif;
+  font-size: 40px;
+  color: #000000;
+  margin: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.settings-subtitle {
+  font-family: 'BrokenLed', sans-serif;
+  font-size: 30px;
+  color: #000000;
+  margin: 10px 0 0 0;
+  position: relative;
+  z-index: 10;
+}
+
+/* Профиль — прилипает к шапке */
+.profile-section {
+  min-height: 220px;
+  margin-top: 0;
+  padding: 0;
+}
+
+/* Смена пароля — с отступом от «Профиля» */
+.password-section {
+  min-height: 220px;
+  margin-top: 40px;
+  padding: 0;
+}
+
+/* Обёртка заголовка секции — вплотную к верхнему левому углу */
+.section-title-wrapper {
+  display: inline-block;
+  background: #FFFFFF;
+  border: 1px solid #000000;
+  border-radius: 0;
+  padding: 10px 24px;
+  margin: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.section-title {
+  font-family: 'BrokenLed', sans-serif;
+  font-size: 32px;
+  color: #000000;
+  margin: 0;
+  position: relative;
+  z-index: 10;
+}
+
+/* Поля ввода */
+.inputs-row,
+.password-row {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 0 40px;
+  margin-top: 25px;
+  box-sizing: border-box;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.input-label {
+  font-family: 'Tektur', sans-serif;
+  font-size: 24px;
+  color: #292929;
+  letter-spacing: -0.05em;
+  position: relative;
+  z-index: 10;
+}
+
+.input-wrapper {
+  position: relative;
+  width: 100%;
+  height: 64px;
+  z-index: 10;
+}
+
+.custom-input {
+  width: 100%;
+  height: 100%;
+  background: #FFFFFF;
+  border: 5px solid #DECFFB;
+  border-radius: 8px;
+  padding: 0 13px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 500;
+  font-size: 20px;
+  color: #646464;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.custom-input::placeholder {
+  color: #646464;
+}
+
+.custom-input:focus {
+  border-color: #BE9FF6;
+}
+
+/* Кнопки */
+.apply-btn,
+.change-btn {
+  display: block;
+  margin: 25px 40px 30px auto;
+  width: 200px;
+  height: 45px;
+  background: #925FF0;
+  border-radius: 25px;
+  border: none;
+  color: #FFFFFF;
+  font-family: 'Poppins', sans-serif;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  z-index: 10;
+}
+
+.apply-btn:hover,
+.change-btn:hover {
+  background: #7d4de0;
+  transform: scale(1.05);
+}

@@ -13,19 +13,35 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setToken('mock_jwt_token_' + Date.now(), 'Андрей Каранда', 'Студент');
+  e.preventDefault();
+  setIsLoading(true);
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    // Ищем пользователя в localStorage по email
+    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
+    const user = users.find((u: any) => u.email === email && u.password === password);
+
+    if (user) {
+      // Пользователь найден — передаём его данные
+      setToken(
+        'mock_jwt_token_' + Date.now(),
+        user.email,              // <-- ДОБАВЬ EMAIL
+        user.firstName,
+        user.lastName,
+        user.role || 'Студент'
+      );
       navigate('/menu');
-    } catch (error) {
-      console.error('Ошибка при входе:', error);
-      alert('Неверная почта или пароль.');
-    } finally {
-      setIsLoading(false);
+    } else {
+      alert('Аккаунт не найден. Проверьте email и пароль или зарегистрируйтесь.');
     }
-  };
+  } catch (error) {
+    console.error('Ошибка при входе:', error);
+    alert('Ошибка при входе. Попробуйте снова.');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="main-container">
