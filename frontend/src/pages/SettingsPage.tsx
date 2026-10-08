@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import './SettingsPage.css';
 
 const SettingsPage = () => {
-  const navigate = useNavigate();
-  
+ 
   // Получаем данные из store
   const email = useAuthStore((state) => state.email) || '';
   const firstName = useAuthStore((state) => state.firstName) || '';
