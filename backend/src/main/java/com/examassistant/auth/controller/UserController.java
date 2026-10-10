@@ -26,19 +26,19 @@ public class UserController {
     @Operation(summary = "Update a personal data",
             description = "Returns a void")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Personal data updated"),
+            @ApiResponse(responseCode = "204", description = "Personal data updated"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     @PostMapping("/change/personal")
     public ResponseEntity<?> changePersonal(@Valid @RequestBody PersonalChangeRequest request, @AuthenticationPrincipal CustomUserDetails userDetails){
-        userService.changePersonal(request.getFirstName(), request.getLastName(), userDetails.getUserId());
+        userService.changePersonal(request.getEmail(), request.getFirstName(), request.getLastName(), userDetails.getUserId());
         return ResponseEntity.noContent().build();
     }
     @Operation(summary = "Update a password",
               description = "Returns a void")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Password updated"),
+            @ApiResponse(responseCode = "204", description = "Password updated"),
             @ApiResponse(responseCode = "400", description = "Bad request"),
             @ApiResponse(responseCode = "404", description = "User not found")
     })

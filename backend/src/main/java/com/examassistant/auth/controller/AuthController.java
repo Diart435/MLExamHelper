@@ -3,11 +3,13 @@ package com.examassistant.auth.controller;
 import com.examassistant.auth.DTO.*;
 import com.examassistant.auth.service.AuthService;
 import com.examassistant.auth.service.RefreshTokenService;
+import com.examassistant.common.exception.InvalidTokenException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -91,8 +93,11 @@ public class AuthController {
             @ApiResponse(responseCode = "404", description = "Not found")
     })
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResult> refresh(@CookieValue(name = "refresh_token") String refreshToken,
+    public ResponseEntity<AuthResult> refresh(@CookieValue(name = "refresh_token", required = false) String refreshToken,
                                      HttpServletResponse response){
+        if(refreshToken == null){
+            throw new InvalidTokenException("Refresh token is null");
+        }
        IssuedTokens tokens = authService.refresh(refreshToken);
 
 
@@ -118,7 +123,10 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@CookieValue(name = "refresh_token") String refreshToken) {
+    public ResponseEntity<Void> logout(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
+        if(refreshToken == null){
+            throw new InvalidTokenException("Refresh token is null");
+        }
         authService.logout(refreshToken);
         return ResponseEntity.noContent().build();
     }
