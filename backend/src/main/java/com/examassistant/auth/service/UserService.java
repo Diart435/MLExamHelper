@@ -30,9 +30,10 @@ public class UserService {
     }
 
     @Transactional
-    public void changePersonal(String firstName, String lastName, UUID id){
+    public void changePersonal(String email, String firstName, String lastName, UUID id){
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id.toString()));;
+                .orElseThrow(() -> new UserNotFoundException(id.toString()));
+        user.setEmail(email);
         user.setFirstName(firstName);
         user.setLastName(lastName);
     }
