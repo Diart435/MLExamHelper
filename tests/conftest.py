@@ -1,99 +1,52 @@
 import os
 import time
-from dataclasses import dataclass
+from typing import AsyncGenerator
 
+import httpx
 import pytest
-from dotenv import load_dotenv
-from httpx import AsyncClient, Timeout
+import pytest_asyncio
 
 
-load_dotenv("tests/.env.test")
-
-
-@dataclass(frozen=True)
-class Settings:
-    api_base_url: str
-    request_timeout: int
-    password: str
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+REQUEST_TIMEOUT = float(os.getenv("API_REQUEST_TIMEOUT", "30"))
+DEFAULT_PASSWORD = os.getenv("API_TEST_PASSWORD", "Strong123!")
 
 
 @pytest.fixture(scope="session")
-def settings() -> Settings:
-    return Settings(
-        api_base_url=os.getenv(
-            "QA_API_BASE_URL",
-            "http://localhost:8000",
-        ),
-        request_timeout=int(
-            os.getenv("QA_REQUEST_TIMEOUT", "30")
-        ),
-        password=os.getenv(
-            "QA_TEST_PASSWORD",
-            "Strong123!",
-        ),
-    )
+def settings() -> dict:
+    return {
+        "api_base_url": BASE_URL,
+        "request_timeout": REQUEST_TIMEOUT,
+        "password": DEFAULT_PASSWORD,
+    }
 
 
-@pytest.fixture
-async def api_client(settings: Settings):
-    async with AsyncClient(
-        base_url=settings.api_base_url,
-        timeout=Timeout(settings.request_timeout),
+@pytest_asyncio.fixture
+async def api_client() -> AsyncGenerator[httpx.AsyncClient, None]:
+    async with httpx.AsyncClient(
+        base_url=BASE_URL,
+        timeout=REQUEST_TIMEOUT,
     ) as client:
         yield client
 
 
 @pytest.fixture
-def unique_email() -> str:
+def registration_payload(settings: dict) -> dict:
     timestamp = int(time.time() * 1000)
-    return f"qa.user.{timestamp}@example.test"
 
-
-@pytest.fixture
-def registration_payload(
-    unique_email: str,
-    settings: Settings,
-) -> dict:
     return {
-        "email": unique_email,
-        "password": settings.password,
+        "email": f"qa.user.{timestamp}@example.test",
+        "password": settings["password"],
         "firstName": "Иван",
         "lastName": "Иванов",
     }
 
 
-def assert_auth_response(body: dict) -> None:
-    required_fields = {
-        "userId",
-        "email",
-        "firstName",
-        "lastName",
-        "accessToken",
-        "refreshToken",
-    }
-
-    missing = required_fields - body.keys()
-
-    assert not missing, (
-        f"Missing AuthResponse fields: {missing}"
-    )
-
-    assert body["userId"]
-    assert body["email"]
-    assert body["firstName"]
-    assert body["lastName"]
-    assert body["accessToken"]
-    assert body["refreshToken"]
-
-    assert "password" not in body
-    assert "passwordHash" not in body
-
-
-@pytest.fixture
+@pytest_asyncio.fixture
 async def registered_user(
-    api_client: AsyncClient,
+    api_client: httpx.AsyncClient,
     registration_payload: dict,
-):
+) -> dict:
     response = await api_client.post(
         "/api/auth/register",
         json=registration_payload,
@@ -106,6 +59,7 @@ async def registered_user(
     )
 
     body = response.json()
+
     assert_auth_response(body)
 
     return {
@@ -114,37 +68,29 @@ async def registered_user(
     }
 
 
-@pytest.fixture
-async def logged_in_user(
-    api_client: AsyncClient,
-    registered_user: dict,
-):
-    payload = registered_user["payload"]
-
-    response = await api_client.post(
-        "/api/auth/login",
-        json={
-            "email": payload["email"],
-            "password": payload["password"],
-        },
-    )
-
-    assert response.status_code == 200, (
-        f"Login failed: "
-        f"status={response.status_code}; "
-        f"body={response.text!r}"
-    )
-
-    body = response.json()
-    assert_auth_response(body)
-
-    return body
-
-
-@pytest.fixture
-def auth_headers(logged_in_user: dict) -> dict:
-    return {
-        "Authorization": (
-            f"Bearer {logged_in_user['accessToken']}"
-        )
+def assert_auth_response(body: dict) -> None:
+    required_fields = {
+        "userId",
+        "email",
+        "firstName",
+        "lastName",
+        "accessToken",
     }
+
+    missing = required_fields - body.keys()
+
+    assert not missing, (
+        f"Missing AuthResponse fields: {missing}"
+    )
+
+    assert body["userId"]
+    assert body["email"]
+    assert body["accessToken"]
+
+    assert isinstance(body["userId"], str)
+    assert isinstance(body["email"], str)
+    assert isinstance(body["accessToken"], str)
+
+    assert "password" not in body
+    assert "passwordHash" not in body
+    assert "refreshToken" not in body
