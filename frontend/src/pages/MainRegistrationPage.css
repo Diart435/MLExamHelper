@@ -12,6 +12,7 @@
 .mr-page input,
 .mr-page button { outline: 0; }
 
+/* ===== ФОН И ДЕКОР ===== */
 .mr-bolts {
   position: absolute;
   top: 0;
@@ -124,6 +125,7 @@
   z-index: 2;
 }
 
+/* ===== НАВБАР ===== */
 .mr-nav-green {
   position: absolute;
   width: 1657px;
@@ -135,76 +137,6 @@
   box-shadow: 0 0 50px 0 rgba(151, 71, 255, 0.08);
   z-index: 3;
 }
-
-.mr-nav-black {
-  position: absolute;
-  width: 1608px;
-  height: 80px;
-  top: 53px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #0b0b0b;
-  border-radius: 100px;
-  box-shadow: 0 0 50px 0 rgba(151, 71, 255, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 100px 0 43px;
-  z-index: 20;
-}
-
-.mr-nav-logo-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.mr-nav-logo-icon {
-  width: 27px;
-  height: 27px;
-  background: url(https://static.codia.ai/image/2026-09-30/4fZXxYKSg0.png) no-repeat center / 100% 100%;
-}
-
-.mr-nav-logo {
-  color: #ffffff;
-  font-family: BrokenLed, Poppins, sans-serif;
-  font-size: 20px;
-  line-height: 20px;
-}
-
-.mr-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 140px;
-  height: 40px;
-  background: #925ff0;
-  border-radius: 40px;
-  color: #ffffff;
-  font-size: 16px;
-  letter-spacing: -0.8px;
-  text-transform: capitalize;
-}
-
-.mr-top-btn {
-  position: absolute;
-  top: 73px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 24px;
-  background: #925ff0;
-  border-radius: 40px;
-  color: #ffffff;
-  font-size: 16px;
-  letter-spacing: -0.8px;
-  text-decoration: none;
-  z-index: 5;
-}
-
-.mr-top-info { left: calc(50% + 294px); }
-.mr-top-login { left: calc(50% + 459px); }
 
 .mr-card {
   position: absolute;
@@ -219,6 +151,7 @@
   z-index: 6;
 }
 
+/* ===== ФОРМА ===== */
 .mr-form {
   position: absolute;
   inset: 0;
@@ -282,7 +215,6 @@
 .mr-field-input::placeholder { color: rgba(0, 0, 0, 0.5); }
 .mr-field-input:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* Кнопка-глаз для показа/скрытия пароля */
 .mr-eye-btn {
   flex-shrink: 0;
   width: 20px;
@@ -322,7 +254,6 @@
 .mr-submit:hover:not(:disabled) { background: #1a1a1a; }
 .mr-submit:disabled { opacity: 0.7; cursor: not-allowed; }
 
-
 .mr-footer {
   position: absolute;
   top: 879px;
@@ -356,25 +287,6 @@
 
 .mr-footer-link:hover { text-decoration: underline; }
 
-/* ===== ШРИФТЫ ===== */
-.mr-page,
-.mr-page input,
-.mr-page button,
-.mr-field-label,
-.mr-field-input,
-.mr-submit,
-.mr-footer-text,
-.mr-footer-link,
-.mr-nav-btn,
-.mr-top-btn {
-  font-family: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-
-.mr-title,
-.mr-nav-logo {
-  font-family: BrokenLed, Poppins, sans-serif;
-}
-
 .mr-stripe {
   position: absolute;
   width: 153px;
@@ -402,34 +314,54 @@ a.mr-stripe:hover {
   opacity: 0.55;
 }
 
+/* ===== ШРИФТЫ ===== */
+.mr-page,
+.mr-page input,
+.mr-page button,
+.mr-field-label,
+.mr-field-input,
+.mr-submit,
+.mr-footer-text,
+.mr-footer-link {
+  font-family: Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.mr-title {
+  font-family: BrokenLed, Poppins, sans-serif;
+}
+
+/* =========================================================
+   НАВБАР И ЛОГОТИП (ИДЕНТИЧНО LOGIN PAGE, БЕЗ ДУБЛЕЙ)
+   ========================================================= */
 .mr-nav-black {
   position: absolute;
   width: 1608px;
   height: 80px;
-  top: 53px;
   left: 50%;
-  transform: translateX(-50%);
+  top: 53px;
   background: #0b0b0b;
   border-radius: 100px;
-  box-shadow: 0 0 50px 0 rgba(151, 71, 255, 0.08);
+  box-shadow: 0 0 50px -10px rgba(151, 71, 255, 0.08);
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  padding: 0 100px 0 43px;
+  justify-content: space-between;
+  padding: 0 43px 0 100px; /* 43px слева - как в Login */
   z-index: 20;
+  transform: translateX(-50%);
 }
 
 .mr-nav-logo-btn {
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 8px 28px;
+  padding: 8px 28px; /* Ровно как в Login */
   display: flex;
   align-items: center;
   gap: 10px;
   pointer-events: auto;
   transition: transform 0.2s ease;
   z-index: 21;
+  margin: 0;
 }
 
 .mr-nav-logo-btn:hover {
@@ -456,8 +388,9 @@ a.mr-stripe:hover {
 }
 
 .mr-nav-logo {
-  font-family: 'BrokenLed', sans-serif;
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
   font-size: 22px;
   font-weight: 600;
   color: #ffffff;
+  line-height: 1;
 }

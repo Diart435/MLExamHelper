@@ -16,30 +16,44 @@ const MainRegistrationPage = () => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-        alert('Пароли не совпадают!');
-        return;
+      alert('Пароли не совпадают!');
+      return;
     }
 
     if (password.length < 6) {
-        alert('Пароль должен содержать минимум 6 символов.');
-        return;
+      alert('Пароль должен содержать минимум 6 символов.');
+      return;
     }
+
+    // === ПРОВЕРКА НА СУЩЕСТВОВАНИЕ ПОЛЬЗОВАТЕЛЯ С ТАКОЙ ПОЧТОЙ ===
+    const existingUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
+    const userExists = existingUsers.some(
+      (u: any) => u.email.toLowerCase().trim() === email.toLowerCase().trim()
+    );
+
+    if (userExists) {
+      alert('Пользователь с такой почтой уже зарегистрирован. Пожалуйста, войдите в систему или используйте другую почту.');
+      return; // Прерываем выполнение, не переходим на следующий шаг
+    }
+    // ============================================================
 
     setIsLoading(true);
     try {
-        // ЗАГЛУШКА
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        console.log('Шаг 1 регистрации:', { email, password });
-        sessionStorage.setItem('pendingEmail', email);
-        sessionStorage.setItem('pendingPassword', password);
-        navigate('/register');
+      // ЗАГЛУШКА
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      console.log('Шаг 1 регистрации:', { email, password });
+      
+      sessionStorage.setItem('pendingEmail', email);
+      sessionStorage.setItem('pendingPassword', password);
+      
+      navigate('/register');
     } catch (error) {
-        console.error('Ошибка при регистрации:', error);
-        alert('Ошибка при создании аккаунта. Попробуйте снова.');
+      console.error('Ошибка при регистрации:', error);
+      alert('Ошибка при создании аккаунта. Попробуйте снова.');
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-    };
+  };
 
   return (
     <div className="mr-page">
@@ -47,6 +61,8 @@ const MainRegistrationPage = () => {
       <div className="mr-chevron" />
 
       <div className="mr-nav-green" />
+      
+      {/* НАВБАР С ЛОГОТИПОМ */}
       <div className="mr-nav-black">
         <button 
           className="mr-nav-logo-btn" 
@@ -134,12 +150,11 @@ const MainRegistrationPage = () => {
         </button>
 
         <span className="mr-stripe mr-stripe-left mr-stripe-active" />
-            <Link
-            to="/register"
-            className="mr-stripe mr-stripe-right"
-            title="Перейти к шагу 2: имя, фамилия и предметы"
-            />
-
+        <Link
+          to="/register"
+          className="mr-stripe mr-stripe-right"
+          title="Перейти к шагу 2: имя, фамилия и предметы"
+        />
 
         <div className="mr-footer">
           <span className="mr-footer-line" />
