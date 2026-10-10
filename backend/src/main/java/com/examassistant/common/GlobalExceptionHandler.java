@@ -1,7 +1,9 @@
 package com.examassistant.common;
 
 import com.examassistant.common.DTO.ApiError;
+import com.examassistant.common.exception.InvalidCredentialsException;
 import com.examassistant.common.exception.InvalidTokenException;
+import com.examassistant.common.exception.UserAlreadyExistException;
 import com.examassistant.common.exception.UserNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
@@ -32,19 +34,19 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<ApiError> handleConflict(IllegalStateException ex, WebRequest req){
+    @ExceptionHandler(UserAlreadyExistException.class)
+    public ResponseEntity<ApiError> handleConflict(UserAlreadyExistException ex, WebRequest req){
         return build(HttpStatus.CONFLICT, ex.getMessage(), req);
     }
 
-    @ExceptionHandler(InvalidTokenException.class)
-    public ResponseEntity<ApiError> handleInvalidToken(InvalidTokenException ex, WebRequest req){
-        return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), req);
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(UserNotFoundException ex, WebRequest req){
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ApiError> handleUserNotFound(UserNotFoundException ex, WebRequest req){
-        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
+    @ExceptionHandler({InvalidTokenException.class, InvalidCredentialsException.class})
+    public ResponseEntity<ApiError> handleInvalidToken(Exception ex, WebRequest req){
+        return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), req);
     }
 
     @ExceptionHandler(Exception.class)

@@ -14,6 +14,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     Optional<RefreshToken> findByToken(String token);
 
+    @Query("SELECT rt.token FROM RefreshToken rt WHERE rt.userId = :userId AND rt.revoked = false AND rt.expiresAt > :now")
+    Optional<String> findFirstToken(@Param("userId") UUID userId, @Param("now") OffsetDateTime now);
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE RefreshToken rt SET rt.revoked = true " +
             "WHERE rt.userId = :userId AND rt.revoked = false")

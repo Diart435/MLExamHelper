@@ -1,13 +1,12 @@
 package com.examassistant.auth.service;
 
-import com.examassistant.auth.DTO.AuthResponse;
-import com.examassistant.auth.DTO.LoginRequest;
-import com.examassistant.auth.DTO.RefreshRequest;
-import com.examassistant.auth.DTO.RegisterRequest;
+import com.examassistant.auth.DTO.*;
 import com.examassistant.auth.entity.RefreshToken;
 import com.examassistant.auth.entity.User;
 import com.examassistant.auth.repository.RefreshTokenRepository;
 import com.examassistant.auth.repository.UserRepository;
+import com.examassistant.common.exception.InvalidCredentialsException;
+import com.examassistant.common.exception.UserAlreadyExistException;
 import com.examassistant.common.exception.UserNotFoundException;
 import com.examassistant.security.service.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +30,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest req) {
         if (userRepository.existsByEmail(req.getEmail())) {
-            throw new IllegalArgumentException("Email already registered");
+            throw new UserAlreadyExistException("Email already registered");
         }
 
         User user = new User();
@@ -41,31 +40,31 @@ public class AuthService {
         user.setLastName(req.getLastName());
         user.setCreatedAt(OffsetDateTime.now());
         user.setUpdatedAt(OffsetDateTime.now());
-        userRepository.save(user);
+        User saved = userRepository.save(user);
 
-        return issueTokens(user);
+        return getAuth(saved);
     }
     @Transactional
     public AuthResponse login(LoginRequest req) {
         log.info("Login attempt: email={}", req.getEmail());
 
         User user = userRepository.findByEmail(req.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new InvalidCredentialsException("This email doesn't exist"));
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new InvalidCredentialsException("Password is incorrect");
         }
 
         refreshTokenService.revokeAllByUserId(user.getUserId());
 
-        return issueTokens(user);
+        return getAuth(user);
     }
 
     @Transactional
-    public AuthResponse refresh(String oldRefreshToken) {
+    public IssuedTokens refresh(String refreshToken) {
         log.info("Refresh attempt");
 
-        RefreshToken stored = refreshTokenService.validate(oldRefreshToken);
+        RefreshToken stored = refreshTokenService.validate(refreshToken);
 
         stored.setRevoked(true);
         repository.save(stored);
@@ -73,23 +72,23 @@ public class AuthService {
         User user = userRepository.findById(stored.getUserId())
                 .orElseThrow(() -> new UserNotFoundException(stored.getUserId().toString()));
 
-        return issueTokens(user);
+        String access = jwtService.generate(user.getUserId(), user.getEmail());
+        String refresh = refreshTokenService.create(user.getUserId());
+
+        return new IssuedTokens(access, refresh);
     }
     @Transactional
     public void logout(String refreshToken) {
         refreshTokenService.revokeByToken(refreshToken);
     }
 
-    private AuthResponse issueTokens(User user) {
-        String access = jwtService.generate(user.getUserId(), user.getEmail());
-        String refresh = refreshTokenService.create(user.getUserId());
+    private AuthResponse getAuth(User user){
         return new AuthResponse(
-                user.getUserId(),
+                user.getUserId().toString(),
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
-                access,
-                refresh
+                jwtService.generate(user.getUserId(), user.getEmail())
         );
     }
 }

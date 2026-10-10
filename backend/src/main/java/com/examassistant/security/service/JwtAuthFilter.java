@@ -1,5 +1,6 @@
 package com.examassistant.security.service;
 
+import com.examassistant.security.model.CustomUserDetails;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -24,7 +25,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         String header = request.getHeader("Authorization");
-        if(header == null || !header.startsWith("Bearer: ")){
+        if(header == null || !header.startsWith("Bearer ")){
             chain.doFilter(request,response);
             return;
         }
@@ -35,10 +36,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             UUID userId = UUID.fromString(claims.getSubject());
             String email = claims.get("email", String.class);
 
-            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+            CustomUserDetails userDetails = new CustomUserDetails(
                     userId,
-                    null,
+                    email,
                     List.of(new SimpleGrantedAuthority("ROLE_USER"))
+            );
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities()
             );
             auth.setDetails(email);
             SecurityContextHolder.getContext().setAuthentication(auth);
