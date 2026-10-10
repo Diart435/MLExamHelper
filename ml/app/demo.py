@@ -22,7 +22,6 @@ async def main() -> None:
     setup_logging()
     rag = RAGService()
 
-    # === 1. "ingest" flow (минуя MinIO — берём локальный PDF) ===
     text = extract_text("data/Лекция_№1_Модел_е_как_основной_метод_исслед_я_сложных_систем.pdf")
     chunks_n = await rag.index_material(101, text)
     print(f"\n[INGEST] Indexed {chunks_n} chunks from sample.pdf into material 101")
