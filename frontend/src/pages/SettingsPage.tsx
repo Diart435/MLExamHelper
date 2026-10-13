@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { changePersonal, changePassword } from '../api/user';
 import './SettingsPage.css';
 
 const SettingsPage = () => {
- 
-  // Получаем данные из store
+  // Получаем данные и функцию обновления из store
   const email = useAuthStore((state) => state.email) || '';
   const firstName = useAuthStore((state) => state.firstName) || '';
   const lastName = useAuthStore((state) => state.lastName) || '';
   const updateUser = useAuthStore((state) => state.updateUser);
 
-  // Локальные состояния (предзаполнены текущими данными)
+  // Локальные состояния
   const [newFirstName, setNewFirstName] = useState(firstName);
   const [newLastName, setNewLastName] = useState(lastName);
   const [newEmail, setNewEmail] = useState(email);
@@ -18,94 +18,73 @@ const SettingsPage = () => {
   const [newPassword, setNewPassword] = useState('');
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Обновляем локальные состояния, если данные в store изменились
+  // Синхронизируем локальные состояния, если данные в store изменились
   useEffect(() => {
     setNewFirstName(firstName);
     setNewLastName(lastName);
     setNewEmail(email);
   }, [firstName, lastName, email]);
 
-  const handleApplyProfile = () => {
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const userIndex = users.findIndex((u: any) => u.email === email);
-
-    if (userIndex === -1) {
-      alert('Пользователь не найден в системе. Войдите заново.');
+  const handleApplyProfile = async () => {
+    if (!newFirstName.trim() || !newLastName.trim() || !newEmail.trim()) {
+      alert('Все поля профиля должны быть заполнены!');
       return;
     }
 
-    // Если поле не пустое — обновляем, иначе оставляем старое
-    const updatedUser = {
-      ...users[userIndex],
-      firstName: newFirstName.trim() || users[userIndex].firstName,
-      lastName: newLastName.trim() || users[userIndex].lastName,
-      email: newEmail.trim() || users[userIndex].email,
-    };
-
-    // Проверяем, не занят ли новый email другим пользователем
-    if (newEmail.trim() && newEmail.trim() !== email) {
-      const emailExists = users.some(
-        (u: any) => u.email.toLowerCase() === newEmail.trim().toLowerCase()
-      );
-      if (emailExists) {
-        alert('Эта почта уже используется другим пользователем!');
-        return;
-      }
+    setIsLoading(true);
+    try {
+      // 1. Реальный запрос к API
+      await changePersonal({
+        email: newEmail.trim(),
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+      });
+      
+      // 2. Обновляем store, чтобы сайдбар мгновенно отобразил новые данные
+      updateUser(newFirstName.trim(), newLastName.trim(), newEmail.trim());
+      
+      alert('Профиль успешно обновлён!');
+    } catch (error: any) {
+      console.error('Ошибка обновления профиля:', error);
+      const errorMsg = error.response?.data?.message || 'Ошибка при обновлении профиля. Возможно, эта почта уже занята.';
+      alert(errorMsg);
+    } finally {
+      setIsLoading(false);
     }
-
-    users[userIndex] = updatedUser;
-    localStorage.setItem('mock_users', JSON.stringify(users));
-
-    // Обновляем store (если поле пустое — передаём undefined, чтобы оставить старое)
-    updateUser(
-      newFirstName.trim() || undefined,
-      newLastName.trim() || undefined,
-      newEmail.trim() || undefined
-    );
-
-    alert('Профиль успешно обновлён!');
   };
 
-  const handleChangePassword = () => {
-    if (!oldPassword.trim() || !newPassword.trim()) {
-      alert('Заполните оба поля пароля!');
+  const handleChangePassword = async () => {
+    if (!newPassword.trim()) {
+      alert('Введите новый пароль!');
+      return;
+    }
+    if (newPassword.length < 8) {
+      alert('Новый пароль должен содержать минимум 8 символов!');
       return;
     }
 
-    if (newPassword.length < 6) {
-      alert('Новый пароль должен содержать минимум 6 символов!');
-      return;
+    setIsLoading(true);
+    try {
+      // Согласно твоей спецификации API, бэкенд принимает только { password: string }
+      // Если бэкенд на самом деле требует и старый пароль, добавь oldPassword в этот объект
+      await changePassword({ password: newPassword });
+      
+      setOldPassword('');
+      setNewPassword('');
+      alert('Пароль успешно изменён!');
+    } catch (error: any) {
+      console.error('Ошибка смены пароля:', error);
+      const errorMsg = error.response?.data?.message || 'Ошибка при смене пароля.';
+      alert(errorMsg);
+    } finally {
+      setIsLoading(false);
     }
-
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const userIndex = users.findIndex((u: any) => u.email === email);
-
-    if (userIndex === -1) {
-      alert('Пользователь не найден. Войдите заново.');
-      return;
-    }
-
-    // Проверяем старый пароль
-    if (users[userIndex].password !== oldPassword) {
-      alert('Старый пароль введён неверно!');
-      return;
-    }
-
-    // Обновляем пароль
-    users[userIndex].password = newPassword;
-    localStorage.setItem('mock_users', JSON.stringify(users));
-
-    // Очищаем поля
-    setOldPassword('');
-    setNewPassword('');
-
-    alert('Пароль успешно изменён!');
   };
 
   return (
     <div className="settings-content-wrapper">
-      {/* Шапка */}
       <div className="settings-section settings-header-section">
         <h1 className="settings-title">Настройки</h1>
         <p className="settings-subtitle">
@@ -113,7 +92,6 @@ const SettingsPage = () => {
         </p>
       </div>
 
-      {/* Профиль */}
       <div className="settings-section profile-section">
         <div className="section-title-wrapper">
           <h2 className="section-title">Профиль</h2>
@@ -129,6 +107,7 @@ const SettingsPage = () => {
                 placeholder={firstName}
                 value={newFirstName}
                 onChange={(e) => setNewFirstName(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -142,6 +121,7 @@ const SettingsPage = () => {
                 placeholder={lastName}
                 value={newLastName}
                 onChange={(e) => setNewLastName(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -155,17 +135,17 @@ const SettingsPage = () => {
                 placeholder={email}
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
         </div>
 
-        <button className="apply-btn" onClick={handleApplyProfile}>
-          Применить
+        <button className="apply-btn" onClick={handleApplyProfile} disabled={isLoading}>
+          {isLoading ? 'Сохранение...' : 'Применить'}
         </button>
       </div>
 
-      {/* Смена пароля */}
       <div className="settings-section password-section">
         <div className="section-title-wrapper">
           <h2 className="section-title">Смена пароля</h2>
@@ -181,11 +161,13 @@ const SettingsPage = () => {
                 placeholder="Ваш старый пароль"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
+                disabled={isLoading}
               />
               <button
                 type="button"
                 className="eye-btn"
                 onClick={() => setShowOldPassword(!showOldPassword)}
+                disabled={isLoading}
                 aria-label={showOldPassword ? 'Скрыть пароль' : 'Показать пароль'}
               >
                 👁
@@ -202,11 +184,13 @@ const SettingsPage = () => {
                 placeholder="Ваш новый пароль"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                disabled={isLoading}
               />
               <button
                 type="button"
                 className="eye-btn"
                 onClick={() => setShowNewPassword(!showNewPassword)}
+                disabled={isLoading}
                 aria-label={showNewPassword ? 'Скрыть пароль' : 'Показать пароль'}
               >
                 👁
@@ -215,8 +199,8 @@ const SettingsPage = () => {
           </div>
         </div>
 
-        <button className="change-btn" onClick={handleChangePassword}>
-          Изменить
+        <button className="change-btn" onClick={handleChangePassword} disabled={isLoading}>
+          {isLoading ? 'Изменение...' : 'Изменить'}
         </button>
       </div>
     </div>

@@ -1,8 +1,9 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import '../pages/MenuPage.css';
 
 const CabinetLayout = () => {
+  const location = useLocation(); // Хук для отслеживания текущего маршрута
   const logout = useAuthStore((state) => state.logout);
   const firstName = useAuthStore((state) => state.firstName) || 'Пользователь';
   const lastName = useAuthStore((state) => state.lastName) || '';
@@ -23,14 +24,24 @@ const CabinetLayout = () => {
 
   const userInitials = getInitials(fullName);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      // Ждём, пока бэкенд обработает выход и очистит куки/токены
+      await logout(); 
+    } catch (error) {
+      console.error('Ошибка при выходе:', error);
+    } finally {
+      // В любом случае перенаправляем на страницу входа
+      navigate('/login');
+    }
   };
+
+  const isCoursesPage = location.pathname === '/courses';
 
   return (
     <div className="menu-page">
       <div className="bg-circles-pattern" />
+      
       <aside className="sidebar-column v15_914">
         <div className="sidebar-header v15_916">
             <div className="logo-wrapper">
@@ -58,7 +69,7 @@ const CabinetLayout = () => {
 
         <nav className="sidebar-menu">
           <NavLink
-            to="/menu"
+            to="/courses"
             end
             className={({ isActive }) =>
               `menu-item item-home v15_943${isActive ? ' menu-item-active' : ''}`
@@ -68,7 +79,7 @@ const CabinetLayout = () => {
             Курсы
           </NavLink>
           <NavLink
-            to="/courses"
+            to="/menu"
             className={({ isActive }) =>
               `menu-item item-materials v15_944${isActive ? ' menu-item-active' : ''}`
             }
@@ -95,13 +106,13 @@ const CabinetLayout = () => {
             Мой прогресс
           </NavLink>
         </nav>
+
        <div className="settings-block v15_959">
           <div className="settings-wrapper">
             <div className="settings-white-area">
               <div className="bump green top-left" />
               <div className="bump green top-right" />
 
-              {/* ← ЗДЕСЬ БЫЛА ПРОБЛЕМА. Теперь NavLink, как у остальных */}
               <NavLink
                 to="/menu/settings"
                 className={({ isActive }) =>
@@ -120,9 +131,20 @@ const CabinetLayout = () => {
       </aside>
 
       <div className="main-content-area v15_913">
+        {/* 👇 ЗДЕСЬ ИСПОЛЬЗУЕТСЯ handleLogout */}
         <button className="logout-btn" onClick={handleLogout}>
           Выйти
         </button>
+        
+        {/* 👇 ЗДЕСЬ ИСПОЛЬЗУЕТСЯ isCoursesPage */}
+        {isCoursesPage && (
+          <div className="courses-header-box">
+            <h1 className="courses-title">Курсы</h1>
+            <p className="courses-subtitle">
+              Загружайте материалы и готовьтесь к сессии по каждому предмету
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="cabinet-outlet">
