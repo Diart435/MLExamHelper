@@ -3,6 +3,7 @@ package com.examassistant.auth.service;
 import com.examassistant.auth.DTO.UserDTO;
 import com.examassistant.auth.entity.User;
 import com.examassistant.auth.repository.UserRepository;
+import com.examassistant.common.exception.UserAlreadyExistException;
 import com.examassistant.common.exception.UserNotFoundException;
 import com.examassistant.common.mapper.UserMapper;
 import com.examassistant.security.service.JwtService;
@@ -33,6 +34,9 @@ public class UserService {
     public void changePersonal(String email, String firstName, String lastName, UUID id){
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id.toString()));
+        if(userRepository.existsByEmail(email)){
+            throw new UserAlreadyExistException("User already exists");
+        }
         user.setEmail(email);
         user.setFirstName(firstName);
         user.setLastName(lastName);
