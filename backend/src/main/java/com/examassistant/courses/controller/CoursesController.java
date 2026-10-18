@@ -1,11 +1,13 @@
 package com.examassistant.courses.controller;
 
 import com.examassistant.common.DTO.ApiError;
+import com.examassistant.courses.mapper.CourseMapper;
 import com.examassistant.courses.DTO.CourseFilter;
 import com.examassistant.courses.DTO.CoursesResponse;
 import com.examassistant.courses.DTO.CreateCourseRequest;
 import com.examassistant.courses.DTO.UpdateCourseRequest;
 import com.examassistant.courses.service.CoursesService;
+import com.examassistant.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +35,7 @@ import java.util.UUID;
 public class CoursesController {
 
     private final CoursesService coursesService;
+    private final CourseMapper courseMapper;
 
     @Operation(summary = "Create a new course", description = "Creates a course assigned to a specific owner.")
     @ApiResponses(value = {
@@ -42,8 +46,11 @@ public class CoursesController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping
-    public ResponseEntity<CoursesResponse> create(@Valid @RequestBody CreateCourseRequest create) {
-        CoursesResponse course = coursesService.create(create);
+    public ResponseEntity<CoursesResponse> create(
+            @Valid @RequestBody CreateCourseRequest create,
+            @AuthenticationPrincipal CustomUserDetails user
+            ) {
+        CoursesResponse course = courseMapper.toResponse(coursesService.create(create, user.getUserId()));
         return ResponseEntity.status(HttpStatus.CREATED).body(course);
     }
 
@@ -58,8 +65,10 @@ public class CoursesController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @GetMapping("/{id}")
-    public ResponseEntity<CoursesResponse> getById(@PathVariable @NotNull UUID id) {
-        CoursesResponse course = coursesService.getById(id);
+    public ResponseEntity<CoursesResponse> getById(
+            @PathVariable @NotNull UUID id,
+            @AuthenticationPrincipal CustomUserDetails user) {
+        CoursesResponse course = courseMapper.toResponse(coursesService.getById(id, user.getUserId()));
         return ResponseEntity.ok(course);
     }
 
@@ -74,9 +83,10 @@ public class CoursesController {
     @GetMapping
     public ResponseEntity<Page<CoursesResponse>> search(
             @Valid @ModelAttribute CourseFilter filter,
-            Pageable pageable
+            Pageable pageable,
+            @AuthenticationPrincipal CustomUserDetails user
     ) {
-        Page<CoursesResponse> courses = coursesService.search(filter, pageable);
+        Page<CoursesResponse> courses = coursesService.search(filter, pageable, user.getUserId()).map(courseMapper::toResponse);
         return ResponseEntity.ok(courses);
     }
 
@@ -93,9 +103,10 @@ public class CoursesController {
     @PutMapping("/{id}")
     public ResponseEntity<CoursesResponse> update(
             @PathVariable @NotNull UUID id,
-            @Valid @RequestBody UpdateCourseRequest request
+            @Valid @RequestBody UpdateCourseRequest request,
+            @AuthenticationPrincipal CustomUserDetails user
     ) {
-        CoursesResponse updated = coursesService.update(id, request);
+        CoursesResponse updated = courseMapper.toResponse(coursesService.update(id, request, user.getUserId()));
         return ResponseEntity.ok(updated);
     }
 
@@ -109,7 +120,9 @@ public class CoursesController {
     })
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable @NotNull UUID id) {
-        coursesService.delete(id);
+    public void delete(
+            @PathVariable @NotNull UUID id,
+            @AuthenticationPrincipal CustomUserDetails user) {
+        coursesService.delete(id, user.getUserId());
     }
 }

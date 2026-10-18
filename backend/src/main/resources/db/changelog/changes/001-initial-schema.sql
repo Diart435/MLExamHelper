@@ -46,6 +46,7 @@ CREATE TABLE materials (
     title           VARCHAR(255) NOT NULL,
     source_uri      TEXT NOT NULL,       -- путь в S3/MinIO или URL
     status_material VARCHAR(50) NOT NULL DEFAULT 'queued', -- queued, processing, ready, error
+    material_size   BIGINT NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_materials_course FOREIGN KEY (course_id) 

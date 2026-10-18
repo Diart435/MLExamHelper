@@ -26,7 +26,7 @@ public class GlobalExceptionHandler {
         log.warn("Validation failed: {}", message);
         return build(HttpStatus.BAD_REQUEST, message, req);
     }
-    @ExceptionHandler(IllegalArgumentException.class)
+    @ExceptionHandler({IllegalArgumentException.class, FileUploadException.class})
     public ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException ex, WebRequest req){
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
     }
@@ -36,8 +36,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), req);
     }
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(UserNotFoundException ex, WebRequest req){
+    @ExceptionHandler({FileForbiddenException.class, CourseForbiddenException.class})
+    public ResponseEntity<ApiError> handleForbidden(Exception ex, WebRequest req){
+        return build(HttpStatus.FORBIDDEN, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler({UserNotFoundException.class,InvalidFileIdException.class})
+    public ResponseEntity<ApiError> handleNotFound(Exception ex, WebRequest req){
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 
@@ -48,7 +53,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, WebRequest req){
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", req);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), req);
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, WebRequest req) {

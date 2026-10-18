@@ -13,6 +13,4 @@ public class CourseFilter {
 
     @Size(max = 255, message = "Search description query is too long")
     private String courseDescription;
-
-    private UUID userId;
 }

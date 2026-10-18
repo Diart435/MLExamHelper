@@ -1,5 +1,6 @@
-package com.examassistant.common.mapper;
+package com.examassistant.courses.mapper;
 
+import com.examassistant.courses.CourseDTO;
 import com.examassistant.courses.DTO.CoursesResponse;
 import com.examassistant.courses.entity.Course;
 import org.mapstruct.Mapper;
@@ -12,4 +13,9 @@ public interface CourseMapper {
     @Mapping(source = "title", target = "title")
     @Mapping(source = "courseDescription", target = "courseDescription")
     CoursesResponse toResponse(Course course);
+
+    @Mapping(source = "courseId", target = "courseId")
+    @Mapping(source = "title", target = "title")
+    @Mapping(source = "courseDescription", target = "courseDescription")
+    CourseDTO toDTO(Course course);
 }

@@ -1,4 +1,4 @@
-package com.examassistant.common.mapper;
+package com.examassistant.auth.mapper;
 
 import com.examassistant.auth.DTO.UserDTO;
 import com.examassistant.auth.entity.User;

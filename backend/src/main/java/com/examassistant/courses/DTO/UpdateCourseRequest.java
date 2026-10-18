@@ -17,6 +17,4 @@ public class UpdateCourseRequest {
 
     @Size(max = 2000, message = "Course description must not exceed 2000 characters")
     private String courseDescription;
-
-    private UUID userId;
 }

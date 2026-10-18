@@ -21,7 +21,4 @@ public class CreateCourseRequest {
     @NotBlank(message = "Course description is required")
     @Size(max = 2000, message = "Course description must not exceed 2000 characters")
     private String courseDescription;
-
-    @NotNull(message = "User ID is required")
-    private UUID userId;
 }
