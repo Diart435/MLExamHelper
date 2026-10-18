@@ -1,10 +1,7 @@
 package com.examassistant.common;
 
 import com.examassistant.common.DTO.ApiError;
-import com.examassistant.common.exception.InvalidCredentialsException;
-import com.examassistant.common.exception.InvalidTokenException;
-import com.examassistant.common.exception.UserAlreadyExistException;
-import com.examassistant.common.exception.UserNotFoundException;
+import com.examassistant.common.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
@@ -63,5 +60,10 @@ public class GlobalExceptionHandler {
                 req.getDescription(false).replace("uri=", "")
         );
         return ResponseEntity.status(status).body(body);
+    }
+
+    @ExceptionHandler(CourseNotFoundException.class)
+    public ResponseEntity<ApiError> handleCourseNotFound(CourseNotFoundException ex, WebRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 }
