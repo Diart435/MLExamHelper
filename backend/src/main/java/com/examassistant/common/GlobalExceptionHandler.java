@@ -41,7 +41,7 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.FORBIDDEN, ex.getMessage(), req);
     }
 
-    @ExceptionHandler({UserNotFoundException.class,InvalidFileIdException.class})
+    @ExceptionHandler({UserNotFoundException.class,FileNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(Exception ex, WebRequest req){
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }

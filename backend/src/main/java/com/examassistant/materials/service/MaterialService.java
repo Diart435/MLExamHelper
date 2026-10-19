@@ -1,8 +1,8 @@
 package com.examassistant.materials.service;
 
 import com.examassistant.common.exception.FileForbiddenException;
+import com.examassistant.common.exception.FileNotFoundException;
 import com.examassistant.common.exception.FileUploadException;
-import com.examassistant.common.exception.InvalidFileIdException;
 import com.examassistant.courses.CourseService;
 import com.examassistant.materials.DTO.MaterialResponse;
 import com.examassistant.materials.entity.Material;
@@ -97,7 +97,7 @@ public class MaterialService {
     @Transactional(readOnly = true)
     public Material findById(UUID materialId, UUID userId){
         Material material = materialRepository.findById(materialId)
-                .orElseThrow(() -> new InvalidFileIdException("Invalid file id"));
+                .orElseThrow(() -> new FileNotFoundException("Invalid file id"));
         if(courseService.getDTOById(material.getCourseId(), userId).getOwnerId().equals(userId)){
             return material;
         }
@@ -111,5 +111,16 @@ public class MaterialService {
         Material material = findById(materialId, userId);
         material.setTitle(title);
         return materialRepository.save(material);
+    }
+
+    @Transactional
+    public void delete(UUID materialId, UUID userId){
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new FileNotFoundException("Invalid file id"));
+        if(!courseService.getDTOById(material.getCourseId(), userId).getOwnerId().equals(userId)){
+            throw new FileForbiddenException("This course is not yours");
+        }
+        s3Service.delete(material.getSourceUri());
+        materialRepository.delete(material);
     }
 }

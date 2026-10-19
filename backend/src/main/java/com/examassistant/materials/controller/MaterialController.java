@@ -2,7 +2,6 @@ package com.examassistant.materials.controller;
 
 import com.examassistant.common.DTO.ApiError;
 import com.examassistant.common.exception.FileUploadException;
-import com.examassistant.courses.CourseService;
 import com.examassistant.materials.DTO.ChangeFileNameRequest;
 import com.examassistant.materials.DTO.MaterialResponse;
 import com.examassistant.materials.mapper.MaterialMapper;
@@ -13,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.UUID;
 
+@Tag(name = "Materials", description = "Endpoints for managing materials")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/materials")
@@ -80,6 +81,10 @@ public class MaterialController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Material found"),
             @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @GetMapping("/{id}")
@@ -94,13 +99,36 @@ public class MaterialController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Material's name changed"),
             @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    @PostMapping("/change/{id}")
+    @PutMapping("/change/{id}")
     public ResponseEntity<MaterialResponse> changeFileName(
             @PathVariable UUID id,
             @Valid ChangeFileNameRequest request,
             @AuthenticationPrincipal CustomUserDetails user){
         return ResponseEntity.ok(materialService.toResponse(materialService.changeFileName(id, request.getTitle(), user.getUserId())));
+    }
+
+    @Operation(summary = "Delete a material", description = "Returns a void.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Material deleted"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteById(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails user
+            ){
+        materialService.delete(id, user.getUserId());
+        return ResponseEntity.noContent().build();
     }
 }

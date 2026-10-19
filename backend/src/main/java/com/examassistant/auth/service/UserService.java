@@ -28,6 +28,9 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserDTO getUserInfo(UUID id){
+        if(id == null){
+            throw new InvalidCredentialsException("Id is null");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id.toString()));
         return userMapper.toUserDTO(user);
@@ -35,6 +38,9 @@ public class UserService {
 
     @Transactional
     public void changePersonal(String email, String firstName, String lastName, UUID id){
+        if(id == null){
+            throw new InvalidCredentialsException("Id is null");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id.toString()));
         if(userRepository.existsByEmail(email)){
@@ -47,6 +53,9 @@ public class UserService {
 
     @Transactional
     public void changePassword(String lastPassword, String newPassword, UUID id){
+        if(id == null){
+            throw new InvalidCredentialsException("Id is null");
+        }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id.toString()));
         if(!passwordEncoder.matches(lastPassword, user.getPasswordHash())){
