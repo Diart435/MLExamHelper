@@ -40,6 +40,7 @@ services:
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
+      WEED_JWT_FILER_SIGNING_KEY: "your-super-secret-signing-key-at-least-32-chars-long"
     entrypoint:
       - /bin/sh
       - -c
