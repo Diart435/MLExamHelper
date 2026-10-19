@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -25,6 +26,10 @@ public class GlobalExceptionHandler {
 
         log.warn("Validation failed: {}", message);
         return build(HttpStatus.BAD_REQUEST, message, req);
+    }
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Invalid ID format. Must be a UUID", req);
     }
     @ExceptionHandler({IllegalArgumentException.class, FileUploadException.class})
     public ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException ex, WebRequest req){
