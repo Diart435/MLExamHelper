@@ -13,7 +13,6 @@ public class MaterialResponse {
     private String typeMaterial;
     private String statusMaterial;
     private String sourceUri;
-    private String fileType;
     private long materialSize;
     private OffsetDateTime createdAt;
 }

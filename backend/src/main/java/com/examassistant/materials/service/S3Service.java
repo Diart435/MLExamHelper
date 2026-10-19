@@ -44,9 +44,15 @@ public class S3Service {
     }
 
     public String upload(UUID materialId, MultipartFile file){
-        String key = "materials/" + materialId + "/" + file.getOriginalFilename();
+        String originalName = file.getOriginalFilename();
+        String extension = "";
+        if (originalName != null && originalName.contains(".")) {
+            extension = originalName.substring(originalName.lastIndexOf("."));
+        }
 
-        try(InputStream is = file.getInputStream()){
+        String key = materialId + "/file" + extension;
+
+        try (InputStream is = file.getInputStream()) {
             s3Client.putObject(
                     PutObjectRequest.builder()
                             .bucket(bucket)
@@ -56,12 +62,11 @@ public class S3Service {
                             .build(),
                     RequestBody.fromInputStream(is, file.getSize())
             );
-        }
-        catch (IOException e){
+        } catch (IOException e) {
             throw new StorageException("Failed to upload file");
         }
 
-        log.info("uploaded {}", key);
+        log.info("Uploaded to S3: {}", key);
         return key;
     }
 
