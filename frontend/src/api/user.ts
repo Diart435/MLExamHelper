@@ -15,7 +15,7 @@ export interface ChangePersonalRequest {
 
 export interface ChangePasswordRequest {
   oldPassword: string;
-  newPassword: string; 
+  newPassword: string;
 }
 
 export const getMe = async (): Promise<User> => {
@@ -24,9 +24,9 @@ export const getMe = async (): Promise<User> => {
 };
 
 export const changePersonal = async (data: ChangePersonalRequest): Promise<void> => {
-  await apiClient.post('/api/user/change/personal', data);
+  await apiClient.put('/api/user/change/personal', data);
 };
 
 export const changePassword = async (data: ChangePasswordRequest): Promise<void> => {
-  await apiClient.post('/api/user/change/password', data);
+  await apiClient.put('/api/user/change/password', data);
 };

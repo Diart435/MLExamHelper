@@ -1,14 +1,16 @@
+import { useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import '../pages/MenuPage.css';
 
 const CabinetLayout = () => {
-  const location = useLocation(); // Хук для отслеживания текущего маршрута
+  const location = useLocation();
+  const checkAuth = useAuthStore((state) => state.checkAuth);
   const logout = useAuthStore((state) => state.logout);
   const firstName = useAuthStore((state) => state.firstName) || 'Пользователь';
   const lastName = useAuthStore((state) => state.lastName) || '';
   const userRole = useAuthStore((state) => state.userRole) || 'Студент';
-  
+
   const navigate = useNavigate();
 
   const fullName = `${firstName} ${lastName}`.trim();
@@ -24,14 +26,16 @@ const CabinetLayout = () => {
 
   const userInitials = getInitials(fullName);
 
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
   const handleLogout = async () => {
     try {
-      // Ждём, пока бэкенд обработает выход и очистит куки/токены
-      await logout(); 
+      await logout();
     } catch (error) {
       console.error('Ошибка при выходе:', error);
     } finally {
-      // В любом случае перенаправляем на страницу входа
       navigate('/login');
     }
   };
@@ -41,23 +45,23 @@ const CabinetLayout = () => {
   return (
     <div className="menu-page">
       <div className="bg-circles-pattern" />
-      
+
       <aside className="sidebar-column v15_914">
         <div className="sidebar-header v15_916">
-            <div className="logo-wrapper">
-                <div className="ai-white-area">
-                <div className="bump purple top-left" />
-                <div className="bump green top-right" />
+          <div className="logo-wrapper">
+            <div className="ai-white-area">
+              <div className="bump purple top-left" />
+              <div className="bump green top-right" />
 
-                <button className="ai-pill" type="button">
-                    <span className="ai-icon" />
-                    <span className="ai-text">ai-помощник</span>
-                </button>
+              <button className="ai-pill" type="button">
+                <span className="ai-icon" />
+                <span className="ai-text">ai-помощник</span>
+              </button>
 
-                <div className="bump purple bottom-left" />
-                <div className="bump green bottom-right" />
-                </div>
+              <div className="bump purple bottom-left" />
+              <div className="bump green bottom-right" />
             </div>
+          </div>
         </div>
 
         <div className="user-profile-block v15_934">
@@ -107,7 +111,7 @@ const CabinetLayout = () => {
           </NavLink>
         </nav>
 
-       <div className="settings-block v15_959">
+        <div className="settings-block v15_959">
           <div className="settings-wrapper">
             <div className="settings-white-area">
               <div className="bump green top-left" />
@@ -131,12 +135,10 @@ const CabinetLayout = () => {
       </aside>
 
       <div className="main-content-area v15_913">
-        {/* 👇 ЗДЕСЬ ИСПОЛЬЗУЕТСЯ handleLogout */}
         <button className="logout-btn" onClick={handleLogout}>
           Выйти
         </button>
-        
-        {/* 👇 ЗДЕСЬ ИСПОЛЬЗУЕТСЯ isCoursesPage */}
+
         {isCoursesPage && (
           <div className="courses-header-box">
             <h1 className="courses-title">Курсы</h1>
