@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -26,6 +27,9 @@ public class CoursesService implements CourseService {
 
     private final CourseRepository courseRepository;
     private final CourseMapper courseMapper;
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "courseId", "title", "courseDescription", "createdAt", "updatedAt", "ownerId"
+    );
 
     @Transactional
     public Course create(@Valid CreateCourseRequest request, UUID id) {
@@ -51,12 +55,16 @@ public class CoursesService implements CourseService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Course> search(CourseFilter filter, Pageable pageable, UUID userId) {
-        UUID ownerId = filter != null ? userId : null;
-        String title = filter != null ? filter.getTitle() : null;
-        String description = filter != null ? filter.getCourseDescription() : null;
+    public Page<Course> search(CourseFilter filter, Pageable pageable, UUID ownerId) {
+        for (org.springframework.data.domain.Sort.Order order : pageable.getSort()) {
+            if (!ALLOWED_SORT_FIELDS.contains(order.getProperty())) {
+                throw new IllegalArgumentException("Invalid sort parameter. Field '" + order.getProperty() + "' not found in entity Course");
+            }
+        }
 
-        return courseRepository.findByFilter(ownerId, title, description, pageable);
+        String title = filter != null ? filter.getTitle() : null;
+
+        return courseRepository.findByFilter(ownerId, title, pageable);
     }
 
     @Transactional

@@ -10,7 +10,4 @@ import java.util.UUID;
 public class CourseFilter {
     @Size(max = 255, message = "Search title query is too long")
     private String title;
-
-    @Size(max = 255, message = "Search description query is too long")
-    private String courseDescription;
 }
