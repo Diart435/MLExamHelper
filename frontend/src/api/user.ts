@@ -14,7 +14,8 @@ export interface ChangePersonalRequest {
 }
 
 export interface ChangePasswordRequest {
-  password: string; 
+  oldPassword: string;
+  newPassword: string; 
 }
 
 export const getMe = async (): Promise<User> => {

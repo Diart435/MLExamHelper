@@ -10,6 +10,14 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
+// Список эндпоинтов, для которых НЕ нужно делать авто-refresh
+const AUTH_ENDPOINTS = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/refresh',
+  '/api/auth/logout',
+];
+
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
   if (token) {
@@ -23,7 +31,17 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Проверяем, является ли это auth-эндпоинтом
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((endpoint) =>
+      originalRequest.url?.includes(endpoint)
+    );
+
+    // Делаем refresh ТОЛЬКО если это 401, запрос не повторялся, И это НЕ auth-эндпоинт
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint 
+    ) {
       originalRequest._retry = true;
 
       try {
@@ -45,6 +63,8 @@ apiClient.interceptors.response.use(
       }
     }
 
+    // Для auth-эндпоинтов (например, неверный пароль при логине) 
+    // просто пробрасываем ошибку дальше, чтобы её обработал компонент LoginPage
     return Promise.reject(error);
   }
 );

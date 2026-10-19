@@ -33,6 +33,11 @@ const SettingsPage = () => {
       return;
     }
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail.trim())) {
+      alert('Пожалуйста, введите корректный адрес электронной почты!');
+      return;
+    }
     setIsLoading(true);
     try {
       // 1. Реальный запрос к API
@@ -55,28 +60,33 @@ const SettingsPage = () => {
     }
   };
 
-  const handleChangePassword = async () => {
+ const handleChangePassword = async () => {
+    if (!oldPassword.trim()) {
+      alert('Введите старый пароль!');
+      return;
+    }
     if (!newPassword.trim()) {
       alert('Введите новый пароль!');
       return;
     }
-    if (newPassword.length < 8) {
-      alert('Новый пароль должен содержать минимум 8 символов!');
+    if (newPassword.length < 6) {
+      alert('Новый пароль должен содержать минимум 6 символов!');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Согласно твоей спецификации API, бэкенд принимает только { password: string }
-      // Если бэкенд на самом деле требует и старый пароль, добавь oldPassword в этот объект
-      await changePassword({ password: newPassword });
+      await changePassword({ 
+        oldPassword: oldPassword, 
+        newPassword: newPassword 
+      });
       
       setOldPassword('');
       setNewPassword('');
       alert('Пароль успешно изменён!');
     } catch (error: any) {
       console.error('Ошибка смены пароля:', error);
-      const errorMsg = error.response?.data?.message || 'Ошибка при смене пароля.';
+      const errorMsg = error.response?.data?.message || 'Старый пароль указан неверно!';
       alert(errorMsg);
     } finally {
       setIsLoading(false);
