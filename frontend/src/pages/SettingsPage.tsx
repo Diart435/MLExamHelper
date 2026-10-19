@@ -69,15 +69,15 @@ const SettingsPage = () => {
       alert('Введите новый пароль!');
       return;
     }
-    if (newPassword.length < 6) {
-      alert('Новый пароль должен содержать минимум 6 символов!');
+    if (newPassword.length < 8) {
+      alert('Новый пароль должен содержать минимум 8 символов!');
       return;
     }
 
     setIsLoading(true);
     try {
       await changePassword({ 
-        oldPassword: oldPassword, 
+        lastPassword: oldPassword, 
         newPassword: newPassword 
       });
       

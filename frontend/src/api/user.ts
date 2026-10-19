@@ -14,7 +14,7 @@ export interface ChangePersonalRequest {
 }
 
 export interface ChangePasswordRequest {
-  oldPassword: string;
+  lastPassword: string;
   newPassword: string;
 }
 

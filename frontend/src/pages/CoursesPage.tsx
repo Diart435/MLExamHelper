@@ -10,11 +10,7 @@ interface Course {
   progress: number;
 }
 
-const MOCK_COURSES: Course[] = [
-  { id: 1, title: 'Базы данных', materialsCount: 12, testsCount: 3, progress: 72 },
-  { id: 2, title: 'Операционные системы', materialsCount: 8, testsCount: 2, progress: 45 },
-  { id: 3, title: 'Английский язык', materialsCount: 15, testsCount: 5, progress: 88 },
-];
+const MOCK_COURSES: Course[] = [];
 
 type SortOption = 'newest' | 'progress';
 
