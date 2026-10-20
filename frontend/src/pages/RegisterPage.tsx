@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import './RegisterPage.css';
 
 const RegisterPage = () => {
@@ -8,6 +9,15 @@ const RegisterPage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
+  // Берём функцию register из нашего обновлённого стора
+  const register = useAuthStore((state) => state.register);
+
+  // Защита: если пользователь открыл эту страницу напрямую без шага 1, возвращаем его назад
+  useEffect(() => {
+    if (!sessionStorage.getItem('pendingEmail')) {
+      navigate('/main-register');
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -16,34 +26,27 @@ const RegisterPage = () => {
       alert('Имя и фамилия обязательны для заполнения!');
       return;
     }
+
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      // ДОСТАЁМ ДАННЫЕ С ПЕРВОГО ШАГА
       const email = sessionStorage.getItem('pendingEmail') || '';
-      const password = sessionStorage.getItem('pendingPassword') || ''; 
+      const password = sessionStorage.getItem('pendingPassword') || '';
 
-      const newUser = {
-        email: email,
-        password: password,
-        firstName: firstName,
-        lastName: lastName,
-        role: 'Студент'
-      };
+      // 1. Делаем реальный запрос к API
+      await register(email, password, firstName.trim(), lastName.trim());
 
-      const existingUsers = JSON.parse(localStorage.getItem('mock_users') || '[]');
-      existingUsers.push(newUser);
-      localStorage.setItem('mock_users', JSON.stringify(existingUsers));
-
+      // 2. Очищаем временные данные
       sessionStorage.removeItem('pendingEmail');
       sessionStorage.removeItem('pendingPassword');
 
-      alert(`Аккаунт успешно создан!\nДобро пожаловать, ${firstName}!`);
-      navigate('/login');
-    } catch (error) {
+      // 3. Перенаправляем в личный кабинет (так как register уже авторизовал пользователя и сохранил токен)
+      navigate('/menu');
+      
+    } catch (error: any) {
       console.error('Ошибка при регистрации:', error);
-      alert('Ошибка при создании аккаунта. Попробуйте снова.');
+      // Пытаемся показать сообщение от бэкенда, иначе стандартное
+      const errorMsg = error.response?.data?.message || 'Ошибка при создании аккаунта. Возможно, эта почта уже занята.';
+      alert(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -56,11 +59,7 @@ const RegisterPage = () => {
       <div className="reg-nav-green" />
       
       <div className="reg-nav-black">
-        <button 
-          className="reg-nav-logo-btn" 
-          type="button" 
-          onClick={() => navigate('/welcome')}
-        >
+        <button className="reg-nav-logo-btn" type="button" onClick={() => navigate('/welcome')}>
           <span className="reg-nav-logo-icon" />
           <span className="reg-nav-logo">ai-помощник</span>
         </button>
@@ -105,11 +104,7 @@ const RegisterPage = () => {
           {isLoading ? 'Создание...' : 'Создать аккаунт'}
         </button>
 
-        <Link
-          to="/main-register"
-          className="reg-stripe reg-stripe-left"
-          title="Вернуться к шагу 1: почта и пароль"
-        />
+        <Link to="/main-register" className="reg-stripe reg-stripe-left" title="Вернуться к шагу 1" />
         <span className="reg-stripe reg-stripe-right reg-stripe-active" />
 
         <div className="reg-footer">

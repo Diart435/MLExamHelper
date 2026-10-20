@@ -1,13 +1,16 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import '../pages/MenuPage.css';
 
 const CabinetLayout = () => {
+  const location = useLocation();
+  const checkAuth = useAuthStore((state) => state.checkAuth);
   const logout = useAuthStore((state) => state.logout);
   const firstName = useAuthStore((state) => state.firstName) || 'Пользователь';
   const lastName = useAuthStore((state) => state.lastName) || '';
   const userRole = useAuthStore((state) => state.userRole) || 'Студент';
-  
+
   const navigate = useNavigate();
 
   const fullName = `${firstName} ${lastName}`.trim();
@@ -23,30 +26,42 @@ const CabinetLayout = () => {
 
   const userInitials = getInitials(fullName);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Ошибка при выходе:', error);
+    } finally {
+      navigate('/login');
+    }
   };
+
+  const isCoursesPage = location.pathname === '/courses';
 
   return (
     <div className="menu-page">
       <div className="bg-circles-pattern" />
+
       <aside className="sidebar-column v15_914">
         <div className="sidebar-header v15_916">
-            <div className="logo-wrapper">
-                <div className="ai-white-area">
-                <div className="bump purple top-left" />
-                <div className="bump green top-right" />
+          <div className="logo-wrapper">
+            <div className="ai-white-area">
+              <div className="bump purple top-left" />
+              <div className="bump green top-right" />
 
-                <button className="ai-pill" type="button">
-                    <span className="ai-icon" />
-                    <span className="ai-text">ai-помощник</span>
-                </button>
+              <button className="ai-pill" type="button">
+                <span className="ai-icon" />
+                <span className="ai-text">ai-помощник</span>
+              </button>
 
-                <div className="bump purple bottom-left" />
-                <div className="bump green bottom-right" />
-                </div>
+              <div className="bump purple bottom-left" />
+              <div className="bump green bottom-right" />
             </div>
+          </div>
         </div>
 
         <div className="user-profile-block v15_934">
@@ -58,7 +73,7 @@ const CabinetLayout = () => {
 
         <nav className="sidebar-menu">
           <NavLink
-            to="/menu"
+            to="/courses"
             end
             className={({ isActive }) =>
               `menu-item item-home v15_943${isActive ? ' menu-item-active' : ''}`
@@ -68,7 +83,7 @@ const CabinetLayout = () => {
             Курсы
           </NavLink>
           <NavLink
-            to="/courses"
+            to="/menu"
             className={({ isActive }) =>
               `menu-item item-materials v15_944${isActive ? ' menu-item-active' : ''}`
             }
@@ -95,13 +110,13 @@ const CabinetLayout = () => {
             Мой прогресс
           </NavLink>
         </nav>
-       <div className="settings-block v15_959">
+
+        <div className="settings-block v15_959">
           <div className="settings-wrapper">
             <div className="settings-white-area">
               <div className="bump green top-left" />
               <div className="bump green top-right" />
 
-              {/* ← ЗДЕСЬ БЫЛА ПРОБЛЕМА. Теперь NavLink, как у остальных */}
               <NavLink
                 to="/menu/settings"
                 className={({ isActive }) =>
@@ -123,6 +138,15 @@ const CabinetLayout = () => {
         <button className="logout-btn" onClick={handleLogout}>
           Выйти
         </button>
+
+        {isCoursesPage && (
+          <div className="courses-header-box">
+            <h1 className="courses-title">Курсы</h1>
+            <p className="courses-subtitle">
+              Загружайте материалы и готовьтесь к сессии по каждому предмету
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="cabinet-outlet">

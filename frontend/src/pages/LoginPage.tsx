@@ -9,39 +9,32 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const setToken = useAuthStore((state) => state.setToken);
+  // 1. Берём функцию login из стора вместо старой setToken
+  const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
-  try {
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    e.preventDefault();
+    setIsLoading(true);
 
-    // Ищем пользователя в localStorage по email
-    const users = JSON.parse(localStorage.getItem('mock_users') || '[]');
-    const user = users.find((u: any) => u.email === email && u.password === password);
-
-    if (user) {
-      // Пользователь найден — передаём его данные
-      setToken(
-        'mock_jwt_token_' + Date.now(),
-        user.email,              // <-- ДОБАВЬ EMAIL
-        user.firstName,
-        user.lastName,
-        user.role || 'Студент'
-      );
-      navigate('/menu');
-    } else {
-      alert('Аккаунт не найден. Проверьте email и пароль или зарегистрируйтесь.');
+    try {
+      // 2. Делаем реальный запрос к API через store
+      await login(email, password);
+      
+      // 3. Если успешно, перенаправляем пользователя
+      navigate('/menu'); 
+    } catch (error: any) {
+      // 4. Обрабатываем ошибки (например, неверный пароль или ошибка сети)
+      console.error('Ошибка при входе:', error);
+      
+      // Пытаемся достать сообщение об ошибке от бэкенда, иначе показываем стандартное
+      const errorMessage = error.response?.data?.message || 'Неверная почта или пароль. Попробуйте снова.';
+      alert(errorMessage);
+    } finally {
+      // 5. Снимаем блокировку кнопки в любом случае (успех или ошибка)
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error('Ошибка при входе:', error);
-    alert('Ошибка при входе. Попробуйте снова.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   return (
     <div className="main-container">
@@ -52,6 +45,7 @@ const LoginPage = () => {
       <div className="nav-black">
         <button 
           className="nav-logo-btn"
+          type="button"
           onClick={() => navigate('/welcome')}
         >
           <span className="nav-logo-icon" />

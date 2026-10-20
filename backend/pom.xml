@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com</groupId>
 	<artifactId>examassistant</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name/>
 	<description/>
 	<url/>
@@ -62,7 +62,7 @@
 		<dependency>
 			<groupId>org.mapstruct</groupId>
 			<artifactId>mapstruct</artifactId>
-			<version>1.5.3.Final</version>
+			<version>1.6.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springdoc</groupId>
@@ -160,6 +160,11 @@
 			<artifactId>spring-modulith-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.0</version>
+		</dependency>
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>
@@ -198,7 +203,7 @@
 								<path>
 									<groupId>org.mapstruct</groupId>
 									<artifactId>mapstruct-processor</artifactId>
-									<version>1.5.3.Final</version>
+									<version>1.6.3</version>
 								</path>
 							</annotationProcessorPaths>
 						</configuration>

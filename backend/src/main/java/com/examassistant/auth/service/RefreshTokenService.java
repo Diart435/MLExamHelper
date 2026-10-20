@@ -68,6 +68,10 @@ public class RefreshTokenService {
 
         return stored;
     }
+    @Transactional
+    public String getToken(UUID id){
+        return repository.findFirstToken(id, OffsetDateTime.now()).orElseGet(() -> create(id));
+    }
 
     @Transactional
     public void deleteExpired() {

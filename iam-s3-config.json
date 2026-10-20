@@ -1,0 +1,6 @@
+{
+  "signingKey": "your-super-secret-signing-key-at-least-32-chars-long",
+  "sts": {
+    "tokenDuration": "1h"
+  }
+}
