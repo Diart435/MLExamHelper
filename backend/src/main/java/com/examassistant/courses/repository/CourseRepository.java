@@ -16,10 +16,10 @@ public interface CourseRepository extends JpaRepository<Course, UUID> {
     @Query("SELECT COUNT(c) > 0 FROM Course c WHERE c.ownerId = :ownerId AND c.title = :title")
     boolean existsByOwnerIdAndTitle(@Param("ownerId") UUID ownerId, @Param("title") String title);
 
-    @Query("SELECT c FROM Course c WHERE " +
-            "c.ownerId = :ownerId AND " +
-            "(:title IS NULL OR LOWER(c.title) LIKE LOWER(CONCAT('%', :title, '%')))")
-    Page<Course> findByFilter(
+    Page<Course> findByOwnerId(UUID ownerId, Pageable pageable);
+
+    @Query("SELECT c FROM Course c WHERE c.ownerId = :ownerId AND LOWER(c.title) LIKE LOWER(CONCAT('%', :title, '%'))")
+    Page<Course> findByOwnerIdAndTitleContainingIgnoreCase(
             @Param("ownerId") UUID ownerId,
             @Param("title") String title,
             Pageable pageable

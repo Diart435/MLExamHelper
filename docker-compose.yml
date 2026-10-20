@@ -41,6 +41,7 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       WEED_JWT_FILER_SIGNING_KEY: "your-super-secret-signing-key-at-least-32-chars-long"
+      WEED_S3_EXTERNAL_URL: http://localhost:9000
     entrypoint:
       - /bin/sh
       - -c
@@ -90,6 +91,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       STORAGE_S3_ENDPOINT: http://seaweedfs:9000
+      STORAGE_S3_PUBLIC_ENDPOINT: http://localhost:9000
       STORAGE_S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       STORAGE_S3_SECRET_KEY: ${S3_SECRET_KEY}
       STORAGE_S3_BUCKET: materials
