@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -83,10 +84,16 @@ public class CoursesController {
     @GetMapping
     public ResponseEntity<Page<CoursesResponse>> search(
             @Valid @ModelAttribute CourseFilter filter,
+            @RequestParam(name = "page", defaultValue = "0") @Min(value = 0, message = "Page index must not be less than zero") int page,
+            @RequestParam(name = "size", defaultValue = "10") @Min(value = 1, message = "Page size must be greater than zero") int size,
             Pageable pageable,
             @AuthenticationPrincipal CustomUserDetails user
     ) {
-        Page<CoursesResponse> courses = coursesService.search(filter, pageable, user.getUserId()).map(courseMapper::toResponse);
+        Pageable validatedPageable = org.springframework.data.domain.PageRequest.of(page, size, pageable.getSort());
+
+        Page<CoursesResponse> courses = coursesService.search(filter, validatedPageable, user.getUserId())
+                .map(courseMapper::toResponse);
+
         return ResponseEntity.ok(courses);
     }
 

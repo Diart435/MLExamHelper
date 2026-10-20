@@ -76,4 +76,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleCourseNotFound(CourseNotFoundException ex, WebRequest req) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException ex, WebRequest req) {
+        log.warn("Constraint violation: {}", ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    }
 }
