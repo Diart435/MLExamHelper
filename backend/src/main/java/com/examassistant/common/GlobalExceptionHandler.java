@@ -77,9 +77,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException ex, WebRequest req) {
-        log.warn("Constraint violation: {}", ex.getMessage());
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleConstraintViolation(jakarta.validation.ConstraintViolationException ex, WebRequest req) {
+        String message = ex.getConstraintViolations().stream()
+                .map(constraintViolation -> constraintViolation.getMessage())
+                .collect(Collectors.joining("; "));
+
+        log.warn("Constraint violation: {}", message);
+        return build(HttpStatus.BAD_REQUEST, message, req);
     }
 }
