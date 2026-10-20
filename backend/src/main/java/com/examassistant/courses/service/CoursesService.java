@@ -57,6 +57,15 @@ public class CoursesService implements CourseService {
 
     @Transactional(readOnly = true)
     public Page<Course> search(CourseFilter filter, Pageable pageable, UUID ownerId) {
+        if (pageable.isPaged()) {
+            if (pageable.getPageNumber() < 0) {
+                throw new IllegalArgumentException("Page index must not be less than zero");
+            }
+            if (pageable.getPageSize() <= 0) {
+                throw new IllegalArgumentException("Page size must be greater than zero");
+            }
+        }
+
         for (org.springframework.data.domain.Sort.Order order : pageable.getSort()) {
             if (!ALLOWED_SORT_FIELDS.contains(order.getProperty())) {
                 throw new IllegalArgumentException("Invalid sort parameter. Field '" + order.getProperty() + "' not found in entity Course");
