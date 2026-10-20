@@ -27,6 +27,7 @@ public class CoursesService implements CourseService {
 
     private final CourseRepository courseRepository;
     private final CourseMapper courseMapper;
+
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "courseId", "title", "courseDescription", "createdAt", "updatedAt", "ownerId"
     );
@@ -62,16 +63,22 @@ public class CoursesService implements CourseService {
             }
         }
 
-        String title = filter != null ? filter.getTitle() : null;
+        String title = (filter != null && filter.getTitle() != null && !filter.getTitle().isBlank())
+                ? filter.getTitle().trim()
+                : null;
 
-        return courseRepository.findByFilter(ownerId, title, pageable);
+        if (title == null) {
+            return courseRepository.findByOwnerId(ownerId, pageable);
+        } else {
+            return courseRepository.findByOwnerIdAndTitleContainingIgnoreCase(ownerId, title, pageable);
+        }
     }
 
     @Transactional
     public Course update(UUID id, @Valid UpdateCourseRequest request, UUID userId) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new CourseNotFoundException(id.toString()));
-        if(!course.getOwnerId().equals(userId)){
+        if (!course.getOwnerId().equals(userId)) {
             throw new CourseForbiddenException("This course is not yours");
         }
 
@@ -97,7 +104,7 @@ public class CoursesService implements CourseService {
     public void delete(UUID id, UUID userId) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new CourseNotFoundException(id.toString()));
-        if(!course.getOwnerId().equals(userId)){
+        if (!course.getOwnerId().equals(userId)) {
             throw new CourseForbiddenException("This course is not yours");
         }
         courseRepository.deleteById(id);
