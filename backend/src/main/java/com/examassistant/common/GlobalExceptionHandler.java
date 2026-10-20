@@ -7,6 +7,7 @@ import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -34,6 +35,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({IllegalArgumentException.class, FileUploadException.class})
     public ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException ex, WebRequest req){
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex, WebRequest req) {
+        log.warn("Missing parameter: {}", ex.getParameterName());
+        return build(HttpStatus.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing", req);
     }
 
     @ExceptionHandler(UserAlreadyExistException.class)
