@@ -84,6 +84,7 @@ CREATE TABLE tests (
     time_limit_minutes INT,          -- лимит времени (в минутах)
     created_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status_test        VARCHAR(50) NOT NULL, --статус теста
+    difficulty      VARCHAR(20) DEFAULT 'medium',     -- easy, medium, hard
 
     CONSTRAINT fk_tests_course FOREIGN KEY (course_id) 
         REFERENCES courses (course_id) ON DELETE CASCADE
@@ -102,7 +103,6 @@ CREATE TABLE test_questions (
     options         JSONB,               -- варианты ответов (для закрытых вопросов)
     answer_key      JSONB,               -- эталонный правильный ответ / ключи
     key_points      JSONB,               -- критерии/пункты оценки для открытых вопросов
-    difficulty      VARCHAR(20) DEFAULT 'medium', -- easy, medium, hard
     source_chunk_id UUID,                -- привязка к чанку (Groundedness / цитирование)
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -144,7 +144,6 @@ CREATE TABLE attempt_answers (
     student_answer JSONB NOT NULL, -- текст или выбранные ID вариантов
     score          NUMERIC(3, 2), -- баллы за вопрос (0.0-1.0)
     feedback       TEXT,          -- разбор ошибки и фидбэк от LLM
-    confidence     NUMERIC(3, 2), -- уверенность LLM-судьи
     created_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_answers_attempt FOREIGN KEY (attempt_id) 
