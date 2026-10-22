@@ -105,6 +105,46 @@ services:
     networks:
       - helper-network
 
+  ml:
+    container_name: ml
+    build:
+      context: ./ml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      # Postgres: ML пишет только material_chunks, читает test_questions.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+
+      # Три пары стримов. Тип задачи задаёт имя стрима — поля type в payload нет.
+      STREAM_TASKS_INGEST: ml:tasks:ingest
+      STREAM_TASKS_CREATE_TEST: ml:tasks:create-test
+      STREAM_TASKS_GRADE_ATTEMPT: ml:tasks:grade-attempt
+      STREAM_RESULTS_INGEST: ml:results:ingest
+      STREAM_RESULTS_CREATE_TEST: ml:results:create-test
+      STREAM_RESULTS_GRADE_ATTEMPT: ml:results:grade-attempt
+      CONSUMER_GROUP: ml-workers
+      CONSUMER_NAME: worker-1
+
+      MINIO_ENDPOINT: seaweedfs:9000
+      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${S3_SECRET_KEY}
+      MINIO_BUCKET: materials
+      MINIO_SECURE: "false"
+
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-minimax/minimax-m3:free}
+      EMBED_MODEL: ${EMBED_MODEL:-openai/text-embedding-3-small}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    networks:
+      - helper-network
+
   frontend:
     container_name: frontend
     build:
