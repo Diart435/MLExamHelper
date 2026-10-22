@@ -1,8 +1,13 @@
 import { useState, useMemo, useEffect, type FormEvent } from 'react';
+// 1. ДОБАВЬТЕ ИМПОРТ ФУНКЦИИ УДАЛЕНИЯ ИЗ ВАШЕГО API ФАЙЛА
+import { deleteCourse } from '../api/courses'; 
 import './CoursesPage.css';
 
+/* ===================== ТИПЫ ===================== */
+
 interface Course {
-  id: number;
+  // 2. ИСПРАВИЛИ ТИП ID НА STRING (UUID) ДЛЯ СОВМЕСТИМОСТИ С БЭКЕНДОМ
+  id: string; 
   title: string;
   description?: string;
   materialsCount: number;
@@ -10,58 +15,71 @@ interface Course {
   progress: number;
 }
 
-const MOCK_COURSES: Course[] = [];
+type MaterialStatus = 'done' | 'progress' | 'error';
+type MaterialKind = 'PDF' | 'Текст' | 'Ссылка' | 'Документ';
+
+interface MaterialItem {
+  id: string;
+  name: string;
+  kind: MaterialKind;
+  status: MaterialStatus;
+}
+
+interface TestItem {
+  id: string;
+  name: string;
+  date: string;
+  questions: number;
+  grade: number;
+}
+
+const MOCK_COURSES: Course[] = [
+  // 3. ОБНОВИЛИ МОКОВЫЕ ДАННЫЕ ПОД НОВЫЙ ТИП ID
+  { 
+    id: '550e8400-e29b-41d4-a716-446655440000', 
+    title: 'Базы данных', 
+    materialsCount: 12, 
+    testsCount: 3, 
+    progress: 72 
+  },
+];
 
 type SortOption = 'newest' | 'progress';
 
-/* ===================== МОДАЛКА ===================== */
+/* ===================== МОДАЛКА «СОЗДАНИЕ КУРСА» ===================== */
 
 interface CreateCourseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (data: { name: string; description: string; files: File[] }) => void;
+  onCreate: (data: { name: string; description: string }) => void;
 }
 
 const CreateCourseModal = ({ isOpen, onClose, onCreate }: CreateCourseModalProps) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
 
-  // Блокируем прокрутку фона + Esc закрывает
   useEffect(() => {
     if (!isOpen) return;
-
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
-
     return () => {
       document.body.style.overflow = prevOverflow;
       document.removeEventListener('keydown', onKey);
     };
   }, [isOpen, onClose]);
 
-  // Сбрасываем форму при открытии
   useEffect(() => {
     if (isOpen) {
       setName('');
       setDescription('');
-      setFiles([]);
       setError('');
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const handleFiles = (list: FileList | null) => {
-    if (!list) return;
-    setFiles(Array.from(list));
-  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -70,27 +88,25 @@ const CreateCourseModal = ({ isOpen, onClose, onCreate }: CreateCourseModalProps
       setError('Введите название курса');
       return;
     }
-    onCreate({ name: trimmed, description: description.trim(), files });
+    onCreate({ name: trimmed, description: description.trim() });
     onClose();
   };
+
+  // handleDeleteCourse УДАЛЕН ОТСЮДА, так как это не место для него
 
   return (
     <div
       className="modal-overlay is-open"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="modal-title"
-      onMouseDown={(e) => {
-        // закрываем только если кликнули именно по фону, а не по карточке
-        if (e.target === e.currentTarget) onClose();
-      }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
         <button className="modal-close" type="button" onClick={onClose} aria-label="Закрыть">
           ×
         </button>
 
-        <h2 className="modal-title" id="modal-title">Название курса</h2>
+        <h2 className="modal-title">Название курса</h2>
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="modal-field">
@@ -118,32 +134,7 @@ const CreateCourseModal = ({ isOpen, onClose, onCreate }: CreateCourseModalProps
             />
           </div>
 
-          <div className="modal-upload">
-            <span className="modal-upload-icon">📎</span>
-            <div className="modal-upload-title">Загрузите материалы</div>
-            <div>Перетащите файлы сюда или нажмите, чтобы выбрать</div>
-            <input
-              type="file"
-              multiple
-              hidden
-              id="cc-files"
-              onChange={(e) => handleFiles(e.target.files)}
-            />
-            <label htmlFor="cc-files" className="modal-upload-link">Выбрать файлы</label>
-            {files.length > 0 && (
-              <div className="modal-files-list">
-                {files.map((f) => (
-                  <div key={f.name + f.size} className="modal-file-item">
-                    📄 {f.name}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <p className="modal-upload-note">Материалы можно будет загрузить позже</p>
-
-          <div className="modal-actions">
+          <div className="modal-actions" style={{ marginTop: '32px' }}>
             <button className="modal-btn modal-btn-cancel" type="button" onClick={onClose}>
               Отмена
             </button>
@@ -157,7 +148,92 @@ const CreateCourseModal = ({ isOpen, onClose, onCreate }: CreateCourseModalProps
   );
 };
 
-/* ===================== СТРАНИЦА ===================== */
+/* ===================== СТРАНИЦА КУРСА ===================== */
+
+interface CourseViewProps {
+  onBack: () => void;
+}
+
+const CourseView = ({ onBack }: CourseViewProps) => {
+  const materials: MaterialItem[] = [
+    { id: 'm1', name: 'Конспект_Лекция_1.pdf', kind: 'PDF', status: 'done' },
+    { id: 'm2', name: 'Транзакция_и_индексы.pdf', kind: 'PDF', status: 'done' },
+    { id: 'm3', name: 'Лекция_sql_.txt', kind: 'Текст', status: 'progress' },
+    { id: 'm4', name: 'Статья про нормализацию', kind: 'Ссылка', status: 'done' },
+    { id: 'm5', name: 'Схема_БД.docx', kind: 'Документ', status: 'error' },
+  ];
+
+  const tests: TestItem[] = [
+    { id: 't1', name: 'Тест по всему курсу', date: '10.09', questions: 10, grade: 4 },
+    { id: 't2', name: 'Транзакции', date: '20.09', questions: 20, grade: 4 },
+  ];
+
+  return (
+    <div className="course-page">
+      <div className="course-columns">
+        {/* ЛЕВАЯ КОЛОНКА: МАТЕРИАЛЫ */}
+        <section className="course-panel">
+          <h2 className="panel-title">Материалы</h2>
+          
+          {/* Чёрная кнопка из макета */}
+          <button className="btn-open-black" type="button">
+            Открыть материалы
+          </button>
+
+          <div className="materials-list" style={{ marginTop: '20px' }}>
+            {materials.length === 0 && (
+              <div className="empty-state">Пока нет материалов</div>
+            )}
+            {materials.map((m) => (
+              <div key={m.id} className="material-row">
+                <div className="material-body">
+                  <p className="material-name">{m.name}</p>
+                  <span className="material-type">{m.kind}</span>
+                </div>
+                <span className={`badge ${m.status}`}>
+                  {m.status === 'done' && 'Обработан'}
+                  {m.status === 'progress' && 'В процессе'}
+                  {m.status === 'error' && 'Ошибка'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ПРАВАЯ КОЛОНКА: ТЕСТЫ */}
+        <section className="course-panel">
+          <h2 className="panel-title">Тесты курса</h2>
+
+          {/* Чёрная кнопка из макета */}
+          <button className="btn-open-black" type="button">
+            Открыть тесты
+          </button>
+
+          <div className="tests-list" style={{ marginTop: '20px' }}>
+            {tests.length === 0 && (
+              <div className="empty-state">Пока нет тестов</div>
+            )}
+            {tests.map((t) => (
+              <div key={t.id} className="test-row">
+                <div className="test-body">
+                  <p className="test-name">{t.name}</p>
+                  <span className="test-meta">{t.date} · {t.questions} вопросов</span>
+                </div>
+                <div className="test-grade" title="Оценка">{t.grade}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <button className="btn-back" type="button" onClick={onBack}>
+        ← Ко всем курсам
+      </button>
+    </div>
+  );
+};
+
+/* ===================== ГЛАВНЫЙ КОМПОНЕНТ ===================== */
 
 const CoursesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -165,6 +241,26 @@ const CoursesPage = () => {
   const [isLoading] = useState(false);
   const [courses, setCourses] = useState<Course[]>(MOCK_COURSES);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [openedCourse, setOpenedCourse] = useState<Course | null>(null);
+
+
+  // 5. ПЕРЕНОСИМ ЛОГИКУ УДАЛЕНИЯ СЮДА
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!window.confirm('Вы уверены, что хотите удалить этот курс?')) {
+      return;
+    }
+
+    try {
+      await deleteCourse(courseId);
+      // Обновляем локальный стейт, удалив курс из массива
+      setCourses((prev) => prev.filter((c) => c.id !== courseId));
+    } catch (err: any) {
+      console.error('Ошибка удаления курса:', err);
+      const errorMsg = err.response?.data?.message || 'Не удалось удалить курс';
+      alert(errorMsg);
+    }
+  };
 
   const filteredCourses = useMemo(() => {
     let result = [...courses];
@@ -178,20 +274,15 @@ const CoursesPage = () => {
     return result;
   }, [courses, searchQuery, sortBy]);
 
-  const handleCreateCourse = (data: { name: string; description: string; files: File[] }) => {
-    // TODO: заменить на реальный POST /api/courses (FormData с files)
-    console.log('CREATE COURSE:', {
-      name: data.name,
-      description: data.description,
-      files: data.files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
-    });
-
+  const handleCreateCourse = (data: { name: string; description: string }) => {
+    console.log('CREATE COURSE:', data);
     setCourses((prev) => [
       {
-        id: Date.now(),
+        // 6. ИСПОЛЬЗУЕМ STRING ID ДЛЯ ЕДИНООБРАЗИЯ
+        id: Date.now().toString(), 
         title: data.name,
         description: data.description,
-        materialsCount: data.files.length,
+        materialsCount: 0,
         testsCount: 0,
         progress: 0,
       },
@@ -199,11 +290,14 @@ const CoursesPage = () => {
     ]);
   };
 
+  if (openedCourse) {
+    return <CourseView onBack={() => setOpenedCourse(null)} />;
+  }
+
   return (
     <div className="courses-page">
       <header className="courses-header">
         <h1 className="page-title"></h1>
-
         <div className="controls-bar">
           <input
             type="text"
@@ -212,7 +306,6 @@ const CoursesPage = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
-
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -221,7 +314,6 @@ const CoursesPage = () => {
             <option value="newest">Сначала новые</option>
             <option value="progress">По прогрессу</option>
           </select>
-
           <button className="btn-create-course" onClick={() => setIsModalOpen(true)}>
             + Создать курс
           </button>
@@ -240,12 +332,10 @@ const CoursesPage = () => {
                 <h3 className="card-title">{course.title}</h3>
                 <span className="card-badge">{course.testsCount}</span>
               </div>
-
               <ul className="card-stats-list">
                 <li>• {course.materialsCount} материалов</li>
                 <li>• {course.testsCount} теста</li>
               </ul>
-
               <div className="progress-section">
                 <div className="progress-label">
                   <span>Готовность к сессии - {course.progress}%</span>
@@ -257,10 +347,26 @@ const CoursesPage = () => {
                   />
                 </div>
               </div>
-
+              
               <div className="card-actions">
-                <button className="btn-open">Открыть</button>
-                <button className="btn-create-test">Создать тест</button>
+                <button
+                  className="btn-open"
+                  type="button"
+                  onClick={() => setOpenedCourse(course)}
+                >
+                  Открыть
+                </button>
+                <button 
+                  className="btn-delete" 
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // 7. ТЕПЕРЬ ЭТА ФУНКЦИЯ ВИДИТ handleDeleteCourse
+                    handleDeleteCourse(course.id);
+                  }}
+                >
+                  Удалить
+                </button>
               </div>
             </article>
           ))

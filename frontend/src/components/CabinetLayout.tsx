@@ -7,16 +7,31 @@ const CabinetLayout = () => {
   const location = useLocation();
   const checkAuth = useAuthStore((state) => state.checkAuth);
   const logout = useAuthStore((state) => state.logout);
-  const firstName = useAuthStore((state) => state.firstName) || 'Пользователь';
-  const lastName = useAuthStore((state) => state.lastName) || '';
+  
+  // <-- Читаем флаг инициализации и реальные данные
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+  const firstName = useAuthStore((state) => state.firstName);
+  const lastName = useAuthStore((state) => state.lastName);
   const userRole = useAuthStore((state) => state.userRole) || 'Студент';
 
   const navigate = useNavigate();
 
-  const fullName = `${firstName} ${lastName}`.trim();
+  // <-- Если данные ещё не загрузились, показываем простой лоадер (или верни null)
+  if (!isInitialized) {
+    return (
+      <div className="menu-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="loading-text">Загрузка профиля...</div>
+      </div>
+    );
+  }
+
+  // <-- Используем реальные данные или фоллбек только ПОСЛЕ инициализации
+  const displayName = firstName || 'Пользователь';
+  const displayLastName = lastName || '';
+  const fullName = `${displayName} ${displayLastName}`.trim();
 
   const getInitials = (name: string) => {
-    if (!name) return 'П';
+    if (!name || name === 'Пользователь') return 'П';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -24,7 +39,7 @@ const CabinetLayout = () => {
     return name.substring(0, 2).toUpperCase();
   };
 
-  const userInitials = getInitials(fullName);
+  const userInitials = getInitials(displayName);
 
   useEffect(() => {
     checkAuth();
@@ -149,7 +164,7 @@ const CabinetLayout = () => {
         )}
       </div>
 
-      <div className="cabinet-outlet">
+      <div className={`cabinet-outlet${isCoursesPage ? ' cabinet-outlet--courses' : ''}`}>
         <Outlet />
       </div>
     </div>

@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=BrokenLed&family=Tektur:wght@400;500;600&display=swap');
 
+/* =========================================================
+   СПИСОК КУРСОВ (как было)
+   ========================================================= */
+
 .courses-page {
   padding: 40px 60px;
   max-width: 100%;
@@ -71,7 +75,6 @@
   background: #925ff0;
 }
 
-/* --- Сетка карточек --- */
 .courses-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -189,13 +192,6 @@
 .btn-open:hover { background: #925ff0; }
 .btn-create-test:hover { background: rgba(190, 159, 246, 0.1); }
 
-@media (max-width: 768px) {
-  .courses-page { padding: 20px; }
-  .page-title { font-size: 36px; }
-  .controls-bar { flex-direction: column; align-items: stretch; }
-  .search-input, .sort-select, .btn-create-course { width: 100%; max-width: none; }
-}
-
 /* =========================================================
    МОДАЛЬНОЕ ОКНО «СОЗДАНИЕ КУРСА»
    ========================================================= */
@@ -213,10 +209,7 @@
   animation: modalOverlayIn 0.22s ease both;
 }
 
-@keyframes modalOverlayIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+@keyframes modalOverlayIn { from { opacity: 0; } to { opacity: 1; } }
 
 .modal-card {
   position: relative;
@@ -308,75 +301,6 @@
   color: #d64545;
 }
 
-/* Зона загрузки */
-.modal-upload {
-  border: 3px dashed #BE9FF6;
-  border-radius: 16px;
-  padding: 22px 20px;
-  text-align: center;
-  color: #707071;
-  font-size: 14px;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.modal-upload:hover {
-  background: rgba(190, 159, 246, 0.06);
-  border-color: #925FF0;
-}
-
-.modal-upload-icon {
-  display: block;
-  font-size: 26px;
-  margin-bottom: 8px;
-  color: #BE9FF6;
-}
-
-.modal-upload-title {
-  font-weight: 600;
-  color: #292929;
-  margin-bottom: 4px;
-}
-
-.modal-upload-link {
-  display: inline-block;
-  margin-top: 10px;
-  padding: 8px 18px;
-  border-radius: 100px;
-  background: #BE9FF6;
-  color: #fff;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.modal-upload-link:hover { background: #925FF0; }
-
-.modal-files-list {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: left;
-}
-
-.modal-file-item {
-  font-size: 13px;
-  color: #403838;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.modal-upload-note {
-  margin: 10px 0 26px;
-  font-size: 13px;
-  color: #707071;
-  text-align: center;
-  font-style: italic;
-}
-
-/* Кнопки */
 .modal-actions {
   display: flex;
   gap: 14px;
@@ -410,12 +334,188 @@
 }
 
 .modal-btn-create:hover { background: #1a1a1a; }
-
 .modal-btn:active { transform: scale(0.985); }
 
-@media (max-width: 560px) {
-  .modal-card { padding: 26px 22px 28px; border-width: 8px; border-radius: 32px; }
-  .modal-title { font-size: 30px; }
-  .modal-actions { flex-direction: column; }
-  .modal-btn-cancel { flex: 1; }
+/* =========================================================
+   СТРАНИЦА КУРСА
+   ========================================================= */
+
+.course-page {
+  padding: 40px 40px 60px;
+  font-family: 'Poppins', 'Tektur', sans-serif;
+  color: #292929;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.course-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.course-panel {
+  background: #fff;
+  border: 3px solid #707071;
+  border-radius: 11px;
+  padding: 22px 22px 26px;
+  min-height: 400px;
+}
+
+.panel-title {
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 40px;
+  line-height: 1.05;
+  margin: 0 0 20px;
+  color: #000;
+}
+
+/* НОВАЯ ЧЁРНАЯ КНОПКА (внутри колонок) */
+.btn-open-black {
+  width: 100%;
+  padding: 12px;
+  background: #000000;
+  color: #FFFFFF;
+  border: 3px solid #000000;
+  border-radius: 16px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px; /* Чуть уменьшили для аккуратности */
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-open-black:hover {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+}
+
+.btn-open-black:active {
+  transform: scale(0.98);
+}
+
+/* Списки материалов и тестов */
+.material-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 3px solid #707071;
+}
+.material-row:last-child { border-bottom: none; }
+.material-body { min-width: 0; }
+.material-name {
+  font-family: 'Tektur', sans-serif;
+  font-size: 20px;
+  line-height: 1.15;
+  margin: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.material-type {
+  font-family: 'Tektur', sans-serif;
+  font-size: 14px;
+  color: #707071;
+}
+
+.badge {
+  font-family: 'Tektur', sans-serif;
+  font-size: 14px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.badge.done { background: #C8FEC7; border-color: #56BD54; color: #56BD54; }
+.badge.progress { background: #DCC9FF; border-color: #925FF0; color: #925FF0; }
+.badge.error { background: #FFC5C5; border-color: #E64646; color: #E64646; }
+
+.test-row {
+  padding: 18px 0;
+  border-bottom: 3px solid #707071;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+.test-row:last-of-type { border-bottom: none; }
+.test-body { min-width: 0; }
+.test-name {
+  font-family: 'Tektur', sans-serif;
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 0 0 6px;
+}
+.test-meta {
+  font-family: 'Tektur', sans-serif;
+  font-size: 15px;
+  color: #707071;
+}
+.test-grade {
+  width: 40px;
+  height: 40px;
+  background: #000;
+  color: #fff;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Tektur', sans-serif;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.btn-back {
+  margin-top: 28px;
+  background: transparent;
+  border: none;
+  color: #925FF0;
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.btn-back:hover { text-decoration: underline; }
+
+.empty-state {
+  text-align: center;
+  color: #707071;
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+@media (max-width: 1024px) {
+  .course-columns { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .courses-page { padding: 20px; }
+  .page-title { font-size: 36px; }
+  .controls-bar { flex-direction: column; align-items: stretch; }
+  .search-input, .sort-select, .btn-create-course { width: 100%; max-width: none; }
+}
+
+.btn-delete {
+  flex: 1;
+  padding: 10px;
+  background: black;
+  color: #fff;
+  border-radius: 12px;
+  font-family: 'Tektur', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: black;
+  color: #fff;
 }
