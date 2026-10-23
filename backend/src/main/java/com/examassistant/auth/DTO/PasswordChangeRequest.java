@@ -8,5 +8,9 @@ import lombok.Data;
 public class PasswordChangeRequest {
     @NotBlank(message = "Password is required")
     @Size(min = 8, max = 20, message = "Password can be bigger than 8 and less than 20")
-    private String password;
+    private String lastPassword;
+
+    @NotBlank(message = "Password is required")
+    @Size(min = 8, max = 20, message = "Password can be bigger than 8 and less than 20")
+    private String newPassword;
 }

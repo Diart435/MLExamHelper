@@ -345,7 +345,7 @@ a.mr-stripe:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 43px 0 100px; /* 43px слева - как в Login */
+  padding: 0 43px 0 100px;
   z-index: 20;
   transform: translateX(-50%);
 }
@@ -354,7 +354,7 @@ a.mr-stripe:hover {
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 8px 28px; /* Ровно как в Login */
+  padding: 8px 28px;
   display: flex;
   align-items: center;
   gap: 10px;

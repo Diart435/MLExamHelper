@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   postgres:
     image: pgvector/pgvector:pg15
@@ -38,22 +37,40 @@ services:
   seaweedfs:
     image: chrislusf/seaweedfs:4.47
     container_name: seaweedfs
-    command: server -s3 -s3.port=9000 -master.volumeSizeLimitMB=100
-    ports:
-      - "9000:9000"
-      - "9333:9333"
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
+      WEED_JWT_FILER_SIGNING_KEY: "your-super-secret-signing-key-at-least-32-chars-long"
+      WEED_S3_EXTERNAL_URL: http://localhost:9000
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        cp /etc/seaweedfs/s3-config.json /tmp/s3-config.json
+        
+        sed -e "s|\$${S3_ACCESS_KEY}|\${S3_ACCESS_KEY}|g" \
+            -e "s|\$${S3_SECRET_KEY}|\${S3_SECRET_KEY}|g" \
+            /tmp/s3-config.json > /tmp/s3-config-final.json
+            
+        mv /tmp/s3-config-final.json /tmp/s3-config.json
+        
+        exec weed server -s3 -s3.port=9000 -s3.config=/tmp/s3-config.json -s3.iam.config=/etc/seaweedfs/iam-s3-config.json -master.volumeSizeLimitMB=100
     healthcheck:
       test: ["CMD", "wget", "--timeout=3", "--quiet", "--tries=1", "-O", "/dev/null", "http://127.0.0.1:9333/cluster/status"]
       interval: 10s
       timeout: 10s
       retries: 6
-      start_period: 15s
+      start_period: 30s
+    ports:
+      - "9000:9000"
+      - "9333:9333"
     volumes:
       - seaweedfs-data:/data
+      - ./s3-config.json:/etc/seaweedfs/s3-config.json:ro
+      - ./iam-s3-config.json:/etc/seaweedfs/iam-s3-config.json:ro
     restart: unless-stopped
+    networks:
+      - helper-network
 
   backend:
     container_name: backend
@@ -73,7 +90,58 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-    restart: always
+      STORAGE_S3_ENDPOINT: http://seaweedfs:9000
+      STORAGE_S3_PUBLIC_ENDPOINT: http://localhost:9000
+      STORAGE_S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      STORAGE_S3_SECRET_KEY: ${S3_SECRET_KEY}
+      STORAGE_S3_BUCKET: materials
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - helper-network
+
+  ml:
+    container_name: ml
+    build:
+      context: ./ml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      # Postgres: ML пишет только material_chunks, читает test_questions.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+
+      # Три пары стримов. Тип задачи задаёт имя стрима — поля type в payload нет.
+      STREAM_TASKS_INGEST: ml:tasks:ingest
+      STREAM_TASKS_CREATE_TEST: ml:tasks:create-test
+      STREAM_TASKS_GRADE_ATTEMPT: ml:tasks:grade-attempt
+      STREAM_RESULTS_INGEST: ml:results:ingest
+      STREAM_RESULTS_CREATE_TEST: ml:results:create-test
+      STREAM_RESULTS_GRADE_ATTEMPT: ml:results:grade-attempt
+      CONSUMER_GROUP: ml-workers
+      CONSUMER_NAME: worker-1
+
+      MINIO_ENDPOINT: seaweedfs:9000
+      MINIO_ACCESS_KEY: ${S3_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${S3_SECRET_KEY}
+      MINIO_BUCKET: materials
+      MINIO_SECURE: "false"
+
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-minimax/minimax-m3:free}
+      EMBED_MODEL: ${EMBED_MODEL:-openai/text-embedding-3-small}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
     networks:
       - helper-network
 
@@ -85,7 +153,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - helper-network

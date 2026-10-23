@@ -1,18 +1,17 @@
 package com.examassistant.common;
 
 import com.examassistant.common.DTO.ApiError;
-import com.examassistant.common.exception.InvalidCredentialsException;
-import com.examassistant.common.exception.InvalidTokenException;
-import com.examassistant.common.exception.UserAlreadyExistException;
-import com.examassistant.common.exception.UserNotFoundException;
+import com.examassistant.common.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -29,9 +28,19 @@ public class GlobalExceptionHandler {
         log.warn("Validation failed: {}", message);
         return build(HttpStatus.BAD_REQUEST, message, req);
     }
-    @ExceptionHandler(IllegalArgumentException.class)
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest req) {
+        return build(HttpStatus.BAD_REQUEST, "Invalid ID format. Must be a UUID", req);
+    }
+    @ExceptionHandler({IllegalArgumentException.class, FileUploadException.class})
     public ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException ex, WebRequest req){
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex, WebRequest req) {
+        log.warn("Missing parameter: {}", ex.getParameterName());
+        return build(HttpStatus.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing", req);
     }
 
     @ExceptionHandler(UserAlreadyExistException.class)
@@ -39,8 +48,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), req);
     }
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ApiError> handleNotFound(UserNotFoundException ex, WebRequest req){
+    @ExceptionHandler({FileForbiddenException.class, CourseForbiddenException.class})
+    public ResponseEntity<ApiError> handleForbidden(Exception ex, WebRequest req){
+        return build(HttpStatus.FORBIDDEN, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler({UserNotFoundException.class,FileNotFoundException.class})
+    public ResponseEntity<ApiError> handleNotFound(Exception ex, WebRequest req){
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 
@@ -51,7 +65,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, WebRequest req){
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", req);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), req);
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, WebRequest req) {
@@ -63,5 +77,20 @@ public class GlobalExceptionHandler {
                 req.getDescription(false).replace("uri=", "")
         );
         return ResponseEntity.status(status).body(body);
+    }
+
+    @ExceptionHandler(CourseNotFoundException.class)
+    public ResponseEntity<ApiError> handleCourseNotFound(CourseNotFoundException ex, WebRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleConstraintViolation(jakarta.validation.ConstraintViolationException ex, WebRequest req) {
+        String message = ex.getConstraintViolations().stream()
+                .map(constraintViolation -> constraintViolation.getMessage())
+                .collect(Collectors.joining("; "));
+
+        log.warn("Constraint violation: {}", message);
+        return build(HttpStatus.BAD_REQUEST, message, req);
     }
 }
