@@ -41,7 +41,7 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       WEED_JWT_FILER_SIGNING_KEY: "your-super-secret-signing-key-at-least-32-chars-long"
-      WEED_S3_EXTERNAL_URL: http://localhost:9000
+      WEED_S3_EXTERNAL_URL: http://${HOST_IP}:9000
     entrypoint:
       - /bin/sh
       - -c
@@ -91,10 +91,11 @@ services:
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       STORAGE_S3_ENDPOINT: http://seaweedfs:9000
-      STORAGE_S3_PUBLIC_ENDPOINT: http://localhost:9000
+      STORAGE_S3_PUBLIC_ENDPOINT: http://${HOST_IP}:9000
       STORAGE_S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       STORAGE_S3_SECRET_KEY: ${S3_SECRET_KEY}
       STORAGE_S3_BUCKET: materials
+      APP_CORS_ALLOWED_ORIGINS: http://${HOST_IP}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health/readiness"]
       interval: 10s
@@ -117,7 +118,6 @@ services:
       seaweedfs:
         condition: service_healthy
     environment:
-      # Postgres: ML пишет только material_chunks, читает test_questions.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
 
@@ -151,7 +151,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "80:80"
     depends_on:
       backend:
         condition: service_healthy
