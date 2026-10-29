@@ -254,7 +254,7 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
             <button 
               className="btn-open-black" 
               type="button"
-              onClick={() => window.location.href = '/results'}
+              onClick={() => window.location.href = '/tests'}
             >
               Открыть тесты
             </button>

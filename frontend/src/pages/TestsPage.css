@@ -1,0 +1,389 @@
+@import url('https://fonts.googleapis.com/css2?family=BrokenLed&family=Tektur:wght@400;500;600&display=swap');
+
+/* =========================================================
+   ОБЩАЯ СТРАНИЦА
+   ========================================================= */
+.tests-page {
+  padding: 24px 60px 60px;
+  font-family: 'Tektur', sans-serif;
+  color: #292929;
+  background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(190,159,246,0.1) 100%);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* =========================================================
+   ПАНЕЛЬ ФИЛЬТРОВ
+   ========================================================= */
+.filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.filter-select {
+  padding: 10px 16px;
+  border-radius: 16px;
+  border: 3px solid #BE9FF6;
+  background: #fff;
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+  color: #707071;
+  cursor: pointer;
+  outline: none;
+}
+
+.filter-select--purple {
+  background: #E3D4FF;
+  color: #000;
+}
+
+.grade-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.grade-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  border: 3px solid #BE9FF6;
+  background: #fff;
+  font-family: 'Tektur', sans-serif;
+  font-size: 20px;
+  color: #000;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.grade-btn:hover,
+.grade-btn.active {
+  background: #E3D4FF;
+}
+
+.search-input {
+  flex-grow: 1;
+  min-width: 200px;
+  max-width: 250px;
+  padding: 12px 20px;
+  border-radius: 16px;
+  border: 3px solid #BE9FF6;
+  background: #fff;
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+  color: #000;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: #707071;
+}
+
+.btn-create-test {
+  padding: 12px 24px;
+  border-radius: 16px;
+  border: 3px solid #BE9FF6;
+  background: #E3D4FF;
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  color: #000;
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 0.2s;
+}
+
+.btn-create-test:hover {
+  background: #d4c0ff;
+}
+
+/* =========================================================
+   ТАБЛИЦА (ВКЛАДОЧНЫЙ ДИЗАЙН КАК В КУРСАХ)
+   ========================================================= */
+.tabbed-section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ушко (заголовок) */
+.panel-title.tab-header {
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 32px;
+  line-height: 1.05;
+  margin: 0 0 0 24px;
+  padding: 8px 24px;
+  color: #000;
+  background: #fff;
+  border: 3px solid #707071;
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  z-index: 2;
+  position: relative;
+  top: 3px;
+  width: fit-content;
+}
+
+/* Белый блок */
+.course-panel.tabbed-panel {
+  background: #fff;
+  border: 3px solid #707071;
+  border-radius: 16px;
+  padding: 24px;
+  min-height: 400px;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+}
+
+/* Сетка заголовков таблицы */
+.table-head {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1.2fr 1.5fr;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid #707071;
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+  color: #000;
+  font-weight: 500;
+}
+
+/* Тело таблицы */
+.table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1.2fr 1.5fr;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 3px solid #707071;
+  font-size: 16px;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+/* Бейджи */
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 70px;
+  height: 26px;
+  background: #BE9FF6;
+  border: 1px solid #000;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.grade-badge--empty {
+  background: #fff;
+  border: 1px solid #ccc;
+  color: #999;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.status-badge--done {
+  background: #C8FEC7;
+  border: 1px solid #56BD54;
+  color: #56BD54;
+}
+
+.status-badge--progress {
+  background: #F6FEC7;
+  border: 1px solid #BDAD54;
+  color: #BDAD54;
+}
+
+/* Кнопки действий */
+.col-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #BE9FF6;
+  background: #E3D4FF;
+  font-family: 'Tektur', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-btn:hover {
+  background: #d4c0ff;
+}
+
+.action-btn--wide {
+  width: 100%;
+  max-width: 139px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #707071;
+  font-style: italic;
+  padding: 40px 0;
+}
+
+/* =========================================================
+   МОДАЛЬНОЕ ОКНО
+   ========================================================= */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.57);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card {
+  position: relative;
+  width: 630px;
+  max-width: 100%;
+  background: linear-gradient(0deg, rgba(238, 255, 238, 0.37), rgba(238, 255, 238, 0.37)), #fff;
+  border: 11px solid #C8FEC7;
+  border-radius: 48px;
+  box-shadow: 0 17px 17.6px rgba(0, 0, 0, 0.25);
+  padding: 36px 40px 40px;
+  font-family: 'Tektur', sans-serif;
+}
+
+.modal-close {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  background: transparent;
+  border: none;
+  font-size: 30px;
+  cursor: pointer;
+}
+
+.modal-title {
+  font-family: 'BrokenLed', sans-serif;
+  font-size: 35px;
+  margin: 0 0 24px;
+}
+
+.modal-field {
+  margin-bottom: 24px;
+}
+
+.modal-label {
+  display: block;
+  font-size: 25px;
+  margin-bottom: 12px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 3px solid #BE9FF6;
+  background: #fff;
+  font-family: 'Tektur', sans-serif;
+  font-size: 20px;
+  box-sizing: border-box;
+}
+
+.modal-error {
+  color: red;
+  font-size: 14px;
+  margin-top: 8px;
+  display: block;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-start;
+  margin-top: 32px;
+}
+
+.modal-btn {
+  padding: 12px 24px;
+  border-radius: 16px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 20px;
+  cursor: pointer;
+  border: 3px solid transparent;
+}
+
+.modal-btn-cancel {
+  background: #fff;
+  border-color: #BE9FF6;
+  color: #BE9FF6;
+}
+
+.modal-btn-create {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+}
+
+/* =========================================================
+   АДАПТИВ
+   ========================================================= */
+@media (max-width: 1100px) {
+  .table-head, .table-row {
+    grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr 1.5fr;
+  }
+  .col-date { display: none; }
+}
+
+@media (max-width: 768px) {
+  .tests-page { padding: 20px; }
+  .filters-bar { flex-direction: column; align-items: stretch; }
+  .search-input { max-width: none; }
+  .btn-create-test { margin-left: 0; }
+  
+  .table-head { display: none; }
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 16px;
+    border: 3px solid #707071;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+  .table-row .col-course,
+  .table-row .col-date,
+  .table-row .col-questions {
+    font-size: 14px;
+    color: #707071;
+  }
+  
+  .panel-title.tab-header {
+    margin-left: 16px;
+    padding: 6px 16px;
+    font-size: 28px;
+  }
+  
+  .course-panel.tabbed-panel {
+    padding: 16px;
+  }
+}
