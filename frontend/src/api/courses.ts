@@ -1,24 +1,11 @@
+// src/api/courses.ts
 import apiClient from './client';
 
-export interface Course {
-  id: string;                    // UUID в Java → string в TS
+// ===== DTO (Wire Format — 1-в-1 как в PDF) =====
+export interface CourseDto {
+  courseId: string;
   title: string;
-  courseDescription: string;     // camelCase как в Java DTO
-  ownerId: string;
-  createdAt: string;             // ISO-строка LocalDateTime
-  updatedAt: string;
-}
-
-// Структура ответа Spring Data Page<T>
-export interface CoursePage {
-  content: Course[];
-  totalPages: number;
-  totalElements: number;
-  number: number;                // текущая страница (с 0)
-  size: number;
-  first: boolean;
-  last: boolean;
-  empty: boolean;
+  courseDescription: string;
 }
 
 export interface CreateCourseRequest {
@@ -31,58 +18,74 @@ export interface UpdateCourseRequest {
   courseDescription?: string;
 }
 
-export interface CourseFilter {
-  title?: string;
-  page?: number;                 // по умолчанию 0
-  size?: number;                 // по умолчанию 20
-  sort?: string;                 // например: "createdAt,desc" или "title,asc"
+// Spring Data Page ответ
+export interface PageResponse<T> {
+  content: T[];
+  totalPages: number;
+  totalElements: number;
+  size: number;
+  number: number;
+  numberOfElements: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
 }
 
-export const getCourses = async (params: CourseFilter): Promise<CoursePage> => {
-  const response = await apiClient.get<CoursePage>('/api/courses', {
-    params: {
-      title: params.title || undefined,
-      page: params.page ?? 0,
-      size: params.size ?? 20,
-      sort: params.sort || undefined,
-    },
-  });
-  return response.data;
+export type CoursePage = PageResponse<CourseDto>;
+
+// ===== Query Params (плоские, как в PDF) =====
+export interface GetCoursesParams {
+  title?: string;      // фильтр по названию
+  page?: number;       // default 0
+  size?: number;       // default 10 (PDF: default 10)
+  sort?: string;       // e.g. "createdAt,desc"
+}
+
+// ===== API =====
+const BASE = '/api/courses';
+
+export const coursesApi = {
+  /** GET /api/courses?title=...&page=0&size=10&sort=createdAt,desc */
+  getAll: (params: GetCoursesParams = {}) => {
+    const sp = new URLSearchParams();
+    if (params.title) sp.set('title', params.title);
+    sp.set('page', String(params.page ?? 0));
+    sp.set('size', String(params.size ?? 10));
+    if (params.sort) sp.set('sort', params.sort);
+    return apiClient.get<CoursePage>(`${BASE}?${sp.toString()}`).then((r) => r.data);
+  },
+
+  /** GET /api/courses/{id} */
+  getById: (id: string) => apiClient.get<CourseDto>(`${BASE}/${id}`).then((r) => r.data),
+
+  /** POST /api/courses */
+  create: (data: CreateCourseRequest) => apiClient.post<CourseDto>(BASE, data).then((r) => r.data),
+
+  /** PUT /api/courses/{id} */
+  update: (id: string, data: UpdateCourseRequest) => apiClient.put<CourseDto>(`${BASE}/${id}`, data).then((r) => r.data),
+
+  /** DELETE /api/courses/{id} */
+  delete: (id: string) => apiClient.delete(`${BASE}/${id}`),
 };
 
-export const getCourseById = async (id: string): Promise<Course> => {
-  const response = await apiClient.get<Course>(`/api/courses/${id}`);
-  return response.data;
-};
+// ===== UI Mappers =====
+export interface CourseUI {
+  id: string;
+  title: string;
+  description: string;
+  materialsCount: number;
+  testsCount: number;
+  progress: number;
+  createdAt: string;
+}
 
-export const createCourse = async (data: CreateCourseRequest): Promise<Course> => {
-  const response = await apiClient.post<Course>('/api/courses', data);
-  return response.data;
-};
-
-export const updateCourse = async (
-  id: string,
-  data: UpdateCourseRequest
-): Promise<Course> => {
-  const response = await apiClient.put<Course>(`/api/courses/${id}`, data);
-  return response.data;
-};
-
-export const deleteCourse = async (id: string): Promise<void> => {
-  await apiClient.delete(`/api/courses/${id}`);
-};
-
-export const formatDate = (isoString: string): string => {
-  if (!isoString) return '';
-  return new Date(isoString).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-};
-
-export const truncateText = (text: string, maxLength: number = 120): string => {
-  if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength).trim() + '…';
-};
+export const mapCourseDtoToUI = (d: CourseDto, extra: Partial<CourseUI> = {}): CourseUI => ({
+  id: d.courseId,
+  title: d.title,
+  description: d.courseDescription,
+  materialsCount: 0,
+  testsCount: 0,
+  progress: 0,
+  createdAt: new Date().toISOString(),
+  ...extra,
+});

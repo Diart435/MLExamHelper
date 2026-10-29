@@ -7,31 +7,16 @@ const CabinetLayout = () => {
   const location = useLocation();
   const checkAuth = useAuthStore((state) => state.checkAuth);
   const logout = useAuthStore((state) => state.logout);
-  
-  // <-- Читаем флаг инициализации и реальные данные
-  const isInitialized = useAuthStore((state) => state.isInitialized);
-  const firstName = useAuthStore((state) => state.firstName);
-  const lastName = useAuthStore((state) => state.lastName);
+  const firstName = useAuthStore((state) => state.firstName) || 'Пользователь';
+  const lastName = useAuthStore((state) => state.lastName) || '';
   const userRole = useAuthStore((state) => state.userRole) || 'Студент';
 
   const navigate = useNavigate();
 
-  // <-- Если данные ещё не загрузились, показываем простой лоадер (или верни null)
-  if (!isInitialized) {
-    return (
-      <div className="menu-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="loading-text">Загрузка профиля...</div>
-      </div>
-    );
-  }
-
-  // <-- Используем реальные данные или фоллбек только ПОСЛЕ инициализации
-  const displayName = firstName || 'Пользователь';
-  const displayLastName = lastName || '';
-  const fullName = `${displayName} ${displayLastName}`.trim();
+  const fullName = `${firstName} ${lastName}`.trim();
 
   const getInitials = (name: string) => {
-    if (!name || name === 'Пользователь') return 'П';
+    if (!name) return 'П';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -39,7 +24,7 @@ const CabinetLayout = () => {
     return name.substring(0, 2).toUpperCase();
   };
 
-  const userInitials = getInitials(displayName);
+  const userInitials = getInitials(fullName);
 
   useEffect(() => {
     checkAuth();
@@ -56,6 +41,7 @@ const CabinetLayout = () => {
   };
 
   const isCoursesPage = location.pathname === '/courses';
+  const isTestsPage = location.pathname === '/tests';
 
   return (
     <div className="menu-page">
@@ -107,7 +93,7 @@ const CabinetLayout = () => {
             Материалы
           </NavLink>
           <NavLink
-            to="/results"
+            to="/tests"
             className={({ isActive }) =>
               `menu-item item-tests v15_945${isActive ? ' menu-item-active' : ''}`
             }
@@ -154,6 +140,7 @@ const CabinetLayout = () => {
           Выйти
         </button>
 
+        {/* Шапка КУРСОВ */}
         {isCoursesPage && (
           <div className="courses-header-box">
             <h1 className="courses-title">Курсы</h1>
@@ -162,9 +149,17 @@ const CabinetLayout = () => {
             </p>
           </div>
         )}
+
+        {/* Шапка ТЕСТОВ */}
+        {isTestsPage && (
+          <div className="tests-header-box">
+            <h1 className="tests-title">Мои тесты</h1>
+            <p className="tests-subtitle">Все тесты по всем курсам</p>
+          </div>
+        )}
       </div>
 
-      <div className={`cabinet-outlet${isCoursesPage ? ' cabinet-outlet--courses' : ''}`}>
+      <div className={`cabinet-outlet${isCoursesPage ? ' cabinet-outlet--courses' : ''}${isTestsPage ? ' cabinet-outlet--tests' : ''}`}>
         <Outlet />
       </div>
     </div>
