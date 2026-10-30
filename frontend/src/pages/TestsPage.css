@@ -104,37 +104,35 @@
 .tabbed-section {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 40px;
 }
 
-/* Ушко (заголовок) */
 .panel-title.tab-header {
+  background: #ffffff !important;
+  border: 3px solid #707071 !important;
+  border-bottom: 3px solid #ffffff !important; 
+  border-radius: 11px 11px 0 0 !important;
+  padding: 8px 24px !important;
   font-family: 'BrokenLed', 'Poppins', sans-serif;
   font-size: 32px;
-  line-height: 1.05;
-  margin: 0 0 0 24px;
-  padding: 8px 24px;
   color: #000;
-  background: #fff;
-  border: 3px solid #707071;
-  border-bottom: none;
-  border-radius: 16px 16px 0 0;
-  z-index: 2;
   position: relative;
-  top: 3px;
+  z-index: 10 !important;
+  margin-bottom: -2px !important; 
   width: fit-content;
 }
 
-/* Белый блок */
 .course-panel.tabbed-panel {
-  background: #fff;
-  border: 3px solid #707071;
-  border-radius: 16px;
-  padding: 24px;
-  min-height: 400px;
+  background: #ffffff !important;
+  border: 3px solid #707071 !important; 
+  border-radius: 11px !important;
+  padding: 24px !important;
+  min-height: 600px;
   width: 100%;
   box-sizing: border-box;
   position: relative;
-  z-index: 1;
+  z-index: 1 !important;
 }
 
 /* Сетка заголовков таблицы */
