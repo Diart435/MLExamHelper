@@ -519,3 +519,41 @@
   background: black;
   color: #fff;
 }
+/* ===================== ФИНАЛЬНОЕ РЕШЕНИЕ ДЛЯ ВКЛАДОК ===================== */
+
+.tabbed-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 40px;
+}
+
+.panel-title.tab-header {
+  background: #ffffff !important;
+  border: 3px solid #707071 !important;
+  /* МАГИЯ: нижняя граница вкладки белая. Она перекроет верхнюю границу блока */
+  border-bottom: 3px solid #ffffff !important; 
+  border-radius: 11px 11px 0 0 !important; /* Точно как в Figma (.v47_416) */
+  padding: 8px 24px !important;
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 32px;
+  color: #000;
+  position: relative;
+  z-index: 10 !important;
+  /* Притягиваем блок к вкладке на 3px (толщина границы) */
+  margin-bottom: -3px !important; 
+  width: fit-content;
+}
+
+.course-panel.tabbed-panel {
+  background: #ffffff !important;
+  /* ПОЛНАЯ рамка со всех 4 сторон, как ты просил */
+  border: 3px solid #707071 !important; 
+  border-radius: 11px !important; /* Точно как в Figma */
+  padding: 24px !important;
+  min-height: 600px;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1 !important;
+}

@@ -1,10 +1,13 @@
-import { useEffect } from 'react';
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { coursesApi } from '../api/courses';
 import '../pages/MenuPage.css';
 
 const CabinetLayout = () => {
   const location = useLocation();
+  const { courseId } = useParams<{ courseId: string }>();
+  const [courseTitle, setCourseTitle] = useState('');
   const checkAuth = useAuthStore((state) => state.checkAuth);
   const logout = useAuthStore((state) => state.logout);
   const firstName = useAuthStore((state) => state.firstName) || 'Пользователь';
@@ -42,6 +45,15 @@ const CabinetLayout = () => {
 
   const isCoursesPage = location.pathname === '/courses';
   const isTestsPage = location.pathname === '/tests';
+  const isCreateTestPage = location.pathname.includes('/tests/create');
+
+    useEffect(() => {
+    if (isCreateTestPage && courseId) {
+      coursesApi.getById(courseId)
+        .then((course) => setCourseTitle(course.title))
+        .catch(() => setCourseTitle(''));
+    }
+  }, [isCreateTestPage, courseId]);
 
   return (
     <div className="menu-page">
@@ -157,9 +169,16 @@ const CabinetLayout = () => {
             <p className="tests-subtitle">Все тесты по всем курсам</p>
           </div>
         )}
+
+        {isCreateTestPage && (
+          <div className="tests-header-box">
+            <h1 className="tests-title">Мои тесты - {courseTitle}</h1>
+            <p className="tests-subtitle">Создание теста</p>
+          </div>
+        )}
       </div>
 
-      <div className={`cabinet-outlet${isCoursesPage ? ' cabinet-outlet--courses' : ''}${isTestsPage ? ' cabinet-outlet--tests' : ''}`}>
+      <div className={`cabinet-outlet${isCoursesPage ? ' cabinet-outlet--courses' : ''}${(isTestsPage || isCreateTestPage) ? ' cabinet-outlet--tests' : ''}`}>
         <Outlet />
       </div>
     </div>

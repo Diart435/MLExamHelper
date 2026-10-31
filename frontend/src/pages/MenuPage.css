@@ -462,10 +462,9 @@
 }
 
 .cabinet-outlet--courses {
-  top: 155px !important;                 
-  height: calc(100% - 155px) !important;
+  top: 136px !important;                 /* Было 155px */
+  height: calc(100% - 136px) !important; /* Было calc(100% - 155px) */
 }
-
 /* ===== ДОБАВЛЕНО ДЛЯ ТЕСТОВ (1 в 1 как у курсов) ===== */
 
 .tests-header-box {
@@ -500,6 +499,6 @@
 }
 
 .cabinet-outlet--tests {
-  top: 155px !important;                 
-  height: calc(100% - 155px) !important;
+  top: 136px !important; 
+  height: calc(100% - 136px) !important;
 }
