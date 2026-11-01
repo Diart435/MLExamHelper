@@ -1,4 +1,7 @@
 package com.examassistant.tests.enums;
 
-public class TestStatus {
+public enum TestStatus {
+    CREATING,
+    CREATED,
+    PASSED
 }
