@@ -43,12 +43,13 @@ public class UserService {
         }
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id.toString()));
-        if(userRepository.existsByEmail(email)){
+        if (!user.getEmail().equals(email) && userRepository.existsByEmail(email)) {
             throw new UserAlreadyExistException("User already exists");
         }
         user.setEmail(email);
         user.setFirstName(firstName);
         user.setLastName(lastName);
+        user.setUpdatedAt(OffsetDateTime.now());
     }
 
     @Transactional

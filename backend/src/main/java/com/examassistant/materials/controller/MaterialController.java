@@ -108,7 +108,7 @@ public class MaterialController {
     @PutMapping("/change/{id}")
     public ResponseEntity<MaterialResponse> changeFileName(
             @PathVariable UUID id,
-            @Valid ChangeFileNameRequest request,
+            @Valid @RequestBody ChangeFileNameRequest request,
             @AuthenticationPrincipal CustomUserDetails user){
         return ResponseEntity.ok(materialService.toResponse(materialService.changeFileName(id, request.getTitle(), user.getUserId())));
     }
