@@ -104,4 +104,9 @@ public class GlobalExceptionHandler {
         log.warn("Constraint violation: {}", message);
         return build(HttpStatus.BAD_REQUEST, message, req);
     }
+
+    @ExceptionHandler(TestNotFoundException.class)
+    public ResponseEntity<ApiError> handleTestNotFound(TestNotFoundException ex, WebRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
+    }
 }
