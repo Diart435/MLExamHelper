@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -108,7 +109,7 @@ public class AuthController {
     })
     @PostMapping("/refresh")
     public ResponseEntity<AuthResult> refresh(@CookieValue(name = "refresh_token", required = false) String refreshToken,
-                                     HttpServletResponse response){
+                                              HttpServletResponse response, @Value("${app.jwt.refresh-ttl-days}") int ttlDays){
         if(refreshToken == null){
             throw new InvalidTokenException("Refresh token is null");
         }
@@ -119,7 +120,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(false)
                 .path("/api/auth")
-                .maxAge(Duration.ofDays(7))
+                .maxAge(Duration.ofDays(ttlDays))
                 .sameSite("Strict")
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, newCookie.toString());
