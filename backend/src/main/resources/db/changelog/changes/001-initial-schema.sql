@@ -80,8 +80,6 @@ CREATE TABLE tests (
     test_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id          UUID NOT NULL,
     title              VARCHAR(255) NOT NULL,
-    mode               VARCHAR(50) NOT NULL DEFAULT 'training', -- training, exam
-    time_limit_minutes INT,          -- лимит времени (в минутах)
     created_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status_test        VARCHAR(50) NOT NULL, --статус теста
     difficulty      VARCHAR(20) DEFAULT 'medium',     -- easy, medium, hard
