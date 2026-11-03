@@ -14,6 +14,7 @@ import TestsPage from './pages/TestsPage';
 import ResultsPage from './pages/ResultsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import WelcomePage from './pages/WelcomePage';
+import CreateTestPage from './pages/CreateTestPage';
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -61,18 +62,15 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
 
-        <Route element={
-          <ProtectedRoute>
-            <CabinetLayout />
-          </ProtectedRoute>
-        }>
+        <Route element={<ProtectedRoute><CabinetLayout /></ProtectedRoute>}>
           <Route path="/menu" element={<MainPage />} />
           <Route path="/menu/settings" element={<SettingsPage />} />
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/:courseId/materials" element={<MaterialsPage />} />
-          <Route path="/tests/:testId" element={<TestsPage />} />
+          <Route path="/tests" element={<TestsPage />} />
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/courses/:courseId/tests/create" element={<CreateTestPage />}/>
         </Route>
 
         <Route path="/" element={<Navigate to="/menu" replace />} />

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -32,8 +33,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, WebRequest req) {
         return build(HttpStatus.BAD_REQUEST, "Invalid ID format. Must be a UUID", req);
     }
-    @ExceptionHandler({IllegalArgumentException.class, FileUploadException.class})
+    @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> handleBadRequest(IllegalArgumentException ex, WebRequest req){
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(FileUploadException.class)
+    public ResponseEntity<ApiError> handleFileUploadException(FileUploadException ex, WebRequest req){
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
     }
 
@@ -41,6 +47,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex, WebRequest req) {
         log.warn("Missing parameter: {}", ex.getParameterName());
         return build(HttpStatus.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing", req);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiError> handleMissingPart(MissingServletRequestPartException ex, WebRequest req) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), req);
     }
 
     @ExceptionHandler(UserAlreadyExistException.class)
@@ -92,5 +103,10 @@ public class GlobalExceptionHandler {
 
         log.warn("Constraint violation: {}", message);
         return build(HttpStatus.BAD_REQUEST, message, req);
+    }
+
+    @ExceptionHandler(TestNotFoundException.class)
+    public ResponseEntity<ApiError> handleTestNotFound(TestNotFoundException ex, WebRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 }

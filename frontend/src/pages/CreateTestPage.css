@@ -1,0 +1,431 @@
+/* ===================== ШАПКА СТРАНИЦЫ (как на странице Курсы) ===================== */
+
+.create-test-page {
+  min-height: 100vh;
+  font-family: 'Tektur', sans-serif;
+  color: #282828;
+  padding: 40px 60px 60px;
+  background: transparent; /* Явно указываем прозрачный фон */
+}
+
+/* Белый header сверху */
+.page-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 40px;
+  background: #fff;
+  border-bottom: 1px solid #000;
+}
+
+.page-header-title {
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 40px;
+  color: #000;
+  margin: 0;
+}
+
+.logout-btn-header {
+  background: transparent;
+  border: none;
+  color: #e64646;
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  transition: opacity 0.2s;
+}
+
+.logout-btn-header:hover {
+  opacity: 0.7;
+}
+
+/* Белая полоса с подзаголовком */
+.page-subheader-bar {
+  padding: 16px 40px;
+  background: #fff;
+  border-bottom: 1px solid #000;
+}
+
+.page-subheader-title {
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 30px;
+  color: #000;
+  margin: 0;
+}
+
+/* Контент на фиолетовом фоне */
+.create-test-content {
+  padding: 30px 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+/* ===================== ОСТАЛЬНЫЕ СТИЛИ ===================== */
+
+/* Табы */
+.tabbed-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.panel-title.tab-header {
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 32px;
+  line-height: 1.05;
+  margin: 0 0 0 24px;
+  padding: 8px 24px;
+  color: #000;
+  background: #fff;
+  border: 3px solid #707071;
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  z-index: 2;
+  position: relative;
+  top: 3px;
+  display: inline-block;
+}
+
+.course-panel.tabbed-panel {
+  background: #fff;
+  border: 3px solid #707071;
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  padding: 24px;
+  min-height: 600px;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 1;
+}
+
+/* Материалы */
+.materials-counter {
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  color: #000;
+  margin-bottom: 20px;
+}
+
+.materials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.material-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.material-check {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.material-check input[type="checkbox"] {
+  display: none;
+}
+
+.check-box {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #925ff0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.check-box .check-mark {
+  color: #925ff0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.material-check input[type="checkbox"]:checked + .check-box {
+  background: #925ff0;
+}
+
+.material-check input[type="checkbox"]:checked + .check-box .check-mark {
+  color: #fff;
+}
+
+.material-check input[type="checkbox"]:disabled + .check-box {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.material-body {
+  flex: 1;
+}
+
+.material-name {
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  color: #000;
+  margin: 0 0 4px 0;
+}
+
+.material-type {
+  font-family: 'Tektur', sans-serif;
+  font-size: 14px;
+  color: #707071;
+}
+
+.badge {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.badge.done {
+  background: #c7fdc6;
+  color: #55bc53;
+  border: 1px solid #55bc53;
+}
+
+.badge.progress {
+  background: #dcc9ff;
+  color: #925ff0;
+  border: 1px solid #925ff0;
+}
+
+.badge.error {
+  background: #ffc5c5;
+  color: #e64646;
+  border: 1px solid #e64646;
+}
+
+.retry-btn {
+  padding: 6px 12px;
+  background: transparent;
+  color: #925ff0;
+  border: 1px solid #925ff0;
+  border-radius: 4px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.retry-btn:hover {
+  background: #925ff0;
+  color: #fff;
+}
+
+/* Параметры */
+.params-title {
+  font-family: 'Tektur', sans-serif;
+  font-size: 28px;
+  color: #000;
+  margin: 0 0 20px 0;
+}
+
+.param-field {
+  margin-bottom: 24px;
+}
+
+.param-label {
+  display: block;
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  color: #000;
+  margin-bottom: 8px;
+}
+
+.param-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 3px solid #be9ff6;
+  border-radius: 15px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+  color: #000;
+  background: #fff;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.param-input:focus {
+  outline: none;
+  border-color: #925ff0;
+}
+
+.param-input::placeholder {
+  color: #707071;
+}
+
+.questions-section {
+  margin-top: 30px;
+  padding: 20px;
+  border: 3px dashed #be9ff6;
+  border-radius: 15px;
+}
+
+.questions-title {
+  font-family: 'Tektur', sans-serif;
+  font-size: 24px;
+  color: #000;
+  margin: 0 0 20px 0;
+}
+
+.question-type-block {
+  margin-bottom: 24px;
+}
+
+.question-type-label {
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  color: #000;
+  margin: 0 0 12px 0;
+}
+
+.question-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.question-btn {
+  padding: 10px 20px;
+  background: #fff;
+  border: 3px solid #be9ff6;
+  border-radius: 15px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  color: #000;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.question-btn:hover {
+  background: #f0e6ff;
+}
+
+.question-btn.active {
+  background: #925ff0;
+  color: #fff;
+  border-color: #925ff0;
+}
+
+.custom-input-wrapper {
+  flex: 1;
+  min-width: 150px;
+}
+
+.custom-input {
+  width: 100%;
+  padding: 10px 16px;
+  border: 3px solid #be9ff6;
+  border-radius: 15px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  color: #000;
+  background: #fff;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.custom-input:focus {
+  outline: none;
+  border-color: #925ff0;
+}
+
+.custom-input::placeholder {
+  color: #707071;
+}
+
+.error-message {
+  margin-top: 20px;
+  padding: 12px;
+  background: #ffc5c5;
+  color: #e64646;
+  border: 1px solid #e64646;
+  border-radius: 8px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 16px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 20px;
+  margin-top: 30px;
+  justify-content: center;
+}
+
+.btn-cancel,
+.btn-create {
+  padding: 12px 32px;
+  border-radius: 16px;
+  font-family: 'Tektur', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel {
+  background: #fff;
+  color: #925ff0;
+  border: 3px solid #be9ff6;
+}
+
+.btn-cancel:hover {
+  background: #f0e6ff;
+}
+
+.btn-create {
+  background: #000;
+  color: #fff;
+  border: 3px solid #000;
+}
+
+.btn-create:hover:not(:disabled) {
+  background: #1a1a1a;
+}
+
+.btn-create:disabled,
+.btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.empty-state {
+  text-align: center;
+  color: #707071;
+  font-style: italic;
+  padding: 40px 20px;
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+  .create-test-content {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+  
+  .page-header-bar,
+  .page-subheader-bar {
+    padding: 16px 20px;
+  }
+  
+  .page-header-title {
+    font-size: 28px;
+  }
+  
+  .page-subheader-title {
+    font-size: 22px;
+  }
+}
+

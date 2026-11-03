@@ -45,7 +45,11 @@ public class MaterialService {
         material.setMaterialId(materialId);
         material.setCourseId(courseId);
         material.setStatusMaterial(STATUS_MATERIAL.PROCESSING);
-        material.setTitle(file.getOriginalFilename());
+        String filename = file.getOriginalFilename();
+        if(filename == null) {
+            throw new FileUploadException("filename is null");
+        }
+        material.setTitle(filename);
         material.setMaterialSize(file.getSize());
 
         String uri = s3Service.upload(materialId, file);
