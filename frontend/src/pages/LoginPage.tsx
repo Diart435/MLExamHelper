@@ -22,7 +22,7 @@ const LoginPage = () => {
       await login(email, password);
       
       // 3. Если успешно, перенаправляем пользователя
-      navigate('/menu'); 
+      navigate('/courses'); 
     } catch (error: any) {
       // 4. Обрабатываем ошибки (например, неверный пароль или ошибка сети)
       console.error('Ошибка при входе:', error);
