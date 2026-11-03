@@ -1,6 +1,6 @@
 package com.examassistant.tests.DTO;
 
-import com.examassistant.tests.enums.TestDifficulty;
+import com.examassistant.tests.TestDifficulty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -25,4 +25,6 @@ public class CreateTestRequest {
     private String title;
 
     private TestDifficulty difficulty;
+
+    private int numQuestions;
 }

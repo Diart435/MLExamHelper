@@ -3,6 +3,8 @@ package com.examassistant.tests.service;
 import com.examassistant.common.exception.CourseForbiddenException;
 import com.examassistant.common.exception.CourseNotFoundException;
 import com.examassistant.common.exception.TestNotFoundException;
+import com.examassistant.courses.CourseDTO;
+import com.examassistant.courses.CourseService;
 import com.examassistant.courses.entity.Course;
 import com.examassistant.courses.repository.CourseRepository;
 import com.examassistant.tests.TestDTO;
@@ -10,7 +12,7 @@ import com.examassistant.tests.TestService;
 import com.examassistant.tests.DTO.CreateTestRequest;
 import com.examassistant.tests.DTO.TestFilter;
 import com.examassistant.tests.entity.Test;
-import com.examassistant.tests.enums.TestDifficulty;
+import com.examassistant.tests.TestDifficulty;
 import com.examassistant.tests.enums.TestStatus;
 import com.examassistant.tests.mapper.TestMapper;
 import com.examassistant.tests.repository.TestRepository;
@@ -30,7 +32,7 @@ import java.util.UUID;
 public class TestsService implements TestService {
 
     private final TestRepository testRepository;
-    private final CourseRepository courseRepository;
+    private final CourseService courseService;
     private final TestMapper testMapper;
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
@@ -39,16 +41,12 @@ public class TestsService implements TestService {
 
     @Transactional
     public Test create(CreateTestRequest request, UUID userId) {
-        Course course = courseRepository.findById(request.getCourseId())
-                .orElseThrow(() -> new CourseNotFoundException(request.getCourseId().toString()));
-
-        if (!course.getOwnerId().equals(userId)) {
-            throw new CourseForbiddenException("You cannot create a test for a course that is not yours");
-        }
+        CourseDTO course = courseService.getDTOById(request.getCourseId(), userId);
 
         Test test = Test.builder()
                 .courseId(request.getCourseId())
                 .title(request.getTitle())
+                .numQuestions(request.getNumQuestions())
                 .statusTest(TestStatus.CREATED)
                 .difficulty(request.getDifficulty() != null ? request.getDifficulty() : TestDifficulty.MEDIUM)
                 .createdAt(OffsetDateTime.now())
@@ -63,12 +61,7 @@ public class TestsService implements TestService {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new TestNotFoundException(id.toString()));
 
-        Course course = courseRepository.findById(test.getCourseId())
-                .orElseThrow(() -> new CourseNotFoundException(test.getCourseId().toString()));
-
-        if (!course.getOwnerId().equals(userId)) {
-            throw new CourseForbiddenException("This test does not belong to your course");
-        }
+        CourseDTO course = courseService.getDTOById(test.getCourseId(), userId);
 
         return test;
     }
@@ -91,11 +84,7 @@ public class TestsService implements TestService {
         TestStatus statusTest = filter != null ? filter.getStatusTest() : null;
 
         if (courseId != null) {
-            Course course = courseRepository.findById(courseId)
-                    .orElseThrow(() -> new CourseNotFoundException(courseId.toString()));
-            if (!course.getOwnerId().equals(userId)) {
-                throw new CourseForbiddenException("This course does not belong to you");
-            }
+            CourseDTO course = courseService.getDTOById(courseId, userId);
             return testRepository.findByCourseIdAndStatusTest(courseId, statusTest, pageable);
         } else {
             return testRepository.findByCourseOwnerId(userId, statusTest, pageable);
@@ -107,12 +96,7 @@ public class TestsService implements TestService {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new TestNotFoundException(id.toString()));
 
-        Course course = courseRepository.findById(test.getCourseId())
-                .orElseThrow(() -> new CourseNotFoundException(test.getCourseId().toString()));
-
-        if (!course.getOwnerId().equals(userId)) {
-            throw new CourseForbiddenException("You cannot delete a test from a course that is not yours");
-        }
+        CourseDTO course = courseService.getDTOById(test.getCourseId(), userId);
 
         testRepository.delete(test);
     }

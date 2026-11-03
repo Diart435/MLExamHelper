@@ -4,8 +4,8 @@ import com.examassistant.auth.entity.User;
 import com.examassistant.courses.CourseDTO;
 import com.examassistant.courses.entity.Course;
 import com.examassistant.materials.entity.Material;
-import com.examassistant.materials.enums.STATUS_MATERIAL;
-import com.examassistant.materials.enums.TYPE_MATERIAL;
+import com.examassistant.materials.enums.StatusMaterial;
+import com.examassistant.materials.enums.TypeMaterial;
 import com.examassistant.security.model.CustomUserDetails;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
@@ -75,10 +75,10 @@ public final class TestFixtures {
         return Material.builder()
                 .materialId(MATERIAL_ID)
                 .courseId(COURSE_ID)
-                .typeMaterial(TYPE_MATERIAL.PDF)
+                .typeMaterial(TypeMaterial.PDF)
                 .title("lecture.pdf")
                 .sourceUri("materials/key.pdf")
-                .statusMaterial(STATUS_MATERIAL.READY)
+                .statusMaterial(StatusMaterial.READY)
                 .materialSize(1024L)
                 .createdAt(CREATED_AT)
                 .build();

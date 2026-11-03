@@ -1,6 +1,6 @@
 package com.examassistant.tests.DTO;
 
-import com.examassistant.tests.enums.TestDifficulty;
+import com.examassistant.tests.TestDifficulty;
 import com.examassistant.tests.enums.TestStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,4 +18,5 @@ public class TestsResponse {
     private String title;
     private TestStatus statusTest;
     private TestDifficulty difficulty;
+    private int numQuestions;
 }

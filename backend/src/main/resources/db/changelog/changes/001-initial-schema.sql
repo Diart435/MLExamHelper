@@ -77,11 +77,12 @@ COMMENT ON TABLE material_chunks IS 'Фрагменты текста матер�
 -- 5. Таблица tests (Сгенерированные тесты)
 -- =============================================================================
 CREATE TABLE tests (
-    test_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    course_id          UUID NOT NULL,
-    title              VARCHAR(255) NOT NULL,
-    created_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status_test        VARCHAR(50) NOT NULL, --статус теста
+    test_id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id           UUID NOT NULL,
+    title               VARCHAR(255) NOT NULL,
+    num_questions       INT NOT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status_test         VARCHAR(50) NOT NULL, --статус теста
     difficulty      VARCHAR(20) DEFAULT 'medium',     -- easy, medium, hard
 
     CONSTRAINT fk_tests_course FOREIGN KEY (course_id) 

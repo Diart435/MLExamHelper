@@ -1,6 +1,6 @@
 package com.examassistant.tests.entity;
 
-import com.examassistant.tests.enums.TestDifficulty;
+import com.examassistant.tests.TestDifficulty;
 import com.examassistant.tests.enums.TestStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,6 +24,9 @@ public class Test {
 
     @Column(name = "title", nullable = false)
     private String title;
+
+    @Column(name = "num_questions", nullable = false)
+    private int numQuestions;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
