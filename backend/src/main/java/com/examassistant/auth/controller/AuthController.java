@@ -1,10 +1,14 @@
 package com.examassistant.auth.controller;
 
 import com.examassistant.auth.DTO.*;
+import com.examassistant.auth.entity.User;
 import com.examassistant.auth.service.AuthService;
 import com.examassistant.auth.service.RefreshTokenService;
+import com.examassistant.auth.service.UserService;
+import com.examassistant.auth.service.VkAuthService;
 import com.examassistant.common.DTO.ApiError;
 import com.examassistant.common.exception.InvalidTokenException;
+import com.examassistant.security.service.JwtService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,7 +17,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "Auth", description = "Endpoints for authentication")
@@ -32,6 +36,9 @@ import java.util.UUID;
 public class AuthController {
     private final AuthService authService;
     private final RefreshTokenService refreshTokenService;
+    private final VkAuthService vkAuthService;
+    private final JwtService jwtService;
+    private final UserService userService;
 
     @Operation(
             summary = "Register an user",
@@ -47,13 +54,13 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest register, HttpServletResponse response){
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest register, HttpServletResponse response) {
         AuthResponse auth = authService.register(register);
         String token = refreshTokenService.getToken(UUID.fromString(auth.getUserId()));
 
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", token)
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/api/auth")
                 .maxAge(Duration.ofDays(7))
                 .sameSite("Strict")
@@ -77,13 +84,13 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest login, HttpServletResponse response){
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest login, HttpServletResponse response) {
         AuthResponse auth = authService.login(login);
         String token = refreshTokenService.getToken(UUID.fromString(auth.getUserId()));
 
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", token)
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/api/auth")
                 .maxAge(Duration.ofDays(7))
                 .sameSite("Strict")
@@ -109,16 +116,16 @@ public class AuthController {
     })
     @PostMapping("/refresh")
     public ResponseEntity<AuthResult> refresh(@CookieValue(name = "refresh_token", required = false) String refreshToken,
-                                              HttpServletResponse response, @Value("${app.jwt.refresh-ttl-days}") int ttlDays){
-        if(refreshToken == null){
+                                              HttpServletResponse response, @Value("${app.jwt.refresh-ttl-days}") int ttlDays) {
+        if (refreshToken == null) {
             throw new InvalidTokenException("Refresh token is null");
         }
-       IssuedTokens tokens = authService.refresh(refreshToken);
+        IssuedTokens tokens = authService.refresh(refreshToken);
 
 
         ResponseCookie newCookie = ResponseCookie.from("refresh_token", tokens.getRefreshToken())
                 .httpOnly(true)
-                .secure(false)
+                .secure(true)
                 .path("/api/auth")
                 .maxAge(Duration.ofDays(ttlDays))
                 .sameSite("Strict")
@@ -141,10 +148,39 @@ public class AuthController {
     })
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
-        if(refreshToken == null){
+        if (refreshToken == null) {
             throw new InvalidTokenException("Refresh token is null");
         }
         authService.logout(refreshToken);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+            summary = "Callback for vk",
+            description = "Returns a map of personal data"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "User logged out"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PostMapping("/vk/callback")
+    public ResponseEntity<?> handleVkCallback(@RequestBody VkCallbackRequest request) {
+        VkUserInfoResponse vkInfo = vkAuthService.authenticate(
+                request.getCode(),
+                request.getCodeVerifier(),
+                request.getDeviceId()
+        );
+
+        User user = userService.findOrCreateByVk(vkInfo);
+
+        String accessToken = jwtService.generate(user.getUserId(), user.getEmail());
+
+        return ResponseEntity.ok(Map.of(
+                "accessToken", accessToken,
+                "email", user.getEmail(),
+                "firstName", user.getFirstName(),
+                "lastName", user.getLastName()
+        ));
     }
 }

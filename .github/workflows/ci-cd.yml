@@ -38,5 +38,8 @@ jobs:
           S3_SECRET_KEY=${{secrets.S3_SECRET_KEY}}
           OPENROUTER_API_KEY=${{secrets.OPENROUTER_API_KEY}}
           HOST_IP=${{secrets.HOST_IP}}
+          VK_CLIENT_ID=${{secrets.VK_CLIENT_ID}}
+          VK_CLIENT_SECRET=${{secrets.VK_CLIENT_SECRET}}
+          S3_SIGNING_KEY=${{secrets.S3_SIGNING_KEY}}
           EOF
           docker compose up -d --build

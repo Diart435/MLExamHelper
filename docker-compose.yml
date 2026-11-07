@@ -40,7 +40,7 @@ services:
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
-      WEED_JWT_FILER_SIGNING_KEY: "your-super-secret-signing-key-at-least-32-chars-long"
+      WEED_JWT_FILER_SIGNING_KEY: ${S3_SIGNING_KEY}
       WEED_S3_EXTERNAL_URL: http://${HOST_IP}:9000
     entrypoint:
       - /bin/sh
@@ -52,9 +52,15 @@ services:
             -e "s|\$${S3_SECRET_KEY}|\${S3_SECRET_KEY}|g" \
             /tmp/s3-config.json > /tmp/s3-config-final.json
             
+        cp /etc/seaweedfs/iam-s3-config.json /tmp/iam-s3-config.json
+
+        sed -e "s|\$${S3_SIGNING_KEY}|\${S3_SIGNING_KEY}|g" \
+            /tmp/iam-s3-config.json > /tmp/iam-s3-config-final.json
+            
         mv /tmp/s3-config-final.json /tmp/s3-config.json
+        mv /tmp/iam-s3-config-final.json /tmp/iam-s3-config.json
         
-        exec weed server -s3 -s3.port=9000 -s3.config=/tmp/s3-config.json -s3.iam.config=/etc/seaweedfs/iam-s3-config.json -master.volumeSizeLimitMB=100
+        exec weed server -s3 -s3.port=9000 -s3.config=/tmp/s3-config.json -s3.iam.config=/tmp/iam-s3-config.json -master.volumeSizeLimitMB=100
     healthcheck:
       test: ["CMD", "wget", "--timeout=3", "--quiet", "--tries=1", "-O", "/dev/null", "http://127.0.0.1:9333/cluster/status"]
       interval: 10s
@@ -96,6 +102,8 @@ services:
       STORAGE_S3_SECRET_KEY: ${S3_SECRET_KEY}
       STORAGE_S3_BUCKET: materials
       APP_CORS_ALLOWED_ORIGINS: http://${HOST_IP}
+      VK_CLIENT_ID: ${VK_CLIENT_ID}
+      VK_CLIENT_SECRET: ${VK_CLIENT_SECRET}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health/readiness"]
       interval: 10s
@@ -172,7 +180,7 @@ services:
     entrypoint: sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; done"
     networks:
       - helper-network
-      
+
 volumes:
   postgres-data:
   redis-data:
