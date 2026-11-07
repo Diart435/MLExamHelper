@@ -152,10 +152,24 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:80"
+      - "443:443"
     depends_on:
       backend:
         condition: service_healthy
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/user1/ml-exam-helper/certbot/www:/var/www/certbot:ro
+      - /home/user1/ml-exam-helper/certbot/conf:/etc/letsencrypt:ro
     restart: unless-stopped
+    networks:
+      - helper-network
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - /home/user1/ml-exam-helper/certbot/www:/var/www/certbot
+      - /home/user1/ml-exam-helper/certbot/conf:/etc/letsencrypt
+    entrypoint: sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; done"
     networks:
       - helper-network
       
