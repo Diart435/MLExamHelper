@@ -102,28 +102,11 @@ const LoginPage = () => {
           {isLoading ? 'Вход...' : 'Войти'}
         </button>
 
-       <button 
+        <button 
           type="button" 
           className="btn-vk-login"
           onClick={initiateVkLogin}
-          style={{ 
-            position: 'absolute',
-            top: '750px', /* Располагаем между кнопкой входа (682px) и футером */
-            left: 'calc(50% - 176.5px)', /* Центрируем так же, как submit-btn */
-            width: '353px',
-            height: '56px',
-            background: '#0077FF', 
-            color: '#fff', 
-            borderRadius: '10px', 
-            border: 'none', 
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '16px',
-            fontFamily: 'Poppins, sans-serif',
-            transition: 'background 0.2s'
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#0066DD')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = '#0077FF')}
+          disabled={isLoading}
         >
           Войти через VK ID
         </button>
