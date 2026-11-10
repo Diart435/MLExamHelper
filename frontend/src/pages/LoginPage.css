@@ -503,8 +503,8 @@ input, button { outline: 0; }
 /* ===================== КНОПКА VK ID ===================== */
 .btn-vk-login {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  left: calc(50% - 176.5px); /* Строго по левому краю полей ввода и кнопки "Войти" */
+  top: 758px; /* 738px (низ кнопки "Войти") + 20px комфортного отступа */
   width: 353px;
   height: 56px;
   background: #0077FF;
@@ -516,7 +516,7 @@ input, button { outline: 0; }
   font-size: 16px;
   font-family: 'Poppins', sans-serif;
   transition: background 0.2s;
-  margin-top: 20px; /* Отступ от кнопки "Войти" */
+  z-index: 10;
 }
 
 .btn-vk-login:hover {
@@ -526,6 +526,11 @@ input, button { outline: 0; }
 .btn-vk-login:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Сдвигаем футер вниз, чтобы освободить место */
+.form-footer {
+  top: 840px !important; /* 758px + 56px (низ кнопки VK) + 26px отступа */
 }
 
 /* Адаптивность для мобильных */
