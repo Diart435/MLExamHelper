@@ -1,7 +1,7 @@
 import { generateCodeVerifier, generateCodeChallenge } from '../utils/pkce';
 import apiClient from './client';
 
-const CLIENT_ID = import.meta.env.VITE_VK_CLIENT_ID;
+const CLIENT_ID = '54882632';
 // Браузер сам подставит https://www.qaizzy.localhost.cc или localhost
 const REDIRECT_URI = `${window.location.origin}/auth/vk/callback`; 
 const AUTH_URL = 'https://id.vk.ru/authorize';
