@@ -41,5 +41,6 @@ jobs:
           VK_CLIENT_ID=${{secrets.VK_CLIENT_ID}}
           VK_CLIENT_SECRET=${{secrets.VK_CLIENT_SECRET}}
           S3_SIGNING_KEY=${{secrets.S3_SIGNING_KEY}}
+          CORS=${{secrets.CORS}}
           EOF
           docker compose up -d --build
