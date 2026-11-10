@@ -1,5 +1,6 @@
 package com.examassistant.tests;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import jakarta.persistence.EnumeratedValue;
 import lombok.Getter;
 
@@ -16,6 +17,7 @@ public enum TestDifficulty {
         this.value = value;
     }
 
+    @JsonCreator
     public static TestDifficulty fromValue(String value) {
         for (TestDifficulty difficulty : TestDifficulty.values()) {
             if (difficulty.value.equals(value)) {

@@ -7,7 +7,6 @@ import lombok.Getter;
 public enum QuestionType {
     SINGLE_CHOICE("single_choice"),
     MULTI_CHOICE("multi_choice"),
-    TRUE_FALSE("true_false"),
     OPEN_ANSWER("open_answer");
 
     @EnumeratedValue

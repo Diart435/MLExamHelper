@@ -46,7 +46,7 @@ public class TestsService implements TestService {
         Test test = Test.builder()
                 .courseId(request.getCourseId())
                 .title(request.getTitle())
-                .numQuestions(request.getNumQuestions())
+                .amountQuestions(request.getAmountQuestions())
                 .statusTest(TestStatus.CREATED)
                 .difficulty(request.getDifficulty() != null ? request.getDifficulty() : TestDifficulty.MEDIUM)
                 .createdAt(OffsetDateTime.now())

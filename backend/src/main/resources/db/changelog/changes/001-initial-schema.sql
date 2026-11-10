@@ -80,7 +80,7 @@ CREATE TABLE tests (
     test_id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id           UUID NOT NULL,
     title               VARCHAR(255) NOT NULL,
-    num_questions       INT NOT NULL,
+    amount_questions    VARCHAR(50) NOT NULL,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status_test         VARCHAR(50) NOT NULL, --статус теста
     difficulty      VARCHAR(20) DEFAULT 'medium',     -- easy, medium, hard
@@ -100,7 +100,6 @@ CREATE TABLE test_questions (
     type_question   VARCHAR(50) NOT NULL, -- single_choice, multi_choice, true_false, open_answer
     text_question   TEXT NOT NULL,
     options         JSONB,               -- варианты ответов (для закрытых вопросов)
-    answer_key      JSONB,               -- эталонный правильный ответ / ключи
     key_points      JSONB,               -- критерии/пункты оценки для открытых вопросов
     source_chunk_id UUID,                -- привязка к чанку (Groundedness / цитирование)
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -137,13 +136,15 @@ COMMENT ON TABLE student_attempts IS 'Попытки прохождения те
 -- 8. Таблица attempt_answers (Ответы студента на отдельные вопросы)
 -- =============================================================================
 CREATE TABLE attempt_answers (
-    answer_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    attempt_id     UUID NOT NULL,
-    question_id    UUID NOT NULL,
-    student_answer JSONB NOT NULL, -- текст или выбранные ID вариантов
-    score          NUMERIC(3, 2), -- баллы за вопрос (0.0-1.0)
-    feedback       TEXT,          -- разбор ошибки и фидбэк от LLM
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    answer_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    attempt_id         UUID NOT NULL,
+    question_id     UUID NOT NULL,
+    is_correct      BOOLEAN NOT NULL,
+    student_answer  JSONB NOT NULL, -- текст или выбранные ID вариантов
+    correct_answer  JSONB NOT NULL,
+    score           NUMERIC(3, 2), -- баллы за вопрос (0.0-1.0)
+    feedback        TEXT,          -- разбор ошибки и фидбэк от LLM
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_answers_attempt FOREIGN KEY (attempt_id) 
         REFERENCES student_attempts (attempt_id) ON DELETE CASCADE,

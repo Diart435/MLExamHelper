@@ -1,5 +1,6 @@
 package com.examassistant.tests.entity;
 
+import com.examassistant.tests.TestAmountQuestions;
 import com.examassistant.tests.TestDifficulty;
 import com.examassistant.tests.enums.TestStatus;
 import jakarta.persistence.*;
@@ -25,17 +26,15 @@ public class Test {
     @Column(name = "title", nullable = false)
     private String title;
 
-    @Column(name = "num_questions", nullable = false)
-    private int numQuestions;
+    @Column(name = "amount_questions", nullable = false)
+    private TestAmountQuestions amountQuestions;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "status_test", nullable = false, length = 50)
     private TestStatus statusTest;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "difficulty", length = 20)
     @Builder.Default
     private TestDifficulty difficulty = TestDifficulty.MEDIUM;

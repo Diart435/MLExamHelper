@@ -1,5 +1,6 @@
 package com.examassistant.tests.DTO;
 
+import com.examassistant.tests.TestAmountQuestions;
 import com.examassistant.tests.TestDifficulty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -26,5 +27,5 @@ public class CreateTestRequest {
 
     private TestDifficulty difficulty;
 
-    private int numQuestions;
+    private TestAmountQuestions amountQuestions;
 }
