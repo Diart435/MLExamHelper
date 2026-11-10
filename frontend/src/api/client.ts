@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://176.123.163.20:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -12,10 +12,11 @@ const apiClient = axios.create({
 
 // Список эндпоинтов, для которых НЕ нужно делать авто-refresh
 const AUTH_ENDPOINTS = [
-  '/api/auth/login',
-  '/api/auth/register',
-  '/api/auth/refresh',
-  '/api/auth/logout',
+  '/auth/login',
+  '/auth/register',
+  '/auth/refresh',
+  '/auth/logout',
+  '/auth/vk/callback', 
 ];
 
 apiClient.interceptors.request.use((config) => {
@@ -46,7 +47,7 @@ apiClient.interceptors.response.use(
 
       try {
         const response = await axios.post(
-          `${API_BASE_URL}/api/auth/refresh`,
+          `${API_BASE_URL}/auth/refresh`, 
           {},
           { withCredentials: true }
         );

@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { login as apiLogin, register as apiRegister, logout as apiLogout } from '../api/auth';
 import { getMe as apiGetMe } from '../api/user';
 
+interface VkAuthData {
+  accessToken: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
 interface AuthState {
   token: string | null;
   email: string | null;
@@ -16,6 +23,7 @@ interface AuthState {
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   updateUser: (firstName: string, lastName: string, email: string) => void;
+  setVkAuth: (data: VkAuthData) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -105,5 +113,17 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   updateUser: (firstName: string, lastName: string, email: string) => {
     set({ firstName, lastName, email });
+  },
+  
+  setVkAuth: (data: VkAuthData) => {
+    localStorage.setItem('accessToken', data.accessToken);
+    set({
+      token: data.accessToken,
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      isAuthenticated: true,
+      isInitialized: true,
+    });
   },
 }));
