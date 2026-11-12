@@ -5,7 +5,7 @@ import com.examassistant.common.exception.FileUploadException;
 import com.examassistant.materials.DTO.ChangeFileNameRequest;
 import com.examassistant.materials.DTO.MaterialResponse;
 import com.examassistant.materials.mapper.MaterialMapper;
-import com.examassistant.materials.service.MaterialService;
+import com.examassistant.materials.service.MaterialsService;
 import com.examassistant.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -32,7 +32,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @RequestMapping("/api/materials")
 public class MaterialController {
-    private final MaterialService materialService;
+    private final MaterialsService materialService;
     private final MaterialMapper materialMapper;
 
     @Operation(summary = "Upload material", description = "Upload material for course.")

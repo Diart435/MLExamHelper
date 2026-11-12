@@ -13,11 +13,13 @@ public interface TestMapper {
     @Mapping(source = "title", target = "title")
     @Mapping(source = "statusTest", target = "statusTest")
     @Mapping(source = "difficulty", target = "difficulty")
+    @Mapping(source = "amountQuestions", target = "amountQuestions")
     TestsResponse toResponse(Test test);
 
     @Mapping(source = "testId", target = "testId")
     @Mapping(source = "title", target = "title")
     @Mapping(source = "statusTest", target = "statusTest")
     @Mapping(source = "difficulty", target = "difficulty")
+    @Mapping(source = "amountQuestions", target = "amountQuestions")
     TestDTO toDTO(Test test);
 }

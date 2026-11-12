@@ -2,8 +2,8 @@ package com.examassistant.materials.mapper;
 
 import com.examassistant.materials.DTO.MaterialResponse;
 import com.examassistant.materials.entity.Material;
-import com.examassistant.materials.enums.STATUS_MATERIAL;
-import com.examassistant.materials.enums.TYPE_MATERIAL;
+import com.examassistant.materials.enums.StatusMaterial;
+import com.examassistant.materials.enums.TypeMaterial;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -16,12 +16,12 @@ public interface MaterialMapper {
     MaterialResponse toDTO(Material material);
 
     @Named("statusToString")
-    default String statusToString(STATUS_MATERIAL statusMaterial){
+    default String statusToString(StatusMaterial statusMaterial){
         return statusMaterial.name();
     }
 
     @Named("typeToString")
-    default String typeToString(TYPE_MATERIAL typeMaterial) {
+    default String typeToString(TypeMaterial typeMaterial) {
         return typeMaterial.name();
     }
 }

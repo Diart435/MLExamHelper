@@ -2,7 +2,7 @@ CREATE TABLE query_tasks (
     task_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     test_id UUID NOT NULL,
     title TEXT NOT NULL,
-    num_questions INT NOT NULL,
+    amount_questions VARCHAR(50) NOT NULL,
     difficulty VARCHAR(20),
     course_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

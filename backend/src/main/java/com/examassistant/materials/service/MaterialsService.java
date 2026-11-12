@@ -4,10 +4,13 @@ import com.examassistant.common.exception.FileForbiddenException;
 import com.examassistant.common.exception.FileNotFoundException;
 import com.examassistant.common.exception.FileUploadException;
 import com.examassistant.courses.CourseService;
+import com.examassistant.messaging.ProcessMaterialRedisRequest;
+import com.examassistant.messaging.Producer;
 import com.examassistant.materials.DTO.MaterialResponse;
+import com.examassistant.materials.MaterialService;
 import com.examassistant.materials.entity.Material;
-import com.examassistant.materials.enums.STATUS_MATERIAL;
-import com.examassistant.materials.enums.TYPE_MATERIAL;
+import com.examassistant.materials.enums.StatusMaterial;
+import com.examassistant.materials.enums.TypeMaterial;
 import com.examassistant.materials.mapper.MaterialMapper;
 import com.examassistant.materials.repository.MaterialRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +28,12 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class MaterialService {
+public class MaterialsService implements MaterialService {
     private final S3Service s3Service;
     private final MaterialRepository materialRepository;
     private final MaterialMapper materialMapper;
     private final CourseService courseService;
+    private final Producer redisProducer;
 
     @Transactional
     public MaterialResponse save(UUID courseId, MultipartFile file, UUID userId) throws IOException {
@@ -38,13 +42,13 @@ public class MaterialService {
         }
         UUID materialId = UUID.randomUUID();
 
-        TYPE_MATERIAL typeMaterial = getTypeMaterial(file);
+        TypeMaterial typeMaterial = getTypeMaterial(file);
 
         Material material = new Material();
         material.setTypeMaterial(typeMaterial);
         material.setMaterialId(materialId);
         material.setCourseId(courseId);
-        material.setStatusMaterial(STATUS_MATERIAL.PROCESSING);
+        material.setStatusMaterial(StatusMaterial.PROCESSING);
         String filename = file.getOriginalFilename();
         if(filename == null) {
             throw new FileUploadException("filename is null");
@@ -57,10 +61,11 @@ public class MaterialService {
         material.setCreatedAt(OffsetDateTime.now());
 
         Material saved = materialRepository.save(material);
+        sendProcessMaterial(saved);
         return toResponse(saved);
     }
 
-    private TYPE_MATERIAL getTypeMaterial(MultipartFile file) throws IOException {
+    private TypeMaterial getTypeMaterial(MultipartFile file) throws IOException {
         byte[] header = new byte[4];
         try (InputStream is = file.getInputStream()) {
             if (is.read(header) != 4) {
@@ -68,13 +73,13 @@ public class MaterialService {
             }
         }
 
-        TYPE_MATERIAL typeMaterial = null;
+        TypeMaterial typeMaterial = null;
 
         if (header[0] == 0x25 && header[1] == 0x50 && header[2] == 0x44 && header[3] == 0x46) {
-            typeMaterial = TYPE_MATERIAL.PDF;
+            typeMaterial = TypeMaterial.PDF;
         }
         else if (header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04) {
-            typeMaterial = TYPE_MATERIAL.DOCX;
+            typeMaterial = TypeMaterial.DOCX;
         }
         else{
             throw new FileUploadException("The type of file can be DOCX or PDF");
@@ -126,5 +131,20 @@ public class MaterialService {
         }
         s3Service.delete(material.getSourceUri());
         materialRepository.delete(material);
+    }
+
+    @Transactional
+    @Override
+    public void changeStatus(UUID materialId, String status) {
+        Material material = materialRepository.findById(materialId)
+                .orElseThrow(() -> new FileNotFoundException("Invalid file id"));
+
+        material.setStatusMaterial(StatusMaterial.fromValue(status));
+    }
+
+    public void sendProcessMaterial(Material material){
+        UUID taskId = UUID.randomUUID();
+        ProcessMaterialRedisRequest req = new ProcessMaterialRedisRequest(taskId, material.getMaterialId(), material.getSourceUri());
+        redisProducer.publishMaterialProcess(req);
     }
 }
