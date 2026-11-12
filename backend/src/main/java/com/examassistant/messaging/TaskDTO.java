@@ -1,6 +1,7 @@
 package com.examassistant.messaging;
 
 import com.examassistant.messaging.enums.StatusTask;
+import com.examassistant.common.enums.TestAmountQuestions;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -16,6 +17,6 @@ public class TaskDTO {
     private OffsetDateTime createdAt;
     private OffsetDateTime finishedAt;
     private StatusTask statusTask;
-    private int numQuestions;
+    private TestAmountQuestions amountQuestions;
     private String difficulty;
 }

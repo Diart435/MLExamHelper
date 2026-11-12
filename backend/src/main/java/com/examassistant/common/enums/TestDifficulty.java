@@ -1,4 +1,4 @@
-package com.examassistant.tests;
+package com.examassistant.common.enums;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import jakarta.persistence.EnumeratedValue;

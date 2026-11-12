@@ -34,10 +34,10 @@ public class RedisProducer implements Producer {
                 .map(UUID::toString)
                 .collect(Collectors.joining(",")));
         fields.put("title", test.getTitle());
-        fields.put("num_questions", String.valueOf(test.getNumQuestions()));
+        fields.put("amount_questions", test.getAmountQuestions().getValue());
         fields.put("difficulty", test.getDifficulty());
         fields.put("course_id", test.getCourseId().toString());
-        TaskDTO taskDTO = new TaskDTO(test.getTestId(), test.getCourseId(), test.getTitle(), OffsetDateTime.now(), null, StatusTask.PROCESSING, test.getNumQuestions(), test.getDifficulty());
+        TaskDTO taskDTO = new TaskDTO(test.getTestId(), test.getCourseId(), test.getTitle(), OffsetDateTime.now(), null, StatusTask.PROCESSING, test.getAmountQuestions(), test.getDifficulty());
         taskService.create(test.getTaskId(), taskDTO);
 
         return redisTemplate.opsForStream().add(STREAM_KEY_TESTS, fields);

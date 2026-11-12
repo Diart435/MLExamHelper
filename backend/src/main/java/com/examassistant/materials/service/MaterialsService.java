@@ -142,7 +142,6 @@ public class MaterialsService implements MaterialService {
         material.setStatusMaterial(StatusMaterial.fromValue(status));
     }
 
-    @Transactional
     public void sendProcessMaterial(Material material){
         UUID taskId = UUID.randomUUID();
         ProcessMaterialRedisRequest req = new ProcessMaterialRedisRequest(taskId, material.getMaterialId(), material.getSourceUri());

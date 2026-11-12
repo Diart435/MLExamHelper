@@ -6,7 +6,7 @@ import com.examassistant.messaging.TaskService;
 import com.examassistant.messaging.entity.QueryTask;
 import com.examassistant.messaging.enums.StatusTask;
 import com.examassistant.messaging.repository.TaskRepository;
-import com.examassistant.tests.TestDifficulty;
+import com.examassistant.common.enums.TestDifficulty;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +24,7 @@ public class TasksService implements TaskService {
         QueryTask task = new QueryTask(taskId,
                 taskDTO.getTestId(),
                 taskDTO.getTitle(),
-                taskDTO.getNumQuestions(),
+                taskDTO.getAmountQuestions(),
                 TestDifficulty.fromValue(taskDTO.getDifficulty()),
                 taskDTO.getCourseId(), OffsetDateTime.now(),
                 null,

@@ -23,7 +23,6 @@ public class QuestionsService implements QuestionService {
         question.setTextQuestion(questionDTO.getTextQuestion());
         question.setTypeQuestion(questionDTO.getTypeQuestion());
         question.setOptions(questionDTO.getOptions());
-        question.setAnswerKey(questionDTO.getAnswerKey());
         question.setKeyPoints(questionDTO.getKeyPoints());
         question.setSourceChunkId(questionDTO.getSourceChunkId());
         question.setCreatedAt(OffsetDateTime.now());

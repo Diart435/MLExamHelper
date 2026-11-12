@@ -1,7 +1,8 @@
 package com.examassistant.messaging.entity;
 
 import com.examassistant.messaging.enums.StatusTask;
-import com.examassistant.tests.TestDifficulty;
+import com.examassistant.common.enums.TestAmountQuestions;
+import com.examassistant.common.enums.TestDifficulty;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -26,8 +27,9 @@ public class QueryTask {
     @Column(name = "title", nullable = false)
     private String title;
 
-    @Column(name = "num_questions", nullable = false)
-    private int numQuestions;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "amount_questions", nullable = false)
+    private TestAmountQuestions amountQuestions;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "difficulty")

@@ -2,8 +2,8 @@ package com.examassistant.jobs.listener;
 
 import com.examassistant.jobs.DTO.TestResultResponse;
 import com.examassistant.messaging.TaskService;
-import com.examassistant.tests.QuestionDTO;
 import com.examassistant.tests.QuestionService;
+import com.examassistant.common.enums.TestAmountQuestions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -36,8 +36,8 @@ public class CreateTestListener implements StreamListener<String, MapRecord<Stri
         UUID taskId = UUID.fromString(taskIdStr);
         taskService.changeStatus(taskId);
 
-        String numQuestionsStr = fields.get("num_questions");
-        int numQuestions = Integer.parseInt(numQuestionsStr);
+        String amountQuestionsStr = fields.get("amount_questions");
+        TestAmountQuestions amountQuestionsQuestions = TestAmountQuestions.fromValue(amountQuestionsStr);
 
         String statusStr = fields.get("status");
 

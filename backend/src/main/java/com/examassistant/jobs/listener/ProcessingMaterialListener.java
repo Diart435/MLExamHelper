@@ -25,8 +25,6 @@ public class ProcessingMaterialListener implements StreamListener<String, MapRec
         log.info("Обработка статуса материала: {}", message.getValue());
         Map<String, String> fields = message.getValue();
 
-        String taskIdStr = fields.get("task_id");
-        UUID taskId = UUID.fromString(taskIdStr);
         String materialIdStr = fields.get("material_id");
         UUID materialId = UUID.fromString(materialIdStr);
 
