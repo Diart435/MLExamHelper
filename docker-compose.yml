@@ -96,6 +96,10 @@ services:
       STORAGE_S3_SECRET_KEY: ${S3_SECRET_KEY}
       STORAGE_S3_BUCKET: materials
       APP_CORS_ALLOWED_ORIGINS: http://${HOST_IP}
+      ML_STREAMS_TASKS_PREFIX: ml-tasks
+      ML_STREAMS_RESULTS_PREFIX: ml-results
+      ML_STREAMS_CONSUMER_GROUP: ml-backend
+      ML_STREAMS_CONSUMER_NAME: backend-1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/actuator/health/readiness"]
       interval: 10s
@@ -121,13 +125,15 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
 
-      # Три пары стримов. Тип задачи задаёт имя стрима — поля type в payload нет.
-      STREAM_TASKS_INGEST: ml:tasks:ingest
-      STREAM_TASKS_CREATE_TEST: ml:tasks:create-test
-      STREAM_TASKS_GRADE_ATTEMPT: ml:tasks:grade-attempt
-      STREAM_RESULTS_INGEST: ml:results:ingest
-      STREAM_RESULTS_CREATE_TEST: ml:results:create-test
-      STREAM_RESULTS_GRADE_ATTEMPT: ml:results:grade-attempt
+      # Vector store: pgvector, а не in-memory. Чанки должны попадать в
+      # material_chunks — их читает backend, чтобы разрезолвить source_chunk_id
+      # вопроса в UUID чанка. С in-memory они теряются при рестарте ML.
+      VECTOR_STORE_BACKEND: pg
+
+      # Префиксы каналов: один тип задачи — один канал "<prefix>:<type>",
+      # например "ml-tasks:create_test". Тип задаёт имя канала, поля type в payload нет.
+      ML_TASKS_STREAM: ml-tasks
+      ML_RESULTS_STREAM: ml-results
       CONSUMER_GROUP: ml-workers
       CONSUMER_NAME: worker-1
 
@@ -141,6 +147,9 @@ services:
       LLM_MODEL: ${LLM_MODEL:-minimax/minimax-m3:free}
       EMBED_MODEL: ${EMBED_MODEL:-openai/text-embedding-3-small}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # В образе нет ffmpeg/faster-whisper: аудио и видео должны падать явно.
+      WHISPER_ENABLED: "false"
     restart: unless-stopped
     networks:
       - helper-network
