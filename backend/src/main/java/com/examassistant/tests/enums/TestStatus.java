@@ -5,7 +5,9 @@ import jakarta.persistence.EnumeratedValue;
 public enum TestStatus {
     CREATING("creating"),
     CREATED("created"),
-    PASSED("passed");
+    READY("ready"),
+    PASSED("passed"),
+    ERROR("error");
 
     @EnumeratedValue
     private final String value;

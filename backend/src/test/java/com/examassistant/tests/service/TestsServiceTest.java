@@ -7,8 +7,11 @@ import com.examassistant.common.exception.TestNotFoundException;
 import com.examassistant.courses.CourseService;
 import com.examassistant.messaging.CreateTestRedisRequest;
 import com.examassistant.messaging.Producer;
+import com.examassistant.ml.payload.MlCreateTestResult;
+import com.examassistant.ml.payload.MlTestData;
 import com.examassistant.support.TestFixtures;
 import com.examassistant.tests.DTO.CreateTestRequest;
+import com.examassistant.tests.QuestionService;
 import com.examassistant.tests.DTO.TestFilter;
 import com.examassistant.tests.TestDTO;
 import com.examassistant.tests.entity.MaterialsTest;
@@ -52,6 +55,8 @@ class TestsServiceTest {
     private Producer redisProducer;
     @Mock
     private MaterialsTestRepository materialsTestRepository;
+    @Mock
+    private QuestionService questionService;
 
     @InjectMocks
     private TestsService testsService;
@@ -69,7 +74,7 @@ class TestsServiceTest {
         assertThat(result.getCourseId()).isEqualTo(TestFixtures.COURSE_ID);
         assertThat(result.getTitle()).isEqualTo("Math test");
         assertThat(result.getAmountQuestions()).isEqualTo(TestAmountQuestions.MEDIUM);
-        assertThat(result.getStatusTest()).isEqualTo(TestStatus.CREATED);
+        assertThat(result.getStatusTest()).isEqualTo(TestStatus.CREATING);
         assertThat(result.getDifficulty()).isEqualTo(TestDifficulty.MEDIUM);
         assertThat(result.getCreatedAt()).isNotNull();
 
@@ -281,6 +286,44 @@ class TestsServiceTest {
         assertThat(captor.getValue())
                 .extracting(link -> link.getId().getMaterialId())
                 .containsExactly(TestFixtures.MATERIAL_ID, TestFixtures.OTHER_MATERIAL_ID);
+    }
+
+    @Test
+    void applyGeneratedTest_savesQuestionsAndMarksReady() {
+        com.examassistant.tests.entity.Test test = TestFixtures.test();
+        when(testRepository.findById(TestFixtures.TEST_ID)).thenReturn(Optional.of(test));
+
+        testsService.applyGeneratedTest(TestFixtures.mlCreateTestResult());
+
+        verify(questionService).saveFromMl(TestFixtures.TEST_ID, List.of(TestFixtures.mlQuestionData()));
+        assertThat(test.getStatusTest()).isEqualTo(TestStatus.READY);
+    }
+
+    @Test
+    void applyGeneratedTest_withoutQuestions_marksError() {
+        com.examassistant.tests.entity.Test test = TestFixtures.test();
+        when(testRepository.findById(TestFixtures.TEST_ID)).thenReturn(Optional.of(test));
+        MlCreateTestResult empty = new MlCreateTestResult(
+                TestFixtures.TASK_ID.toString(), "ok", TestFixtures.TEST_ID.toString(),
+                new MlTestData("Math test", List.of()), null);
+
+        testsService.applyGeneratedTest(empty);
+
+        verifyNoInteractions(questionService);
+        assertThat(test.getStatusTest()).isEqualTo(TestStatus.ERROR);
+    }
+
+    @Test
+    void markGenerationFailed_marksError() {
+        com.examassistant.tests.entity.Test test = TestFixtures.test();
+        when(testRepository.findById(TestFixtures.TEST_ID)).thenReturn(Optional.of(test));
+        MlCreateTestResult failed = new MlCreateTestResult(
+                TestFixtures.TASK_ID.toString(), "error", TestFixtures.TEST_ID.toString(), null, "boom");
+
+        testsService.markGenerationFailed(failed);
+
+        assertThat(test.getStatusTest()).isEqualTo(TestStatus.ERROR);
+        verifyNoInteractions(questionService);
     }
 
     private void stubCourseAccess() {

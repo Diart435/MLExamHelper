@@ -5,6 +5,10 @@ import com.examassistant.courses.CourseDTO;
 import com.examassistant.courses.CourseService;
 import com.examassistant.messaging.CreateTestRedisRequest;
 import com.examassistant.messaging.Producer;
+import com.examassistant.ml.payload.MlCreateTestResult;
+import com.examassistant.ml.payload.MlQuestionData;
+import com.examassistant.ml.payload.MlTestData;
+import com.examassistant.tests.QuestionService;
 import com.examassistant.tests.TestDTO;
 import com.examassistant.tests.TestService;
 import com.examassistant.tests.DTO.CreateTestRequest;
@@ -18,6 +22,7 @@ import com.examassistant.tests.mapper.TestMapper;
 import com.examassistant.tests.repository.MaterialsTestRepository;
 import com.examassistant.tests.repository.TestRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -31,6 +36,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TestsService implements TestService {
 
     private final TestRepository testRepository;
@@ -38,6 +44,7 @@ public class TestsService implements TestService {
     private final TestMapper testMapper;
     private final Producer redisProducer;
     private final MaterialsTestRepository materialsTestRepository;
+    private final QuestionService questionService;
 
     private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
             "testId", "title", "statusTest", "difficulty", "courseId", "createdAt"
@@ -51,7 +58,7 @@ public class TestsService implements TestService {
                 .courseId(request.getCourseId())
                 .title(request.getTitle())
                 .amountQuestions(request.getAmountQuestions())
-                .statusTest(TestStatus.CREATED)
+                .statusTest(TestStatus.CREATING)
                 .difficulty(request.getDifficulty() == null ? TestDifficulty.MEDIUM : request.getDifficulty())
                 .createdAt(OffsetDateTime.now())
                 .build();
@@ -106,6 +113,47 @@ public class TestsService implements TestService {
         CourseDTO course = courseService.getDTOById(test.getCourseId(), userId);
 
         testRepository.delete(test);
+    }
+
+    /**
+     * Тест сгенерирован ML: сохраняем вопросы и переводим тест в READY.
+     *
+     * Если вопросов в ответе нет, тест помечается ERROR — отправлять его
+     * студентам нечего.
+     */
+    @Override
+    @Transactional
+    public void applyGeneratedTest(MlCreateTestResult result) {
+        UUID testId = UUID.fromString(result.testId());
+        Test test = testRepository.findById(testId)
+                .orElseThrow(() -> new TestNotFoundException(testId.toString()));
+
+        MlTestData generated = result.test();
+        List<MlQuestionData> questions = generated == null ? List.of() : generated.questions();
+        if (questions == null || questions.isEmpty()) {
+            log.warn("ML вернул тест {} без вопросов", testId);
+            test.setStatusTest(TestStatus.ERROR);
+            testRepository.save(test);
+            return;
+        }
+
+        questionService.saveFromMl(testId, questions);
+        test.setStatusTest(TestStatus.READY);
+        testRepository.save(test);
+    }
+
+    @Override
+    @Transactional
+    public void markGenerationFailed(MlCreateTestResult result) {
+        if (result.testId() == null) {
+            log.warn("ML вернул ошибку генерации без test_id: {}", result.error());
+            return;
+        }
+        UUID testId = UUID.fromString(result.testId());
+        testRepository.findById(testId).ifPresent(test -> {
+            test.setStatusTest(TestStatus.ERROR);
+            testRepository.save(test);
+        });
     }
 
     public void sendTestTask(Test test, List<UUID> materialIds){
