@@ -1,7 +1,7 @@
 package com.examassistant.tests.service;
 
-import com.examassistant.materials.repository.MaterialChunkRepository;
 import com.examassistant.support.TestFixtures;
+import com.examassistant.tests.QuestionDTO;
 import com.examassistant.tests.entity.Question;
 import com.examassistant.tests.enums.QuestionType;
 import com.examassistant.tests.repository.QuestionRepository;
@@ -12,80 +12,64 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class QuestionsServiceTest {
 
     @Mock
     private QuestionRepository questionRepository;
-    @Mock
-    private MaterialChunkRepository materialChunkRepository;
 
     @InjectMocks
     private QuestionsService questionsService;
 
     @Test
-    void saveFromMl_mapsAllFieldsAndSaves() {
-        when(materialChunkRepository.existsById(TestFixtures.SOURCE_CHUNK_ID)).thenReturn(true);
+    void create_mapsAllFieldsAndSaves() {
+        QuestionDTO dto = TestFixtures.questionDto();
+        OffsetDateTime before = OffsetDateTime.now().minusSeconds(1);
 
-        questionsService.saveFromMl(TestFixtures.TEST_ID, List.of(TestFixtures.mlQuestionData()));
+        questionsService.create(dto);
 
-        Question question = savedQuestions().get(0);
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        verify(questionRepository).save(captor.capture());
+        Question question = captor.getValue();
+
         assertThat(question.getTestId()).isEqualTo(TestFixtures.TEST_ID);
         assertThat(question.getTypeQuestion()).isEqualTo(QuestionType.SINGLE_CHOICE);
         assertThat(question.getTextQuestion()).isEqualTo("What is 2+2?");
         assertThat(question.getOptions()).containsExactly("3", "4");
-        assertThat(question.getAnswerKey()).containsEntry("correct_index", 1);
-        assertThat(question.getKeyPoints()).isEmpty();
+        assertThat(question.getKeyPoints()).isEqualTo(Map.of("correct", List.of("4")));
         assertThat(question.getSourceChunkId()).isEqualTo(TestFixtures.SOURCE_CHUNK_ID);
-        assertThat(question.getQuestionOrder()).isZero();
+        assertThat(question.getCreatedAt()).isAfter(before);
+    }
+
+    @Test
+    void create_optionalFieldsNull_savesQuestionWithoutThem() {
+        QuestionDTO dto = new QuestionDTO(
+                TestFixtures.TEST_ID,
+                QuestionType.OPEN_ANSWER,
+                "Explain the solution",
+                null,
+                null,
+                null
+        );
+
+        questionsService.create(dto);
+
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        verify(questionRepository).save(captor.capture());
+        Question question = captor.getValue();
+
+        assertThat(question.getTypeQuestion()).isEqualTo(QuestionType.OPEN_ANSWER);
+        assertThat(question.getTextQuestion()).isEqualTo("Explain the solution");
+        assertThat(question.getOptions()).isNull();
+        assertThat(question.getKeyPoints()).isNull();
+        assertThat(question.getSourceChunkId()).isNull();
         assertThat(question.getCreatedAt()).isNotNull();
-    }
-
-    @Test
-    void saveFromMl_sameTestTwice_keepsQuestionIdStable() {
-        when(materialChunkRepository.existsById(any())).thenReturn(true);
-
-        questionsService.saveFromMl(TestFixtures.TEST_ID, List.of(TestFixtures.mlQuestionData()));
-        questionsService.saveFromMl(TestFixtures.TEST_ID, List.of(TestFixtures.mlQuestionData()));
-
-        ArgumentCaptor<List<Question>> captor = ArgumentCaptor.forClass(List.class);
-        verify(questionRepository, times(2)).saveAll(captor.capture());
-
-        assertThat(captor.getAllValues().get(0).get(0).getQuestionId())
-                .isEqualTo(captor.getAllValues().get(1).get(0).getQuestionId());
-    }
-
-    @Test
-    void saveFromMl_unknownChunk_savesNullChunkId() {
-        when(materialChunkRepository.existsById(TestFixtures.SOURCE_CHUNK_ID)).thenReturn(false);
-
-        questionsService.saveFromMl(TestFixtures.TEST_ID, List.of(TestFixtures.mlQuestionData()));
-
-        assertThat(savedQuestions().get(0).getSourceChunkId()).isNull();
-    }
-
-    @Test
-    void saveFromMl_noQuestions_throwsAndDoesNotSave() {
-        assertThatThrownBy(() -> questionsService.saveFromMl(TestFixtures.TEST_ID, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-
-        verifyNoInteractions(questionRepository);
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Question> savedQuestions() {
-        ArgumentCaptor<List<Question>> captor = ArgumentCaptor.forClass(List.class);
-        verify(questionRepository).saveAll(captor.capture());
-        return captor.getValue();
     }
 }

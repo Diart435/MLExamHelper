@@ -59,7 +59,7 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, ex.getMessage(), req);
     }
 
-    @ExceptionHandler({FileForbiddenException.class, CourseForbiddenException.class, AttemptForbiddenException.class})
+    @ExceptionHandler({FileForbiddenException.class, CourseForbiddenException.class})
     public ResponseEntity<ApiError> handleForbidden(Exception ex, WebRequest req){
         return build(HttpStatus.FORBIDDEN, ex.getMessage(), req);
     }
@@ -107,11 +107,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(TestNotFoundException.class)
     public ResponseEntity<ApiError> handleTestNotFound(TestNotFoundException ex, WebRequest req) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
-    }
-
-    @ExceptionHandler(AttemptNotFoundException.class)
-    public ResponseEntity<ApiError> handleAttemptNotFound(AttemptNotFoundException ex, WebRequest req) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
 }

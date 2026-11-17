@@ -9,20 +9,13 @@ import com.examassistant.materials.entity.Material;
 import com.examassistant.materials.enums.StatusMaterial;
 import com.examassistant.materials.enums.TypeMaterial;
 import com.examassistant.messaging.CreateTestRedisRequest;
-import com.examassistant.messaging.GradeAttemptRedisRequest;
 import com.examassistant.messaging.ProcessMaterialRedisRequest;
 import com.examassistant.messaging.TaskDTO;
 import com.examassistant.messaging.entity.QueryTask;
 import com.examassistant.messaging.enums.StatusTask;
-import com.examassistant.ml.payload.MlCreateTestResult;
-import com.examassistant.ml.payload.MlGradedItem;
-import com.examassistant.ml.payload.MlGradeAttemptResult;
-import com.examassistant.ml.payload.MlIngestResult;
-import com.examassistant.ml.payload.MlQuestionData;
-import com.examassistant.ml.payload.MlTestData;
 import com.examassistant.security.model.CustomUserDetails;
 import com.examassistant.tests.DTO.CreateTestRequest;
-import com.examassistant.tests.entity.Question;
+import com.examassistant.tests.QuestionDTO;
 import com.examassistant.tests.entity.Test;
 import com.examassistant.tests.enums.QuestionType;
 import com.examassistant.tests.enums.TestStatus;
@@ -43,8 +36,6 @@ public final class TestFixtures {
     public static final UUID TEST_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     public static final UUID TASK_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
     public static final UUID SOURCE_CHUNK_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
-    public static final UUID ATTEMPT_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
-    public static final UUID QUESTION_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     public static final String EMAIL = "student@example.com";
     public static final String OTHER_EMAIL = "other@example.com";
@@ -130,27 +121,6 @@ public final class TestFixtures {
                 .build();
     }
 
-    public static Test readyTest() {
-        Test test = test();
-        test.setStatusTest(TestStatus.READY);
-        return test;
-    }
-
-    public static Question question() {
-        return Question.builder()
-                .questionId(QUESTION_ID)
-                .testId(TEST_ID)
-                .questionOrder(0)
-                .typeQuestion(QuestionType.SINGLE_CHOICE)
-                .textQuestion("What is 2+2?")
-                .options(List.of("3", "4"))
-                .answerKey(Map.of("correct_index", 1, "explanation", "2+2=4"))
-                .keyPoints(List.of())
-                .sourceChunkId(SOURCE_CHUNK_ID)
-                .createdAt(CREATED_AT)
-                .build();
-    }
-
     public static CreateTestRequest createTestRequest() {
         return CreateTestRequest.builder()
                 .courseId(COURSE_ID)
@@ -161,55 +131,14 @@ public final class TestFixtures {
                 .build();
     }
 
-    public static MlQuestionData mlQuestionData() {
-        return new MlQuestionData(
-                1,
-                "single_choice",
+    public static QuestionDTO questionDto() {
+        return new QuestionDTO(
+                TEST_ID,
+                QuestionType.SINGLE_CHOICE,
                 "What is 2+2?",
                 List.of("3", "4"),
-                Map.of("correct_index", 1, "explanation", "2+2=4"),
-                List.of(),
-                SOURCE_CHUNK_ID.toString()
-        );
-    }
-
-    public static MlCreateTestResult mlCreateTestResult() {
-        return new MlCreateTestResult(
-                TASK_ID.toString(),
-                "ok",
-                TEST_ID.toString(),
-                new MlTestData("Math test", List.of(mlQuestionData())),
-                null
-        );
-    }
-
-    public static MlIngestResult mlIngestResult(String status) {
-        return new MlIngestResult(TASK_ID.toString(), status, MATERIAL_ID.toString(), 3, null);
-    }
-
-    public static MlGradeAttemptResult mlGradeAttemptResult() {
-        return new MlGradeAttemptResult(
-                TASK_ID.toString(),
-                "ok",
-                ATTEMPT_ID.toString(),
-                TEST_ID.toString(),
-                50.0,
-                3,
-                List.of(new MlGradedItem(
-                        QUESTION_ID.toString(), true, 1.0, "Верно", "4", "4")),
-                null
-        );
-    }
-
-    public static GradeAttemptRedisRequest gradeAttemptRedisRequest() {
-        return new GradeAttemptRedisRequest(
-                TASK_ID,
-                ATTEMPT_ID,
-                TEST_ID,
-                USER_ID,
-                List.of(Map.of(
-                        "question_id", QUESTION_ID.toString(),
-                        "student_answer", Map.of("index", 1)))
+                Map.of("correct", List.of("4")),
+                SOURCE_CHUNK_ID
         );
     }
 

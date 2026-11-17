@@ -72,29 +72,17 @@ class TasksServiceTest {
         QueryTask task = TestFixtures.queryTask();
         when(taskRepository.findById(TestFixtures.TASK_ID)).thenReturn(Optional.of(task));
 
-        tasksService.changeStatus(TestFixtures.TASK_ID, StatusTask.FINISHED);
+        tasksService.changeStatus(TestFixtures.TASK_ID);
 
         assertThat(task.getStatusTask()).isEqualTo(StatusTask.FINISHED);
-        assertThat(task.getFinishedAt()).isNotNull();
         verify(taskRepository, never()).save(any());
-    }
-
-    @Test
-    void changeStatus_processing_leavesFinishedAtEmpty() {
-        QueryTask task = TestFixtures.queryTask();
-        when(taskRepository.findById(TestFixtures.TASK_ID)).thenReturn(Optional.of(task));
-
-        tasksService.changeStatus(TestFixtures.TASK_ID, StatusTask.PROCESSING);
-
-        assertThat(task.getStatusTask()).isEqualTo(StatusTask.PROCESSING);
-        assertThat(task.getFinishedAt()).isNull();
     }
 
     @Test
     void changeStatus_taskNotFound_throws() {
         when(taskRepository.findById(TestFixtures.TASK_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> tasksService.changeStatus(TestFixtures.TASK_ID, StatusTask.FINISHED))
+        assertThatThrownBy(() -> tasksService.changeStatus(TestFixtures.TASK_ID))
                 .isInstanceOf(TaskNotFoundException.class)
                 .hasMessage("task not found");
     }

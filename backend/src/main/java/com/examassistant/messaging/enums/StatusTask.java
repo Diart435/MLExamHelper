@@ -6,8 +6,7 @@ import lombok.Getter;
 @Getter
 public enum StatusTask {
     PROCESSING("processing"),
-    FINISHED("finished"),
-    ERROR("error");
+    FINISHED("finished");
 
     @EnumeratedValue
     private final String value;

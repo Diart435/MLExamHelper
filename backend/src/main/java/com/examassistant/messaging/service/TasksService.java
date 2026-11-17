@@ -33,11 +33,8 @@ public class TasksService implements TaskService {
     }
 
     @Transactional
-    public void changeStatus(UUID taskId, StatusTask status){
+    public void changeStatus(UUID taskId){
         QueryTask task = taskRepository.findById(taskId).orElseThrow(() -> new TaskNotFoundException("task not found"));
-        task.setStatusTask(status);
-        if (status != StatusTask.PROCESSING) {
-            task.setFinishedAt(OffsetDateTime.now());
-        }
+        task.setStatusTask(StatusTask.FINISHED);
     }
 }

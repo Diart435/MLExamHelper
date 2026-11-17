@@ -4,8 +4,5 @@ import org.springframework.data.redis.connection.stream.RecordId;
 
 public interface Producer {
     RecordId publishCreateTest(CreateTestRedisRequest test);
-
     RecordId publishMaterialProcess(ProcessMaterialRedisRequest material);
-
-    RecordId publishGradeAttempt(GradeAttemptRedisRequest attempt);
 }
