@@ -1,13 +1,21 @@
+"""DOCX parser via `python-docx`."""
+from __future__ import annotations
+
 import io
 
-from docx import Document
 
-from app.parsers.base import ParseError
+class DocxParser:
+    extensions = (".docx",)
 
-
-def parse(data: bytes) -> str:
-    try:
+    def extract(self, data: bytes, *, source: str) -> str:
+        from docx import Document
         doc = Document(io.BytesIO(data))
-    except Exception as e:
-        raise ParseError(f"docx: cannot read document: {e}") from e
-    return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        parts: list[str] = [
+            p.text for p in doc.paragraphs if p.text and p.text.strip()
+        ]
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text and cell.text.strip():
+                        parts.append(cell.text)
+        return "\n\n".join(parts)

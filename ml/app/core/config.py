@@ -12,37 +12,46 @@ class Settings(BaseSettings):
     embed_model: str = "openai/text-embedding-3-small"
     base_url: str = "https://openrouter.ai/api/v1"
 
-    # Postgres. ML пишет только material_chunks, читает test_questions.
-    database_url: str = "postgresql://ml:ml@localhost:5432/ml"
-    db_pool_min_size: int = 1
-    db_pool_max_size: int = 4
-
-    # Redis Streams. Тип задачи задаёт имя стрима, поле type не передаётся.
+    # Redis Streams
     redis_url: str = "redis://localhost:6379/0"
-    stream_tasks_ingest: str = "ml:tasks:ingest"
-    stream_tasks_create_test: str = "ml:tasks:create-test"
-    stream_tasks_grade_attempt: str = "ml:tasks:grade-attempt"
-    stream_results_ingest: str = "ml:results:ingest"
-    stream_results_create_test: str = "ml:results:create-test"
-    stream_results_grade_attempt: str = "ml:results:grade-attempt"
+    # Префиксы каналов. Один тип задачи — один канал "<prefix>:<type>",
+    # например "ml-tasks:create_test". Тип определяется именем канала,
+    # поэтому в payload поля type нет.
+    ml_tasks_stream: str = "ml-tasks"
+    ml_results_stream: str = "ml-results"
     consumer_group: str = "ml-workers"
     consumer_name: str = "worker-1"
-    worker_claim_idle_ms: int = 30000
 
-    # S3 (seaweedfs)
+    # Reclaim зависших сообщений (pending-список канала).
+    # XREADGROUP с ">" отдаёт только новые сообщения: прочитанное, но не
+    # подтверждённое (XACK), лежит в pending-списке и больше не перечитывается.
+    # XAUTOCLAIM возвращает такие сообщения в обработку — доставка получается
+    # "как минимум один раз", поэтому запись результата в БД должна быть
+    # идемпотентной.
+    reclaim_idle_ms: int = 120_000      # сколько сообщение должно провисеть без XACK
+    reclaim_max_attempts: int = 5       # после скольких попыток бросить сообщение
+
+    # MinIO
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "minio_user"
     minio_secret_key: str = "minio_password"
     minio_bucket: str = "materials"
     minio_secure: bool = False
 
-    # RAG
-    chunk_size: int = 800
-    chunk_overlap: int = 100
-    context_chunks: int = 12
+    # Vector store backend
+    #   "mem" — InMemoryVectorStore (по умолчанию, для тестов / dev без Docker)
+    #   "pg"  — PgVectorStore через asyncpg, требует поднятый docker compose
+    vector_store_backend: str = "mem"
+    database_url: str = "postgresql://ml:ml@localhost:5432/ml"
 
     # Misc
     log_level: str = "INFO"
+
+    # Whisper (local faster-whisper)
+    whisper_model_size: str = "base"   # tiny / base / small / medium / large-v3
+    whisper_device: str = "cpu"        # cpu / cuda
+    whisper_compute_type: str = "int8"  # int8 / float16 / float32
+    whisper_enabled: bool = True        # false → audio/video tasks fail explicitly
 
 
 _settings: Settings | None = None
