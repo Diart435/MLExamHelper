@@ -22,6 +22,8 @@ import json
 import pytest
 
 from app.contracts import (
+    BE_TO_ML,
+    ML_TO_BE,
     CreateTestResult,
     CreateTestTask,
     GradeAttemptResult,
@@ -29,15 +31,84 @@ from app.contracts import (
     GradedItem,
     IngestResult,
     IngestTask,
+    TASK_CHANNEL_SLUGS,
     Test,
     TestQuestion,
+    channel_task_type,
+    mirror_channel,
     parse_task,
+    result_channel,
+    stream_channel,
+    task_channel,
 )
 
 
 def payload_of(obj) -> dict:
     """Канонический вид сообщения: ровно то, что уходит в Redis."""
     return json.loads(obj.to_json())
+
+
+# ============================================================================
+#  Схема имён Redis-каналов
+# ============================================================================
+
+class TestChannelNames:
+    def test_slug_matches_internal_task_type(self):
+        assert TASK_CHANNEL_SLUGS == {
+            "ingest": "ingest",
+            "rag_question": "rag-question",
+            "create_test": "create-test",
+            "grade_attempt": "grade-test",
+        }
+
+    @pytest.mark.parametrize(
+        ("task_type", "channel"),
+        [
+            ("ingest", "ingest:be-to-ml"),
+            ("create_test", "create-test:be-to-ml"),
+            ("grade_attempt", "grade-test:be-to-ml"),
+        ],
+    )
+    def test_backend_contract_task_channels(self, task_type, channel):
+        assert task_channel(task_type) == channel
+        assert result_channel(task_type) == channel.replace(BE_TO_ML, ML_TO_BE)
+
+    def test_legacy_rag_question_channel_is_preserved(self):
+        assert task_channel("rag_question") == "rag-question:be-to-ml"
+        assert result_channel("rag_question") == "rag-question:ml-to-be"
+
+    @pytest.mark.parametrize(
+        ("task_type", "direction"),
+        [
+            ("ingest", BE_TO_ML),
+            ("ingest", ML_TO_BE),
+            ("rag_question", BE_TO_ML),
+            ("create_test", BE_TO_ML),
+            ("grade_attempt", ML_TO_BE),
+        ],
+    )
+    def test_channel_task_type_round_trip(self, task_type, direction):
+        channel = stream_channel(task_type, direction)
+        assert channel_task_type(channel) == task_type
+
+    def test_unknown_task_type_raises_key_error(self):
+        with pytest.raises(KeyError):
+            stream_channel("unknown", BE_TO_ML)
+
+    @pytest.mark.parametrize("channel", ["", "unknown", "unknown:be-to-ml", "create_test:be-to-ml"])
+    def test_unknown_channel_has_no_task_type(self, channel):
+        assert channel_task_type(channel) == ""
+
+    @pytest.mark.parametrize(
+        ("channel", "expected"),
+        [
+            ("foo:be-to-ml", "foo:ml-to-be"),
+            ("foo", "foo:ml-to-be"),
+            ("ingest:be-to-ml", "ingest:ml-to-be"),
+        ],
+    )
+    def test_mirror_channel(self, channel, expected):
+        assert mirror_channel(channel) == expected
 
 
 # ============================================================================

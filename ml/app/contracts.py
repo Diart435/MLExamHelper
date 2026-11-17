@@ -1,13 +1,16 @@
 """Контракт сообщений между backend и ML-воркером.
 
 === ГДЕ ЖИВЁТ ===
-Один тип задачи — один канал. Имя канала: `<prefix>:<type>`, где prefix —
-`ml-tasks` (backend → ml) или `ml-results` (ml → backend).
+Один тип задачи — один канал в каждом направлении. Имя канала:
+`<слаг-типа-задачи>:<направление>`, где направление — `be-to-ml` (backend → ml)
+или `ml-to-be` (ml → backend).
 
-    ml-tasks:ingest          ml-results:ingest
-    ml-tasks:rag_question    ml-results:rag_question
-    ml-tasks:create_test     ml-results:create_test
-    ml-tasks:grade_attempt   ml-results:grade_attempt
+    ingest:be-to-ml          ingest:ml-to-be
+    create-test:be-to-ml     create-test:ml-to-be
+    grade-test:be-to-ml      grade-test:ml-to-be
+
+Внутренние типы задач (`ingest`, `create_test`, `grade_attempt`) не совпадают
+со слагами каналов. `rag_question` остаётся legacy-каналом `rag-question`.
 
 Тип задачи определяется ИМЕНЕМ КАНАЛА, а не полем в payload: payload не несёт
 `type`. Обработчик выбирается по каналу, поэтому сообщение нельзя прочитать не
@@ -16,17 +19,17 @@
 === КАК ПОЛЬЗОВАТЬСЯ ===
 Сборка:
     task = IngestTask(material_id="uuid-material", storage_key="uploads/lec.pdf")
-    await redis.xadd(stream_channel("ml-tasks", "ingest"), {"payload": task.to_json()})
+    await redis.xadd(task_channel("ingest"), {"payload": task.to_json()})
 
 Парсинг входящего сообщения (тип известен из канала):
     payload = fields["payload"]
     task = parse_task(payload, "ingest")   # сам выберет нужный dataclass по типу
     if isinstance(task, UnknownTask):
-        ...                            # отдать ошибку в ml-results:ingest
+        ...                            # отдать ошибку в ingest:ml-to-be
 
 Сборка ответа:
     result = IngestResult.ok(task_id="", material_id="uuid-material", chunks_indexed=29)
-    await redis.xadd(stream_channel("ml-results", "ingest"), {"payload": result.to_json()})
+    await redis.xadd(result_channel("ingest"), {"payload": result.to_json()})
 
 === BEST PRACTICE ===
 - ML отдаёт ВАЛИДНЫЙ структурированный JSON, не сырой текст LLM. Если LLM вернул
@@ -61,24 +64,59 @@ MAX_QUESTIONS = 30
 QUESTION_TYPES = ("single_choice", "multi_choice", "open_answer")
 DIFFICULTIES = ("easy", "medium", "hard")
 
-# Префиксы каналов: задачи (backend → ml) и результаты (ml → backend).
-TASKS_STREAM_PREFIX = "ml-tasks"
-RESULTS_STREAM_PREFIX = "ml-results"
+# Направления потока между backend и ML.
+BE_TO_ML = "be-to-ml"
+ML_TO_BE = "ml-to-be"
+
+# Слаг типа задачи в имени канала. Внутренние типы задач не меняются.
+TASK_CHANNEL_SLUGS: dict[str, str] = {
+    "ingest": "ingest",
+    "rag_question": "rag-question",
+    "create_test": "create-test",
+    "grade_attempt": "grade-test",
+}
 
 
-def stream_channel(prefix: str, task_type: str) -> str:
-    """Имя канала для типа задачи: '<prefix>:<type>'.
+def stream_channel(task_type: str, direction: str) -> str:
+    """Имя канала для типа задачи и направления: '<slug>:<direction>'.
 
-    Один тип задачи — один канал. Тип определяется именем канала, а не полем
-    в payload, поэтому сообщение нельзя положить не туда.
+    На неизвестный внутренний тип задачи выбрасывается KeyError: молчаливый
+    fallback мог бы отправить сообщение не в тот канал.
     """
-    return f"{prefix}:{task_type}"
+    return f"{TASK_CHANNEL_SLUGS[task_type]}:{direction}"
+
+
+def task_channel(task_type: str) -> str:
+    """Канал задачи backend → ML."""
+    return stream_channel(task_type, BE_TO_ML)
+
+
+def result_channel(task_type: str) -> str:
+    """Канал результата ML → backend."""
+    return stream_channel(task_type, ML_TO_BE)
 
 
 def channel_task_type(channel: str) -> str:
-    """Обратное преобразование: 'ml-tasks:create_test' → 'create_test'."""
-    head, sep, tail = channel.rpartition(":")
-    return tail if sep else ""
+    """Обратное преобразование: 'create-test:be-to-ml' → 'create_test'."""
+    slug, sep, _direction = channel.partition(":")
+    if not sep:
+        return ""
+    for task_type, channel_slug in TASK_CHANNEL_SLUGS.items():
+        if channel_slug == slug:
+            return task_type
+    return ""
+
+
+def mirror_channel(channel: str) -> str:
+    """Зеркальный канал результата для неизвестного типа задачи.
+
+    Например, 'foo:be-to-ml' → 'foo:ml-to-be'. Если двоеточия нет, оно
+    добавляется: 'foo' → 'foo:ml-to-be'.
+    """
+    slug, sep, _direction = channel.partition(":")
+    if not sep:
+        slug = channel
+    return f"{slug}:{ML_TO_BE}"
 
 
 # ============================================================================

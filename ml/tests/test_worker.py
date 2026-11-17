@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from app.contracts import TASK_TYPES, stream_channel
+from app.contracts import TASK_TYPES, result_channel, task_channel
 from app.workers.rag import RAGWorker
 
 
@@ -53,23 +53,17 @@ class FakeRedis:
         return None
 
 
-TASKS_PREFIX = "ml-tasks"
-RESULTS_PREFIX = "ml-results"
-
-
 def _worker() -> tuple[RAGWorker, FakeRedis]:
     redis = FakeRedis()
     worker = RAGWorker.__new__(RAGWorker)
     worker.rag = None
     worker.redis = redis
-    worker.tasks_prefix = TASKS_PREFIX
-    worker.results_prefix = RESULTS_PREFIX
     worker.group = "ml-workers"
     worker.consumer = "w1"
     worker.reclaim_idle_ms = 120_000
     worker.reclaim_max_attempts = 5
-    worker.task_channels = {t: stream_channel(TASKS_PREFIX, t) for t in TASK_TYPES}
-    worker.result_channels = {t: stream_channel(RESULTS_PREFIX, t) for t in TASK_TYPES}
+    worker.task_channels = {t: task_channel(t) for t in TASK_TYPES}
+    worker.result_channels = {t: result_channel(t) for t in TASK_TYPES}
     worker.channel_types = {ch: t for t, ch in worker.task_channels.items()}
     return worker, redis
 
@@ -78,7 +72,15 @@ class TestWorkerChannels:
     def test_one_channel_per_task_type(self):
         worker, _ = _worker()
         assert set(worker.task_channels) == set(TASK_TYPES)
-        assert worker.task_channels["create_test"] == "ml-tasks:create_test"
+        assert worker.task_channels["ingest"] == "ingest:be-to-ml"
+        assert worker.task_channels["create_test"] == "create-test:be-to-ml"
+        assert worker.task_channels["grade_attempt"] == "grade-test:be-to-ml"
+
+    def test_result_channels_are_mirrors(self):
+        worker, _ = _worker()
+        assert worker.result_channels["ingest"] == "ingest:ml-to-be"
+        assert worker.result_channels["create_test"] == "create-test:ml-to-be"
+        assert worker.result_channels["grade_attempt"] == "grade-test:ml-to-be"
 
     @pytest.mark.asyncio
     async def test_group_created_on_every_task_channel(self):
@@ -98,21 +100,21 @@ class TestWorkerRouting:
     @pytest.mark.asyncio
     async def test_broken_json_gets_error_answer_not_silent_ack(self):
         worker, redis = _worker()
-        await worker._handle("1-1", {"payload": "{не json"}, "ml-tasks:ingest")
+        await worker._handle("1-1", {"payload": "{не json"}, "ingest:be-to-ml")
         assert len(redis.published) == 1
         payload = redis.published[0]["payload"]
         assert payload["status"] == "error"
         assert "not valid JSON" in payload["error"]
-        assert redis.acked == [("ml-tasks:ingest", "1-1")]
+        assert redis.acked == [("ingest:be-to-ml", "1-1")]
 
     @pytest.mark.asyncio
     async def test_non_object_payload_gets_error_answer(self):
         worker, redis = _worker()
-        await worker._handle("1-2", {"payload": "[1, 2, 3]"}, "ml-tasks:ingest")
+        await worker._handle("1-2", {"payload": "[1, 2, 3]"}, "ingest:be-to-ml")
         payload = redis.published[0]["payload"]
         assert payload["status"] == "error"
         assert "JSON object" in payload["error"]
-        assert redis.acked == [("ml-tasks:ingest", "1-2")]
+        assert redis.acked == [("ingest:be-to-ml", "1-2")]
 
     @pytest.mark.asyncio
     async def test_handler_crash_gets_error_answer(self):
@@ -124,7 +126,7 @@ class TestWorkerRouting:
         worker._route = boom  # type: ignore[method-assign]
         await worker._handle("2-2", {"payload": json.dumps(
             {"task_id": "t9"}
-        )}, "ml-tasks:create_test")
+        )}, "create-test:be-to-ml")
         payload = redis.published[0]["payload"]
         assert payload["status"] == "error"
         assert payload["task_id"] == "t9"
@@ -136,18 +138,30 @@ class TestWorkerRouting:
         worker._route = lambda task_type, task: _result(task)  # type: ignore[method-assign]
         await worker._handle("3-3", {"payload": json.dumps(
             {"task_id": "t1"}
-        )}, "ml-tasks:ingest")
+        )}, "ingest:be-to-ml")
         assert redis.published[0]["payload"]["input_msg_id"] == "3-3"
 
     @pytest.mark.asyncio
-    async def test_result_goes_to_mirrored_channel(self):
+    async def test_result_goes_to_mirrored_channel_and_ack_to_source(self):
         worker, redis = _worker()
         worker._route = lambda task_type, task: _result(task)  # type: ignore[method-assign]
         await worker._handle("4-4", {"payload": json.dumps(
             {"task_id": "t1"}
-        )}, "ml-tasks:create_test")
-        assert redis.published[0]["stream"] == "ml-results:create_test"
-        assert redis.acked == [("ml-tasks:create_test", "4-4")]
+        )}, "create-test:be-to-ml")
+        assert redis.published[0]["stream"] == "create-test:ml-to-be"
+        assert redis.acked == [("create-test:be-to-ml", "4-4")]
+
+    @pytest.mark.asyncio
+    async def test_unknown_channel_gets_error_in_mirror_and_is_acked(self):
+        worker, redis = _worker()
+        await worker._handle("4-5", {"payload": json.dumps(
+            {"task_id": "t1"}
+        )}, "foo:be-to-ml")
+        assert len(redis.published) == 1
+        assert redis.published[0]["stream"] == "foo:ml-to-be"
+        assert redis.published[0]["payload"]["status"] == "error"
+        assert "unknown task type" in redis.published[0]["payload"]["error"]
+        assert redis.acked == [("foo:be-to-ml", "4-5")]
 
     @pytest.mark.asyncio
     async def test_payload_has_no_type_field(self):
@@ -156,9 +170,9 @@ class TestWorkerRouting:
         worker._route = lambda task_type, task: _result(task)  # type: ignore[method-assign]
         await worker._handle("5-5", {"payload": json.dumps(
             {"task_id": "t1"}
-        )}, "ml-tasks:grade_attempt")
+        )}, "grade-test:be-to-ml")
         assert "type" not in redis.published[0]["payload"]
-        assert redis.published[0]["stream"] == "ml-results:grade_attempt"
+        assert redis.published[0]["stream"] == "grade-test:ml-to-be"
 
 
 def _result(task: dict) -> dict:
@@ -181,11 +195,11 @@ class TestReclaim:
     @pytest.mark.asyncio
     async def test_reclaimed_message_is_processed_and_acked(self):
         worker, redis = _worker()
-        redis.pending["ml-tasks:ingest"] = [
+        redis.pending["ingest:be-to-ml"] = [
             {"message_id": "9-9", "consumer": "w0",
              "time_since_delivered": 500000, "times_delivered": 2}
         ]
-        redis.claimed["ml-tasks:ingest"] = [
+        redis.claimed["ingest:be-to-ml"] = [
             ("9-9", {"payload": json.dumps({"task_id": "t7"})})
         ]
         worker._route = lambda task_type, task: _result(task)  # type: ignore[method-assign]
@@ -193,21 +207,21 @@ class TestReclaim:
         await worker._reclaim_pending()
 
         assert redis.autoclaim_calls == [
-            {"stream": "ml-tasks:ingest", "idle": 120_000}
+            {"stream": "ingest:be-to-ml", "idle": 120_000}
         ]
         assert len(redis.published) == 1
         assert redis.published[0]["payload"]["task_id"] == "t7"
-        assert redis.acked == [("ml-tasks:ingest", "9-9")]
+        assert redis.acked == [("ingest:be-to-ml", "9-9")]
 
     @pytest.mark.asyncio
     async def test_poison_message_dropped_after_max_attempts(self):
         """Сообщение, которое ломает обработку, не крутится вечно."""
         worker, redis = _worker()
-        redis.pending["ml-tasks:ingest"] = [
+        redis.pending["ingest:be-to-ml"] = [
             {"message_id": "9-9", "consumer": "w0",
              "time_since_delivered": 500000, "times_delivered": 9}
         ]
-        redis.claimed["ml-tasks:ingest"] = [
+        redis.claimed["ingest:be-to-ml"] = [
             ("9-9", {"payload": json.dumps({"task_id": "t7"})})
         ]
         worker._route = lambda task_type, task: _result(task)  # type: ignore[method-assign]
@@ -215,7 +229,7 @@ class TestReclaim:
         await worker._reclaim_pending()
 
         assert redis.published == []
-        assert redis.acked == [("ml-tasks:ingest", "9-9")]
+        assert redis.acked == [("ingest:be-to-ml", "9-9")]
 
     @pytest.mark.asyncio
     async def test_reclaim_failure_does_not_stop_the_worker(self):
@@ -226,4 +240,3 @@ class TestReclaim:
 
         worker.redis.xpending_range = boom  # type: ignore[method-assign]
         await worker._reclaim_pending()  # не должно бросать наружу
-

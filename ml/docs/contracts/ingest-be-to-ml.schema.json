@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-exam:contract:ingest:be-to-ml",
+  "title": "Задача индексации материала — канал ingest:be-to-ml",
+  "description": "Payload задачи от backend к ML для скачивания материала из бакета и индексации его в vector store.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["material_id", "storage_key"],
+  "properties": {
+    "material_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Идентификатор материала в backend (UUID-строка)."
+    },
+    "storage_key": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Путь объекта материала внутри бакета."
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Необязательный идентификатор задачи для корреляции запроса и результата."
+    },
+    "course_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Необязательный идентификатор курса для трассировки; ML не использует его для обработки."
+    }
+  },
+  "examples": [
+    {
+      "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
+      "material_id": "5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04",
+      "storage_key": "materials/5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04/lecture.pdf",
+      "course_id": "f7b2d48c-3a91-4f62-8d15-6e9c4a2b7d30"
+    }
+  ]
+}

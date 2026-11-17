@@ -3,9 +3,9 @@
 Эмулирует те взаимодействия, которые будет делать Java-backend
 с ML-воркером через Redis Streams + MinIO:
 
-  1) ingest       — залить файл в MinIO → XADD ml-tasks:ingest → дождаться ml-results:ingest
-  2) create_test  — XADD ml-tasks:create_test → дождаться ml-results:create_test
-  3) grade_attempt— XADD ml-tasks:grade_attempt → дождаться ml-results:grade_attempt
+  1) ingest       — залить файл в MinIO → XADD ingest:be-to-ml → дождаться ingest:ml-to-be
+  2) create_test  — XADD create-test:be-to-ml → дождаться create-test:ml-to-be
+  3) grade_attempt— XADD grade-test:be-to-ml → дождаться grade-test:ml-to-be
 
 Один тип задачи — один канал: тип задаёт ИМЯ КАНАЛА, а не поле в payload
 (в payload поля `type` нет).
@@ -39,7 +39,7 @@ Stub также повторяет запись результатов в БД (
   python -m tools.stub_backend grade-attempt --test-id <uuid>
 
   # Посмотреть, что лежит в очереди (не consume'ит)
-  python -m tools.stub_backend peek ml-tasks:ingest 5
+  python -m tools.stub_backend peek ingest:be-to-ml 5
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ from minio.error import S3Error
 from redis.asyncio import Redis
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from app.contracts import TASK_TYPES, stream_channel
+from app.contracts import TASK_TYPES, result_channel, task_channel
 
 
 # ============================================================================
@@ -87,20 +87,14 @@ def make_clients() -> tuple[Redis, Minio, dict]:
     minio_secret = _env("MINIO_SECRET_KEY", "minio_password")
     minio_secure = _env("MINIO_SECURE", "false").lower() == "true"
     bucket = _env("MINIO_BUCKET", DEFAULT_BUCKET)
-    # Префиксы каналов: задачи — backend → ml, результаты — ml → backend.
-    tasks_prefix = _env("ML_TASKS_STREAM", "ml-tasks")
-    results_prefix = _env("ML_RESULTS_STREAM", "ml-results")
-
     redis = Redis.from_url(redis_url, decode_responses=True)
     minio = Minio(
         minio_endpoint, access_key=minio_access, secret_key=minio_secret, secure=minio_secure,
     )
     cfg = {
         "bucket": bucket,
-        "tasks_prefix": tasks_prefix,
-        "results_prefix": results_prefix,
-        "task_channels": {t: stream_channel(tasks_prefix, t) for t in TASK_TYPES},
-        "result_channels": {t: stream_channel(results_prefix, t) for t in TASK_TYPES},
+        "task_channels": {t: task_channel(t) for t in TASK_TYPES},
+        "result_channels": {t: result_channel(t) for t in TASK_TYPES},
     }
     return redis, minio, cfg
 
@@ -669,7 +663,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_demo.set_defaults(func=cmd_demo)
 
     p_peek = sub.add_parser("peek", help="XRANGE последних N сообщений в канале")
-    p_peek.add_argument("stream", help="имя канала: ml-tasks:<type> или ml-results:<type>")
+    p_peek.add_argument("stream", help="имя канала: <slug>:be-to-ml или <slug>:ml-to-be")
     p_peek.add_argument("--count", type=int, default=5)
     p_peek.set_defaults(func=cmd_peek)
 

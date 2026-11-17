@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-exam:contract:create-test:ml-to-be",
+  "title": "Результат генерации теста — канал create-test:ml-to-be",
+  "description": "Payload результата от ML к backend со сгенерированным тестом либо с ошибкой генерации.",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "task_id", "test_id", "test"],
+      "properties": {
+        "status": {"const": "ok"},
+        "task_id": {"type": "string", "minLength": 1},
+        "test_id": {"type": "string", "minLength": 1},
+        "test": {"$ref": "#/$defs/test"},
+        "input_msg_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "error"],
+      "properties": {
+        "status": {"const": "error"},
+        "task_id": {
+          "type": "string",
+          "description": "Корреляция. Поле присутствует всегда, но может быть пустой строкой: при битом payload идентификатор задачи неизвестен."
+        },
+        "test_id": {
+          "type": "string",
+          "description": "Тест, для которого не удалось сгенерировать результат. Может отсутствовать, если payload не удалось разобрать."
+        },
+        "error": {"type": "string", "minLength": 1},
+        "input_msg_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "questions"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/question"}
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "text", "options", "answer_key", "key_points", "source_chunk_id"],
+          "properties": {
+            "id": {"type": "integer", "minimum": 0},
+            "type": {"const": "single_choice"},
+            "text": {"type": "string", "minLength": 1},
+            "options": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": {"type": "string"}
+            },
+            "answer_key": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["correct_index", "explanation"],
+              "properties": {
+                "correct_index": {"type": "integer", "minimum": 0},
+                "explanation": {"type": "string"}
+              }
+            },
+            "key_points": {
+              "type": "array",
+              "maxItems": 0,
+              "items": {"type": "string"}
+            },
+            "source_chunk_id": {"type": ["string", "null"]}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "text", "options", "answer_key", "key_points", "source_chunk_id"],
+          "properties": {
+            "id": {"type": "integer", "minimum": 0},
+            "type": {"const": "multi_choice"},
+            "text": {"type": "string", "minLength": 1},
+            "options": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 6,
+              "items": {"type": "string"}
+            },
+            "answer_key": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["correct_indexes", "explanation"],
+              "properties": {
+                "correct_indexes": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 3,
+                  "items": {"type": "integer", "minimum": 0}
+                },
+                "explanation": {"type": "string"}
+              }
+            },
+            "key_points": {
+              "type": "array",
+              "maxItems": 0,
+              "items": {"type": "string"}
+            },
+            "source_chunk_id": {"type": ["string", "null"]}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "text", "options", "answer_key", "key_points", "source_chunk_id"],
+          "properties": {
+            "id": {"type": "integer", "minimum": 0},
+            "type": {"const": "open_answer"},
+            "text": {"type": "string", "minLength": 1},
+            "options": {
+              "type": "array",
+              "maxItems": 0,
+              "items": {"type": "string"}
+            },
+            "answer_key": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["reference_answer", "explanation"],
+              "properties": {
+                "reference_answer": {"type": "string", "minLength": 1},
+                "explanation": {"type": "string"}
+              }
+            },
+            "key_points": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 4,
+              "items": {"type": "string"}
+            },
+            "source_chunk_id": {"type": ["string", "null"]}
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
+      "status": "ok",
+      "test_id": "9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
+      "test": {
+        "title": "Контрольная работа по базам данных",
+        "questions": [
+          {
+            "id": 1,
+            "type": "single_choice",
+            "text": "Какой уровень изоляции транзакций допускает чтение неподтверждённых изменений?",
+            "options": [
+              "READ COMMITTED",
+              "READ UNCOMMITTED",
+              "REPEATABLE READ",
+              "SERIALIZABLE"
+            ],
+            "answer_key": {
+              "correct_index": 1,
+              "explanation": "READ UNCOMMITTED допускает грязные чтения."
+            },
+            "key_points": [],
+            "source_chunk_id": "18c5e91a-2d74-4f60-b839-7e1a5c0d6b42"
+          },
+          {
+            "id": 2,
+            "type": "multi_choice",
+            "text": "Какие ограничения целостности поддерживает реляционная СУБД?",
+            "options": [
+              "Первичный ключ",
+              "Уникальность",
+              "Ссылочная целостность",
+              "Каскадное удаление",
+              "Шифрование"
+            ],
+            "answer_key": {
+              "correct_indexes": [
+                0,
+                1,
+                2
+              ],
+              "explanation": "Первичный ключ, уникальность и ссылочная целостность являются стандартными ограничениями."
+            },
+            "key_points": [],
+            "source_chunk_id": "7a0d3e91-c642-4f88-b125-6d9e2a4c8f31"
+          },
+          {
+            "id": 3,
+            "type": "open_answer",
+            "text": "Объясните назначение транзакции и принцип атомарности.",
+            "options": [],
+            "answer_key": {
+              "reference_answer": "Транзакция объединяет операции в единую логическую единицу работы; атомарность гарантирует выполнение всех операций либо откат всех изменений.",
+              "explanation": "Ответ должен называть единицу работы и гарантию all-or-nothing."
+            },
+            "key_points": [
+              "Транзакция — единая логическая единица работы.",
+              "При ошибке изменения откатываются целиком."
+            ],
+            "source_chunk_id": null
+          }
+        ]
+      },
+      "input_msg_id": "1766000000000-0"
+    }
+  ]
+}

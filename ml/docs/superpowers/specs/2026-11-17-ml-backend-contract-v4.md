@@ -2,7 +2,7 @@
 
 Дата: 2026-11-17
 Ветка: `ml/redis-jobs`
-Зона: `ml/` (ML) + backend-модули `ml`, `messaging`, `jobs`, `tests`, `materials`.
+Зона: `ml/` (ML). Backend-часть контракта — **требования** (`ml/docs/backend-tz-contract-v4.md`), а не код в этой ветке: backend ведёт другой разработчик.
 
 Схема БД — ERD заказчика (`ml/docs/erd.png`). Где контракт от неё отступает —
 в §8, с обоснованием.
@@ -24,7 +24,30 @@ v3 — это контракт тиммейта, приведённый к ERD. 
 | 7 | Backend подписан на **три отдельных канала** результатов, у каждого своя consumer-группа | Один канал с роутингом по полю `type` — это и есть «прочитать не тем обработчиком» |
 | 8 | Явно зафиксирована семантика доставки: at-least-once с двух сторон + идемпотентность записи | Redis Streams дают «хотя бы один раз», а не «ровно один» |
 
-Не изменилось: имена каналов, конверт `XADD <channel> * payload '<JSON>'`,
+### 0.1 Переименование каналов (2026-11-17)
+
+Имена каналов изменены по требованию заказчика: было `ml-tasks:<type>` /
+`ml-results:<type>` — стало `<тип-задачи>:<направление>`, где направление —
+`be-to-ml` или `ml-to-be`:
+
+| Было | Стало |
+|---|---|
+| `ml-tasks:ingest` / `ml-results:ingest` | `ingest:be-to-ml` / `ingest:ml-to-be` |
+| `ml-tasks:create_test` / `ml-results:create_test` | `create-test:be-to-ml` / `create-test:ml-to-be` |
+| `ml-tasks:grade_attempt` / `ml-results:grade_attempt` | `grade-test:be-to-ml` / `grade-test:ml-to-be` |
+
+Причина: старое имя прятало направление в префиксе и не читалось как «от кого
+к кому». Новое читается сразу: `grade-test:be-to-ml` — задача «проверь тест»,
+её ждёт ML. Слаг в имени канала — kebab-case, поэтому он не обязан совпадать
+с внутренним типом в коде (`create_test` → `create-test`,
+`grade_attempt` → `grade-test`); перевод живёт в `app/contracts.py`.
+
+Заодно убрана конфигурируемость префиксов (`ML_TASKS_STREAM`,
+`ML_RESULTS_STREAM`, `ML_STREAMS_*_PREFIX`): имена каналов — часть контракта,
+и если у сторон разъедутся значения переменной, стримы перестанут совпадать
+тихо, с обнаружением только на проде.
+
+Не изменилось: конверт `XADD <channel> * payload '<JSON>'`,
 форматы `answer_key`, микс типов по сложности, шкала оценок, правило
 `is_correct = score ≥ 0.5`, `score_pct` по всем вопросам теста.
 
@@ -35,27 +58,36 @@ v3 — это контракт тиммейта, приведённый к ERD. 
 Один тип задачи — один канал. Тип задаёт **имя канала**, а не поле в payload:
 поля `type` в сообщениях нет вообще.
 
+Имя канала: `<слаг-типа-задачи>:<направление>`, где направление — `be-to-ml`
+(backend → ML) или `ml-to-be` (ML → backend).
+
 | Направление | Канал | Consumer group | Consumer |
 |---|---|---|---|
-| BE → ML | `ml-tasks:ingest` | `ml-workers` | `worker-1` |
-| BE → ML | `ml-tasks:create_test` | `ml-workers` | `worker-1` |
-| BE → ML | `ml-tasks:grade_attempt` | `ml-workers` | `worker-1` |
-| ML → BE | `ml-results:ingest` | `ml-backend` | `backend-1` |
-| ML → BE | `ml-results:create_test` | `ml-backend` | `backend-1` |
-| ML → BE | `ml-results:grade_attempt` | `ml-backend` | `backend-1` |
+| BE → ML | `ingest:be-to-ml` | `ml-workers` | `worker-1` |
+| BE → ML | `create-test:be-to-ml` | `ml-workers` | `worker-1` |
+| BE → ML | `grade-test:be-to-ml` | `ml-workers` | `worker-1` |
+| ML → BE | `ingest:ml-to-be` | `ml-backend` | `backend-1` |
+| ML → BE | `create-test:ml-to-be` | `ml-backend` | `backend-1` |
+| ML → BE | `grade-test:ml-to-be` | `ml-backend` | `backend-1` |
 
-Имена префиксов задаются окружением:
+Слаг в имени канала — kebab-case и не обязан совпадать с внутренним типом
+задачи в коде: `create_test` → `create-test`, `grade_attempt` → `grade-test`.
+Внутри ML типы задач остаются `ingest` / `create_test` / `grade_attempt`
+(плюс legacy `rag_question`), а `app/contracts.py` переводит тип в слаг.
+
+**Имена каналов — константы контракта, не конфигурация.** Их задаёт обе
+стороны одинаково в коде. Конфигурируемый префикс (`ML_TASKS_STREAM` и
+подобные) убран намеренно: если у ML и backend'а разъедутся значения
+переменной, стримы перестанут совпадать тихо, и это обнаружится только на
+проде, в виде «задачи уходят в никуда». Окружением остаётся только
+идентификация воркера:
 
 | Переменная | Сервис | По умолчанию |
 |---|---|---|
-| `ML_STREAMS_TASKS_PREFIX` | backend | `ml-tasks` |
-| `ML_STREAMS_RESULTS_PREFIX` | backend | `ml-results` |
-| `ML_STREAMS_CONSUMER_GROUP` | backend | `ml-backend` |
-| `ML_STREAMS_CONSUMER_NAME` | backend | `backend-1` |
-| `ML_TASKS_STREAM` | ml | `ml-tasks` |
-| `ML_RESULTS_STREAM` | ml | `ml-results` |
 | `CONSUMER_GROUP` | ml | `ml-workers` |
 | `CONSUMER_NAME` | ml | `worker-1` |
+| `ML_STREAMS_CONSUMER_GROUP` | backend | `ml-backend` |
+| `ML_STREAMS_CONSUMER_NAME` | backend | `backend-1` |
 
 Consumer group привязана к одному стриму, поэтому её создают на **каждом**
 канале. Backend создаёт группы с `MKSTREAM` — каналы появляются на лету первым
@@ -71,6 +103,11 @@ XADD <канал> * payload '<JSON одной строкой>'
 переносов строк. Backend читает `MapRecord.getValue().get("payload")` и
 парсит в свой record-тип; ML читает `fields["payload"]` и парсит в
 dataclass по типу из имени канала.
+
+Машино-читаемые схемы всех шести контрактов (JSON Schema draft 2020-12) —
+в `ml/docs/contracts/`, с каноническими примерами payload'ов в
+`ml/docs/contracts/examples/`. Примеры сгенерированы из `app/contracts.py`,
+тест `ml/tests/test_contract_schema.py` не даёт им разъехаться с кодом.
 
 ### 1.3 Семантика доставки
 
@@ -403,7 +440,7 @@ payload'е незачем, они уже в БД.
    `grade` — `NULL`.
 3. Создать `attempt_answers` — по одной строке на ответ: `student_answer`
    (типизированный JSONB), `score`/`feedback` — `NULL`.
-4. Опубликовать задачу `grade_attempt` в `ml-tasks:grade_attempt`.
+4. Опубликовать задачу `grade_attempt` в `grade-test:be-to-ml`.
 5. Ответить клиенту **202 Accepted**: попытка в статусе `processing`.
 
 Порядок при получении вердикта:
@@ -509,8 +546,8 @@ ML в таблицы `tests`, `test_questions`, `student_attempts`, `attempt_ans
 
 ## 9. Обязанности backend — чек-лист
 
-1. Публиковать в `ml-tasks:<type>` с конвертом `payload '<JSON>'`, без поля
-   `type`.
+1. Публиковать в `<тип-задачи>:be-to-ml` с конвертом `payload '<JSON>'`, без
+   поля `type`.
 2. `create_test`: `amountQuestions` — целое 1..30 (бакет развернуть в число),
    `difficulty` — `easy|medium|hard`, `material_ids` — непустой список.
 3. `grade_attempt`: `answers[]` — `{question_id, student_answer}`, где
@@ -554,22 +591,19 @@ ML в таблицы `tests`, `test_questions`, `student_attempts`, `attempt_ans
 | `app/services/open_answer_judge.py` | LLM-судья для `open_answer` |
 | `app/services/test_store.py` | Чтение `test_questions` из Postgres |
 
-### Backend
+### Backend (требования — в этой ветке этих файлов нет)
 
-| Файл | Роль |
+Backend-часть контракта реализуется на стороне backend-разработчика. Таблица ниже — **не описание существующих файлов**, а список того, что должно появиться и за что отвечает. Формулировки «данные, а не код» — в `ml/docs/backend-tz-contract-v4.md`.
+
+| Что должно быть у backend'а | Роль |
 |---|---|
-| `ml/MlChannels.java` | Имена каналов, consumer group, `typeFromChannel()` |
-| `ml/MlTaskPublisher.java` + `messaging/producer/RedisProducer.java` | Публикация задач: `XADD` в `ml-tasks:<type>` |
-| `ml/payload/*.java` | Record'ы результатов ML: `MlIngestResult`, `MlCreateTestResult`, `MlQuestionData`, `MlTestData`, `MlGradeAttemptResult`, `MlGradedItem` |
-| `jobs/MlResultsSubscriber.java` | Подписка на три канала результатов, создание групп |
-| `jobs/listener/MlResultListener.java` | Базовый listener: парсинг payload'а, `XACK` только после успеха |
-| `jobs/listener/ProcessingMaterialListener.java` | `ingest` → `materials.status_material` |
-| `jobs/listener/CreateTestListener.java` | `create_test` → `test_questions` + `tests.status_test` |
-| `jobs/listener/GradeAttemptListener.java` | `grade_attempt` → `student_attempts` + `attempt_answers` |
-| `tests/service/AttemptsService.java` | Сдача попытки, чтение попытки, применение вердикта |
-| `tests/service/QuestionsService.java` | Запись вопросов из ответа ML, детерминированные id |
-| `tests/service/TestsService.java` | Создание теста, применение результата генерации |
-| `db/changelog/changes/006-ml-contract.sql` | `answer_key`, `question_order`, дроп `is_correct`/`correct_answer` |
+| Словарь имён каналов + consumer group | `ingest:be-to-ml` / `create-test:be-to-ml` / `grade-test:be-to-ml`, группа `ml-workers`; три канала результатов `…:ml-to-be`, своя группа на каждом |
+| Продюсер задач | `XADD <канал> * payload '<JSON>'`, без поля `type` |
+| Record'ы результатов ML | `IngestResult`, `CreateTestResult` (с вопросами), `GradeAttemptResult` (с items) — по схемам из `ml/docs/contracts/` |
+| Подписка на результаты | Три канала `…:ml-to-be`, группы с `MKSTREAM`, чтение с `>` |
+| Listener'ы | `ingest` → `materials.status_material`; `create_test` → `test_questions` + `tests.status_test`; `grade_attempt` → `student_attempts` + `attempt_answers`. `XACK` — только после успешной записи |
+| Сдача попытки | `student_attempts` + `attempt_answers` создаются **до** публикации задачи, затем 202 Accepted |
+| Миграция | `answer_key`, `question_order`, дроп `is_correct` / `correct_answer` |
 
 ## 12. Предыдущие версии
 

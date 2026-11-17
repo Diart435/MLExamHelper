@@ -2,15 +2,16 @@
 
 === КОНТРАКТ СООБЩЕНИЙ (для backend-команды) ===
 
-Один тип задачи — один канал. Имя канала: '<prefix>:<type>'.
+Один тип задачи — один канал в каждом направлении. Имя канала:
+'<слаг-типа-задачи>:<направление>', где направление — `be-to-ml` или `ml-to-be`.
 
 Backend публикует в канал задачи:
-    XADD ml-tasks:ingest * payload '<JSON IngestTask>'
-    XADD ml-tasks:create_test * payload '<JSON CreateTestTask>'
+    XADD ingest:be-to-ml * payload '<JSON IngestTask>'
+    XADD create-test:be-to-ml * payload '<JSON CreateTestTask>'
 
 Worker публикует в зеркальный канал результата:
-    XADD ml-results:ingest * payload '<JSON IngestResult>'
-    XADD ml-results:create_test * payload '<JSON CreateTestResult>'
+    XADD ingest:ml-to-be * payload '<JSON IngestResult>'
+    XADD create-test:ml-to-be * payload '<JSON CreateTestResult>'
 
 Тип задачи задаёт ИМЯ КАНАЛА, а не поле в payload: поля `type` нет ни в
 задачах, ни в результатах.
@@ -51,7 +52,7 @@ from app.services.test_generator import TestGenerator
 
 
 async def process_ingest(task: dict | IngestTask, rag: RAGService) -> dict:
-    """Handle задачу из канала ml-tasks:ingest: скачать файл из MinIO и проиндексировать.
+    """Handle задачу из канала ingest:be-to-ml: скачать файл из MinIO и проиндексировать.
 
     Принимает и dict (сырой payload из Redis), и IngestTask (для прямого вызова
     из тестов). На выходе — dict (то, что XADD-ит воркер).
@@ -91,7 +92,7 @@ async def process_ingest(task: dict | IngestTask, rag: RAGService) -> dict:
 
 
 async def process_question(task: dict | RAGQuestionTask, rag: RAGService) -> dict:
-    """Handle задачу из канала ml-tasks:rag_question: ответить по материалу.
+    """Handle задачу из канала rag-question:be-to-ml: ответить по материалу.
 
     Optional fields:
       - top_k: int   (default 4)  — сколько чанков отдать в LLM
@@ -135,7 +136,7 @@ async def process_create_test(
     rag: RAGService,
     generator: TestGenerator | None = None,
 ) -> dict:
-    """Handle задачу из канала ml-tasks:create_test: сгенерировать тест через LLM.
+    """Handle задачу из канала create-test:be-to-ml: сгенерировать тест через LLM.
 
     Архитектура: handler валидирует задачу и формат ответа, держит LLM-вызовы
     и парсинг в TestGenerator. Сам по себе — тонкий, не делает работы.
@@ -172,7 +173,7 @@ async def process_grade_attempt(
     task: dict | GradeAttemptTask,
     grader: Grader | None = None,
 ) -> dict:
-    """Handle задачу из канала ml-tasks:grade_attempt: проверка ответов.
+    """Handle задачу из канала grade-test:be-to-ml: проверка ответов.
 
     Backend прислал попытку — список (question_id, student_answer).
     Достаём вопросы из test_questions: single_choice проверяем детерминированно

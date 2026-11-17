@@ -12,8 +12,6 @@ def test_settings_loads_all_defaults(monkeypatch, tmp_path):
     assert s.llm_model == "minimax/minimax-m3:free"
     assert s.embed_model == "openai/text-embedding-3-small"
     assert s.redis_url == "redis://localhost:6379/0"
-    assert s.ml_tasks_stream == "ml-tasks"
-    assert s.ml_results_stream == "ml-results"
     assert s.consumer_group == "ml-workers"
     assert s.minio_endpoint == "localhost:9000"
     assert s.minio_bucket == "materials"

@@ -14,11 +14,7 @@ class Settings(BaseSettings):
 
     # Redis Streams
     redis_url: str = "redis://localhost:6379/0"
-    # Префиксы каналов. Один тип задачи — один канал "<prefix>:<type>",
-    # например "ml-tasks:create_test". Тип определяется именем канала,
-    # поэтому в payload поля type нет.
-    ml_tasks_stream: str = "ml-tasks"
-    ml_results_stream: str = "ml-results"
+    # Имена каналов — часть контракта и заданы в app/contracts.py.
     consumer_group: str = "ml-workers"
     consumer_name: str = "worker-1"
 

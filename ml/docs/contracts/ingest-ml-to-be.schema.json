@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-exam:contract:ingest:ml-to-be",
+  "title": "Результат индексации материала — канал ingest:ml-to-be",
+  "description": "Payload результата от ML к backend после индексации материала либо после ошибки индексации.",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "chunks_indexed", "material_id"],
+      "properties": {
+        "status": {"const": "ready"},
+        "chunks_indexed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Количество проиндексированных чанков."
+        },
+        "material_id": {"type": "string", "minLength": 1},
+        "task_id": {
+          "type": "string",
+          "description": "Корреляция. У ingest необязателен: backend может не прислать task_id."
+        },
+        "input_msg_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "error"],
+      "properties": {
+        "status": {"const": "error"},
+        "error": {"type": "string", "minLength": 1},
+        "material_id": {
+          "type": "string",
+          "description": "Материал, статус которого backend переводит в «ошибка». Может отсутствовать: если payload не удалось разобрать, ML не знает, о каком материале речь."
+        },
+        "task_id": {
+          "type": "string",
+          "description": "Корреляция. Может отсутствовать или быть пустой: при битом payload идентификатор задачи неизвестен."
+        },
+        "input_msg_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
+      "material_id": "5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04",
+      "status": "ready",
+      "chunks_indexed": 12,
+      "input_msg_id": "1766000000000-0"
+    }
+  ]
+}

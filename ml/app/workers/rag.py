@@ -28,7 +28,13 @@ from loguru import logger
 from redis.asyncio import Redis
 from redis.exceptions import ResponseError, TimeoutError as RedisTimeoutError
 
-from app.contracts import TASK_TYPES, channel_task_type, stream_channel
+from app.contracts import (
+    TASK_TYPES,
+    channel_task_type,
+    mirror_channel,
+    result_channel,
+    task_channel,
+)
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.redis_client import get_redis
@@ -47,16 +53,13 @@ class RAGWorker:
         s = get_settings()
         self.rag = rag or RAGService()
         self.redis = redis or get_redis(s)
-        # Префиксы каналов: 'ml-tasks' → 'ml-tasks:create_test' и т.д.
-        self.tasks_prefix = s.ml_tasks_stream
-        self.results_prefix = s.ml_results_stream
         self.group = s.consumer_group
         self.consumer = s.consumer_name
         self.reclaim_idle_ms = s.reclaim_idle_ms
         self.reclaim_max_attempts = s.reclaim_max_attempts
         # Один тип задачи — один канал в каждом направлении.
-        self.task_channels = {t: stream_channel(self.tasks_prefix, t) for t in TASK_TYPES}
-        self.result_channels = {t: stream_channel(self.results_prefix, t) for t in TASK_TYPES}
+        self.task_channels = {t: task_channel(t) for t in TASK_TYPES}
+        self.result_channels = {t: result_channel(t) for t in TASK_TYPES}
         self.channel_types = {ch: t for t, ch in self.task_channels.items()}
 
     async def ensure_group(self) -> None:
@@ -192,7 +195,7 @@ class RAGWorker:
 
     async def _handle(self, msg_id: str, fields: dict, channel: str) -> None:
         task_type = self.channel_types.get(channel) or channel_task_type(channel)
-        result_channel = self.result_channels.get(task_type, self.results_prefix)
+        result_channel = self.result_channels.get(task_type) or mirror_channel(channel)
         payload = fields.get("payload", "{}")
         try:
             task = json.loads(payload)

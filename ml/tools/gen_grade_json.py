@@ -34,8 +34,8 @@ def hr(title: str) -> None:
 
 
 async def main() -> None:
-    # ── 1. Задача: backend → ML (канал ml-tasks:grade_attempt) ──────────────
-    hr("1. ЗАДАЧА  backend → ML   XADD ml-tasks:grade_attempt * payload '<json>'")
+    # ── 1. Задача: backend → ML (канал grade-test:be-to-ml) ────────────────
+    hr("1. ЗАДАЧА  backend → ML   XADD grade-test:be-to-ml * payload '<json>'")
 
     backend_payload = {
         "task_id": "8f2a1c73-5d90-4b62-8e14-3c7f6a2b9d50",
@@ -109,7 +109,7 @@ async def main() -> None:
                      ensure_ascii=False, indent=2))
 
     # ── 3. Результат: ML → backend ─────────────────────────────────────────
-    hr("3. РЕЗУЛЬТАТ  ML → backend   XADD ml-results:grade_attempt * payload '<json>'")
+    hr("3. РЕЗУЛЬТАТ  ML → backend   XADD grade-test:ml-to-be * payload '<json>'")
 
     outcome = None  # grade() ходит в БД; ниже считаем на тех же items
     from app.services.grader import _aggregate
