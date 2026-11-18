@@ -12,6 +12,7 @@ import json
 import pytest
 
 from app.contracts import TASK_TYPES, result_channel, task_channel
+from app.services.answer_store import AnswerStore
 from app.workers.rag import RAGWorker
 
 
@@ -65,6 +66,9 @@ def _worker() -> tuple[RAGWorker, FakeRedis]:
     worker.task_channels = {t: task_channel(t) for t in TASK_TYPES}
     worker.result_channels = {t: result_channel(t) for t in TASK_TYPES}
     worker.channel_types = {ch: t for t, ch in worker.task_channels.items()}
+    # Хранилище эталонов ответов: по контракту заказчика эталона нет ни в
+    # payload'е, ни в БД backend'а — ML держит его у себя в Redis.
+    worker.answer_store = AnswerStore(redis)
     return worker, redis
 
 
@@ -133,13 +137,35 @@ class TestWorkerRouting:
         assert "kaboom" in payload["error"]
 
     @pytest.mark.asyncio
-    async def test_result_carries_input_msg_id(self):
+    async def test_grade_error_answer_has_no_status_field(self):
+        """В `grade-test:ml-to-be` поля `status` нет по контракту: признак
+        ошибки — само наличие `error`. Backend читает результат строго."""
+        worker, redis = _worker()
+        await worker._handle("5-5", {"payload": "{не json"}, "grade-test:be-to-ml")
+        payload = redis.published[0]["payload"]
+        assert "status" not in payload
+        assert "not valid JSON" in payload["error"]
+        assert redis.published[0]["stream"] == "grade-test:ml-to-be"
+        assert redis.acked == [("grade-test:be-to-ml", "5-5")]
+
+    @pytest.mark.asyncio
+    async def test_other_channels_keep_status_in_error_answer(self):
+        """У остальных каналов `status: "error"` обязателен — backend различает
+        ветки по нему."""
+        worker, redis = _worker()
+        await worker._handle("5-6", {"payload": "{не json"}, "create-test:be-to-ml")
+        assert redis.published[0]["payload"]["status"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_result_carries_no_input_msg_id(self):
+        """`input_msg_id` в контракте заказчика нет: воркер его не добавляет.
+        Корреляция идёт по task_id (и material_id у ingest)."""
         worker, redis = _worker()
         worker._route = lambda task_type, task: _result(task)  # type: ignore[method-assign]
         await worker._handle("3-3", {"payload": json.dumps(
             {"task_id": "t1"}
         )}, "ingest:be-to-ml")
-        assert redis.published[0]["payload"]["input_msg_id"] == "3-3"
+        assert "input_msg_id" not in redis.published[0]["payload"]
 
     @pytest.mark.asyncio
     async def test_result_goes_to_mirrored_channel_and_ack_to_source(self):

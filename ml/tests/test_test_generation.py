@@ -764,11 +764,14 @@ class TestProcessCreateTest:
     @pytest.mark.asyncio
     async def test_ok(self):
         rag = _make_rag_with_chunks([101])
-        llm = _make_fake_llm([llm_response(4, 3, 3)])
+        # Контракт v4.1: числа вопросов в задаче нет — размер выбирает
+        # планировщик, поэтому первым идёт ответ планировщика (10 вопросов),
+        # вторым — генератор (микс medium = 4/3/3).
+        llm = _make_fake_llm([planner_response(10), llm_response(4, 3, 3)])
         gen = TestGenerator(rag=rag, llm=llm)
         task_dict = {
             "task_id": "t1", "test_id": "T1",
-            "material_ids": [101], "title": "Quiz", "amountQuestions": 10,
+            "material_ids": [101], "title": "Quiz",
             "difficulty": "medium",
         }
         result = await process_create_test(task_dict, rag, generator=gen)
@@ -780,13 +783,16 @@ class TestProcessCreateTest:
 
     @pytest.mark.asyncio
     async def test_auto_mode_reports_actual_count(self):
-        """ML сам выбрал размер — backend узнаёт фактическое число по массиву вопросов."""
+        """ML сам выбрал размер — backend узнаёт фактическое число по массиву вопросов.
+
+        Контракт v4.1: числа вопросов в задаче нет вовсе, размер всегда
+        выбирает планировщик."""
         rag = _make_rag_with_chunks([101])
         llm = _make_fake_llm([planner_response(6), llm_response(2, 2, 2)])
         gen = TestGenerator(rag=rag, llm=llm)
         task_dict = {
             "task_id": "t1", "test_id": "T1",
-            "material_ids": [101], "title": "Quiz", "amountQuestions": "min",
+            "material_ids": [101], "title": "Quiz",
             "difficulty": "medium",
         }
         result = await process_create_test(task_dict, rag, generator=gen)
@@ -802,15 +808,19 @@ class TestProcessCreateTest:
         assert "invalid" in result["error"].lower()
 
     @pytest.mark.asyncio
-    async def test_num_questions_out_of_range_returns_error(self):
+    async def test_legacy_amount_questions_is_ignored(self):
+        """Старый payload с `amountQuestions: 31` не должен ронять задачу:
+        числа вопросов в контракте больше нет (v4.1), размер выбирает ML."""
         rag = _make_rag_with_chunks([101])
         task_dict = {
             "task_id": "t1", "test_id": "T1",
             "material_ids": [101], "title": "Quiz", "amountQuestions": 31,
         }
-        result = await process_create_test(task_dict, rag)
-        assert result["status"] == "error"
-        assert "num_questions" in result["error"]
+        llm = _make_fake_llm([planner_response(4), llm_response(2, 1, 1)])
+        gen = TestGenerator(rag=rag, llm=llm)
+        result = await process_create_test(task_dict, rag, generator=gen)
+        assert result["status"] == "ok"
+        assert len(result["test"]["questions"]) == 4
 
     @pytest.mark.asyncio
     async def test_llm_failure_returns_error(self):
@@ -843,13 +853,13 @@ class TestParseCreateTest:
     def test_roundtrip(self):
         original = CreateTestTask(
             task_id="t1", test_id="T1", material_ids=["1", "2", "3"],
-            title="Quiz", num_questions=8, difficulty="hard",
+            title="Quiz", difficulty="hard",
         )
         parsed = parse_task(original.to_json(), "create_test")
         assert isinstance(parsed, CreateTestTask)
         assert parsed.material_ids == ["1", "2", "3"]
         assert parsed.difficulty == "hard"
-        assert parsed.num_questions == 8
+        assert parsed.num_questions is None
 
     def test_missing_num_questions_means_auto(self):
         parsed = CreateTestTask.from_dict({
@@ -857,12 +867,14 @@ class TestParseCreateTest:
         })
         assert parsed.num_questions is None
 
-    def test_amount_questions_is_canonical_name(self):
+    def test_amount_questions_is_ignored(self):
+        """Контракт v4.1: `amountQuestions` из payload'а НЕ читается — числа
+        вопросов в контракте больше нет, размер выбирает ML."""
         parsed = CreateTestTask.from_dict({
             "task_id": "t1", "test_id": "T1", "title": "X", "material_ids": ["1"],
             "amountQuestions": 12,
         })
-        assert parsed.num_questions == 12
+        assert parsed.num_questions is None
 
     def test_min_sentinel_means_auto(self):
         parsed = CreateTestTask.from_dict({
@@ -871,13 +883,14 @@ class TestParseCreateTest:
         })
         assert parsed.num_questions is None
 
-    def test_legacy_num_questions_still_accepted(self):
-        """В Redis Streams остались payload'ы прежнего формата — читаем их."""
+    def test_legacy_num_questions_is_ignored(self):
+        """В Redis Streams остались payload'ы прежнего формата — читаем их
+        без падения, но число вопросов не применяем (v4.1)."""
         parsed = CreateTestTask.from_dict({
             "task_id": "t1", "test_id": "T1", "title": "X", "material_ids": ["1"],
             "num_questions": 7,
         })
-        assert parsed.num_questions == 7
+        assert parsed.num_questions is None
 
     def test_explicit_null_means_auto(self):
         parsed = CreateTestTask.from_dict({
@@ -953,7 +966,9 @@ class TestTestQuestionNormalisation:
         })
         dumped = q.to_dict()
         assert dumped["key_points"] == ["пункт 1"]
-        assert "criteria" not in dumped["answer_key"]
+        # Контракт v4.1: эталон наружу ВЫХОДИТ — но без `criteria`: criteria
+        # живёт только в key_points.
+        assert dumped["answer_key"] == {"reference_answer": "Эталон"}
 
     def test_source_chunk_id_is_kept_and_ref_is_not_published(self):
         """Метка блока — внутренняя, наружу уходит UUID чанка."""
@@ -1021,6 +1036,8 @@ class TestTestQuestionNormalisation:
             })
 
     def test_multi_choice_serialises_indexes(self):
+        """Контракт v4.1: эталон multi_choice выходит наружу — backend пишет
+        его в `test_questions.answer_key`."""
         q = TestQuestion.from_dict({
             "id": 1, "type_question": "multi_choice",
             "options": ["A", "B", "C", "D"],
@@ -1028,9 +1045,13 @@ class TestTestQuestionNormalisation:
             "answer_key": {"correct_indexes": [0, 3], "explanation": "пояснение"},
             "key_points": [],
         })
+        assert q.correct_indexes() == [0, 3]
+        assert q.answer_key["explanation"] == "пояснение"
         dumped = q.to_dict()
-        assert dumped["answer_key"]["correct_indexes"] == [0, 3]
-        assert dumped["answer_key"]["explanation"] == "пояснение"
+        assert dumped["answer_key"] == {
+            "correct_indexes": [0, 3], "explanation": "пояснение",
+        }
+        assert dumped["options"] == ["A", "B", "C", "D"]
 
     def test_unknown_type_raises(self):
         with pytest.raises(ValueError, match="unknown type_question"):

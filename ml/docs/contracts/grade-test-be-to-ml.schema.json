@@ -2,25 +2,43 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ai-exam:contract:grade-test:be-to-ml",
   "title": "Задача проверки попытки — канал grade-test:be-to-ml",
-  "description": "Payload задачи от backend к ML для проверки ответов студента по указанному тесту.",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["task_id", "attempt_id", "test_id", "user_id", "answers"],
+  "required": [
+    "task_id",
+    "attempt_id",
+    "test_id",
+    "answers"
+  ],
   "properties": {
-    "task_id": {"type": "string", "minLength": 1},
-    "attempt_id": {"type": "string", "minLength": 1},
-    "test_id": {"type": "string", "minLength": 1},
-    "user_id": {"type": "string", "minLength": 1},
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "answers": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "additionalProperties": false,
-        "required": ["question_id", "student_answer"],
+        "required": [
+          "question_id",
+          "student_answer"
+        ],
         "properties": {
-          "question_id": {"type": "string", "minLength": 1},
-          "student_answer": {"$ref": "#/$defs/student_answer"}
+          "question_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "student_answer": {
+            "$ref": "#/$defs/student_answer"
+          }
         }
       }
     }
@@ -31,30 +49,41 @@
       "oneOf": [
         {
           "type": "object",
-          "additionalProperties": false,
-          "required": ["index"],
+          "required": [
+            "index"
+          ],
           "properties": {
-            "index": {"type": "integer", "minimum": 0}
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["indexes"],
-          "properties": {
-            "indexes": {
-              "type": "array",
-              "minItems": 1,
-              "items": {"type": "integer", "minimum": 0}
+            "index": {
+              "type": "integer",
+              "minimum": 0
             }
           }
         },
         {
           "type": "object",
-          "additionalProperties": false,
-          "required": ["text"],
+          "required": [
+            "indexes"
+          ],
           "properties": {
-            "text": {"type": "string"}
+            "indexes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            }
           }
         }
       ]
@@ -65,7 +94,6 @@
       "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
       "attempt_id": "4d8f2b76-1e35-4c9a-b027-8f6a3d1e5b42",
       "test_id": "9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
-      "user_id": "8c1d4a29-6e73-4b85-9f02-3a7e5c9d1b68",
       "answers": [
         {
           "question_id": "18c5e91a-2d74-4f60-b839-7e1a5c0d6b42",

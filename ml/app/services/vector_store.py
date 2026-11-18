@@ -22,6 +22,7 @@ import numpy as np
 from loguru import logger
 
 from app.core.config import Settings, get_settings
+from app.core.db import install_json_codecs
 
 
 def _normalize(v: np.ndarray) -> np.ndarray:
@@ -156,6 +157,7 @@ class PgVectorStore:
         import asyncpg  # локальный импорт — pytest с backend=mem не тянет драйвер
         self._pool = await asyncpg.create_pool(
             self._dsn, min_size=self._pool_min_size, max_size=self._pool_max_size,
+            init=install_json_codecs,
         )
         logger.info(f"PgVectorStore connected (min={self._pool_min_size}, "
                     f"max={self._pool_max_size})")

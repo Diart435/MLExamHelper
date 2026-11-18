@@ -2,18 +2,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ai-exam:contract:grade-test:ml-to-be",
   "title": "Результат проверки попытки — канал grade-test:ml-to-be",
-  "description": "Payload результата от ML к backend с оценкой попытки либо с ошибкой проверки.",
   "type": "object",
   "oneOf": [
     {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["status", "task_id", "attempt_id", "test_id", "score_pct", "grade", "items"],
+      "required": [
+        "task_id",
+        "attempt_id",
+        "test_id",
+        "score_pct",
+        "grade",
+        "items"
+      ],
       "properties": {
-        "status": {"const": "ok"},
-        "task_id": {"type": "string", "minLength": 1},
-        "attempt_id": {"type": "string", "minLength": 1},
-        "test_id": {"type": "string", "minLength": 1},
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "score_pct": {
           "type": "number",
           "minimum": 0,
@@ -26,38 +39,30 @@
         },
         "items": {
           "type": "array",
-          "items": {"$ref": "#/$defs/graded_item"}
-        },
-        "input_msg_id": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+          "items": {
+            "$ref": "#/$defs/graded_item"
+          }
         }
       }
     },
     {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["status", "error"],
+      "required": [
+        "error"
+      ],
       "properties": {
-        "status": {"const": "error"},
         "task_id": {
-          "type": "string",
-          "description": "Корреляция. Поле присутствует всегда, но может быть пустой строкой: при битом payload идентификатор задачи неизвестен."
+          "type": "string"
         },
         "attempt_id": {
-          "type": "string",
-          "description": "Попытка, которую не удалось проверить. Может отсутствовать, если payload не удалось разобрать."
+          "type": "string"
         },
         "test_id": {
-          "type": "string",
-          "description": "Тест, который не удалось проверить. Может отсутствовать, если payload не удалось разобрать."
+          "type": "string"
         },
-        "error": {"type": "string", "minLength": 1},
-        "input_msg_id": {
+        "error": {
           "type": "string",
-          "minLength": 1,
-          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+          "minLength": 1
         }
       }
     }
@@ -65,26 +70,42 @@
   "$defs": {
     "graded_item": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["question_id", "is_correct", "score", "feedback", "correct_answer", "student_answer"],
+      "required": [
+        "question_id",
+        "is_correct",
+        "score",
+        "feedback",
+        "correct_answer",
+        "student_answer"
+      ],
       "properties": {
-        "question_id": {"type": "string", "minLength": 1},
-        "is_correct": {"type": "boolean"},
+        "question_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_correct": {
+          "type": "boolean"
+        },
         "score": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
         },
-        "feedback": {"type": "string"},
-        "correct_answer": {"type": "string"},
-        "student_answer": {"type": "string"}
+        "feedback": {
+          "type": "string"
+        },
+        "correct_answer": {
+          "type": "string"
+        },
+        "student_answer": {
+          "type": "string"
+        }
       }
     }
   },
   "examples": [
     {
       "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
-      "status": "ok",
       "attempt_id": "4d8f2b76-1e35-4c9a-b027-8f6a3d1e5b42",
       "test_id": "9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
       "score_pct": 83.33,
@@ -114,8 +135,7 @@
           "correct_answer": "Транзакция объединяет операции в единую логическую единицу работы; атомарность гарантирует выполнение всех операций либо откат всех изменений.",
           "student_answer": "Транзакция обеспечивает атомарность операций."
         }
-      ],
-      "input_msg_id": "1766000000000-0"
+      ]
     }
   ]
 }

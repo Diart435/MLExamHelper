@@ -9,8 +9,11 @@
   - задачи, которые шлёт backend, разбираются ML без потерь (round-trip);
   - результаты, которые шлёт ML, разбираются backend'ом без потерь — здесь
     проверяется форма, которую backend ждёт в своих record'ах;
-  - `answer_key` соответствует типу вопроса;
-  - служебная метка блока (`source_chunk_ref`) наружу не публикуется.
+  - в payload'ах НЕТ полей, которых нет в контракте заказчика
+    (`input_msg_id`, `course_id`, `user_id`, `chunks_indexed`);
+  - служебная метка блока (`source_chunk_ref`) наружу не публикуется;
+  - контракт v4.1: числа вопросов (`amountQuestions`) в задаче нет, а эталон
+    (`answer_key`) в ответе на создание теста — есть.
 
 Полная спека: `ml/docs/superpowers/specs/2026-11-17-ml-backend-contract-v4.md`.
 """
@@ -32,6 +35,7 @@ from app.contracts import (
     IngestResult,
     IngestTask,
     TASK_CHANNEL_SLUGS,
+    StudentAnswer,
     Test,
     TestQuestion,
     channel_task_type,
@@ -117,38 +121,61 @@ class TestChannelNames:
 
 class TestTaskPayloads:
     def test_ingest_task_matches_backend_payload(self):
-        """Backend шлёт task_id, material_id, storage_key — ML читает их все."""
+        """В контракте заказчика у ingest ровно два поля — material_id и
+        storage_key. Корреляция идёт по material_id, task_id в контракте нет."""
         task = IngestTask(
             material_id="5a2c0000-0000-0000-0000-000000000001",
             storage_key="uploads/lec.pdf",
-            task_id="8f1b0000-0000-0000-0000-000000000002",
         )
         assert payload_of(task) == {
-            "task_id": "8f1b0000-0000-0000-0000-000000000002",
             "material_id": "5a2c0000-0000-0000-0000-000000000001",
             "storage_key": "uploads/lec.pdf",
         }
 
     def test_create_test_task_matches_backend_payload(self):
-        """Ключи create_test: amountQuestions (число), difficulty, material_ids."""
+        """Ключи create_test (контракт v4.1): task_id, test_id, material_ids,
+        title, difficulty. Числа вопросов в payload'е нет."""
         task = CreateTestTask(
             task_id="t1",
             test_id="test-1",
             material_ids=["m1", "m2"],
             title="Quiz",
-            num_questions=10,
             difficulty="medium",
-            course_id="c1",
         )
         assert payload_of(task) == {
             "task_id": "t1",
             "test_id": "test-1",
             "material_ids": ["m1", "m2"],
             "title": "Quiz",
-            "amountQuestions": 10,
             "difficulty": "medium",
-            "course_id": "c1",
         }
+
+    def test_create_test_task_has_no_amount_questions(self):
+        """Контракт v4.1: числа вопросов в payload'е нет — размер выбирает ML.
+
+        Даже если внутреннее поле `num_questions` задано (внутренние вызовы и
+        тесты пользуются им), наружу оно не выходит."""
+        task = CreateTestTask(
+            task_id="t1", test_id="test-1", material_ids=["m1"], title="Quiz",
+            num_questions=10,
+        )
+        payload = payload_of(task)
+        assert "amountQuestions" not in payload
+        assert "num_questions" not in payload
+
+    def test_create_test_task_without_course_id(self):
+        """`course_id` в контракте заказчика нет — даже если он задан в коде,
+        в JSON он не попадает."""
+        task = CreateTestTask(
+            task_id="t1",
+            test_id="test-1",
+            material_ids=["m1"],
+            title="Quiz",
+            num_questions=10,
+            difficulty="medium",
+            course_id="c1",
+        )
+        assert "course_id" not in payload_of(task)
 
     def test_grade_attempt_task_matches_backend_payload(self):
         """student_answer — ровно один вид: index | indexes | text."""
@@ -156,20 +183,33 @@ class TestTaskPayloads:
             task_id="t1",
             attempt_id="a1",
             test_id="test-1",
-            user_id="u1",
             answers=[],
         )
-        from app.contracts import StudentAnswer
         task.answers = [
             StudentAnswer(question_id="q1", student_answer_index=2),
             StudentAnswer(question_id="q2", student_answer_indexes=[0, 2]),
             StudentAnswer(question_id="q3", student_answer_text="мой ответ"),
         ]
-        assert payload_of(task)["answers"] == [
-            {"question_id": "q1", "student_answer": {"index": 2}},
-            {"question_id": "q2", "student_answer": {"indexes": [0, 2]}},
-            {"question_id": "q3", "student_answer": {"text": "мой ответ"}},
-        ]
+        assert payload_of(task) == {
+            "task_id": "t1",
+            "attempt_id": "a1",
+            "test_id": "test-1",
+            "answers": [
+                {"question_id": "q1", "student_answer": {"index": 2}},
+                {"question_id": "q2", "student_answer": {"indexes": [0, 2]}},
+                {"question_id": "q3", "student_answer": {"text": "мой ответ"}},
+            ],
+        }
+
+    def test_grade_attempt_task_without_user_id(self):
+        """`user_id` в контракте заказчика нет — даже если он задан в коде,
+        в JSON он не попадает."""
+        task = GradeAttemptTask(
+            task_id="t1", attempt_id="a1", test_id="test-1",
+            user_id="u1",
+            answers=[StudentAnswer(question_id="q1", student_answer_index=0)],
+        )
+        assert "user_id" not in payload_of(task)
 
 
 class TestTaskParsing:
@@ -177,7 +217,6 @@ class TestTaskParsing:
 
     def test_parses_backend_ingest_payload(self):
         raw = {
-            "task_id": "t1",
             "material_id": "m1",
             "storage_key": "uploads/lec.pdf",
         }
@@ -186,7 +225,79 @@ class TestTaskParsing:
         assert task.material_id == "m1"
         assert task.storage_key == "uploads/lec.pdf"
 
+    def test_ingest_ignores_extra_fields(self):
+        """Backend может прислать task_id/course_id (старый контракт) — ML не
+        должен на этом падать: лишние поля просто игнорируются."""
+        raw = {
+            "task_id": "t1",
+            "course_id": "c1",
+            "material_id": "m1",
+            "storage_key": "uploads/lec.pdf",
+        }
+        task = parse_task(raw, "ingest")
+        assert isinstance(task, IngestTask)
+        assert task.material_id == "m1"
+
     def test_parses_backend_create_test_payload(self):
+        raw = {
+            "task_id": "t1",
+            "test_id": "test-1",
+            "material_ids": ["m1"],
+            "title": "Quiz",
+            "difficulty": "hard",
+        }
+        task = parse_task(raw, "create_test")
+        assert isinstance(task, CreateTestTask)
+        assert task.num_questions is None
+        assert task.difficulty == "hard"
+
+    def test_create_test_ignores_legacy_amount_questions(self):
+        """Контракт v4.1: `amountQuestions` из payload'а ИГНОРИРУЕТСЯ.
+
+        Старые сообщения в Redis Streams остались лежать — их нельзя ронять.
+        Разбор проходит, число вопросов остаётся None (размер выбирает ML)."""
+        raw = {
+            "task_id": "t1",
+            "test_id": "test-1",
+            "material_ids": ["m1"],
+            "title": "Quiz",
+            "amountQuestions": 20,
+            "difficulty": "hard",
+        }
+        task = parse_task(raw, "create_test")
+        assert isinstance(task, CreateTestTask)
+        assert task.num_questions is None
+        assert task.difficulty == "hard"
+
+    def test_create_test_ignores_legacy_num_questions(self):
+        """Legacy-имя `num_questions` (ещё более старый формат) — тоже мимо."""
+        raw = {
+            "task_id": "t1",
+            "test_id": "test-1",
+            "material_ids": ["m1"],
+            "title": "Quiz",
+            "num_questions": 7,
+            "difficulty": "medium",
+        }
+        task = parse_task(raw, "create_test")
+        assert isinstance(task, CreateTestTask)
+        assert task.num_questions is None
+
+    def test_create_test_ignores_amount_questions_min(self):
+        """`amountQuestions: "min"` — тоже не часть контракта, просто мимо."""
+        raw = {
+            "task_id": "t1",
+            "test_id": "test-1",
+            "material_ids": ["m1"],
+            "title": "Quiz",
+            "amountQuestions": "min",
+        }
+        task = parse_task(raw, "create_test")
+        assert isinstance(task, CreateTestTask)
+        assert task.num_questions is None
+
+    def test_create_test_ignores_extra_fields(self):
+        """course_id в старых payload'ах остался — разбор не должен падать."""
         raw = {
             "task_id": "t1",
             "test_id": "test-1",
@@ -198,15 +309,13 @@ class TestTaskParsing:
         }
         task = parse_task(raw, "create_test")
         assert isinstance(task, CreateTestTask)
-        assert task.num_questions == 20
-        assert task.difficulty == "hard"
+        assert task.course_id == "c1"
 
     def test_parses_backend_grade_attempt_payload(self):
         raw = {
             "task_id": "t1",
             "attempt_id": "a1",
             "test_id": "test-1",
-            "user_id": "u1",
             "answers": [
                 {"question_id": "q1", "student_answer": {"index": 1}},
                 {"question_id": "q2", "student_answer": {"indexes": [0, 3]}},
@@ -219,6 +328,21 @@ class TestTaskParsing:
         assert task.answers[1].student_answer_indexes == [0, 3]
         assert task.answers[2].student_answer_text == "ответ"
 
+    def test_grade_attempt_ignores_extra_fields(self):
+        """user_id в старых payload'ах остался — разбор не должен падать."""
+        raw = {
+            "task_id": "t1",
+            "attempt_id": "a1",
+            "test_id": "test-1",
+            "user_id": "u1",
+            "answers": [
+                {"question_id": "q1", "student_answer": {"index": 1}},
+            ],
+        }
+        task = parse_task(raw, "grade_attempt")
+        assert isinstance(task, GradeAttemptTask)
+        assert task.user_id == "u1"
+
 
 # ============================================================================
 #  ML → BE: результаты, которые ждёт backend
@@ -226,22 +350,28 @@ class TestTaskParsing:
 
 class TestResultPayloads:
     def test_ingest_ready_payload(self):
-        result = IngestResult.ok(task_id="t1", material_id="m1", chunks_indexed=29)
+        """В контракте заказчика у ingest-результата ровно два поля:
+        material_id и status="ready"."""
+        result = IngestResult.ok(material_id="m1")
         assert payload_of(result) == {
-            "task_id": "t1",
             "material_id": "m1",
             "status": "ready",
-            "chunks_indexed": 29,
         }
 
     def test_ingest_error_payload_keeps_material_id(self):
         """material_id в error-ветке обязателен: без него backend не знает,
         какую строку materials перевести в error."""
-        result = IngestResult.err(task_id="t1", error="unsupported format", material_id="m1")
+        result = IngestResult.err(error="unsupported format", material_id="m1")
         payload = payload_of(result)
         assert payload["status"] == "error"
         assert payload["error"] == "unsupported format"
         assert payload["material_id"] == "m1"
+
+    def test_ingest_result_has_no_task_id_or_chunks_indexed(self):
+        """Ни task_id, ни chunks_indexed в контракте заказчика нет."""
+        payload = payload_of(IngestResult.ok(material_id="m1"))
+        assert "task_id" not in payload
+        assert "chunks_indexed" not in payload
 
     def test_create_test_ok_payload(self):
         question = TestQuestion(
@@ -265,10 +395,25 @@ class TestResultPayloads:
             "type": "single_choice",
             "text": "Вопрос?",
             "options": ["A", "B"],
-            "answer_key": {"correct_index": 0, "explanation": "Потому что"},
             "key_points": [],
+            "answer_key": {"correct_index": 0, "explanation": "Потому что"},
             "source_chunk_id": "chunk-1",
         }]
+
+    def test_create_test_question_carries_answer_key(self):
+        """Контракт v4.1: эталон правильного ответа выходит наружу.
+
+        Backend пишет его в `test_questions.answer_key` — Redis-эталон с TTL
+        30 дней ненадёжен, а LLM-фолбэк уже давал неверный вердикт."""
+        question = TestQuestion(
+            id=1, text="Вопрос?", type_question="single_choice",
+            options=["A", "B"], answer_key={"correct_index": 0},
+        )
+        result = CreateTestResult.ok(
+            task_id="t1", test=Test(title="Quiz", questions=[question]), test_id="test-1",
+        )
+        payload = payload_of(result)
+        assert payload["test"]["questions"][0]["answer_key"] == {"correct_index": 0}
 
     def test_create_test_error_payload_keeps_test_id(self):
         result = CreateTestResult.err(task_id="t1", error="boom", test_id="test-1")
@@ -278,6 +423,7 @@ class TestResultPayloads:
         assert payload["test_id"] == "test-1"
 
     def test_grade_attempt_ok_payload(self):
+        """В grade-ответе поля `status` НЕТ — признак ошибки это `error`."""
         result = GradeAttemptResult.ok(
             task_id="t1", attempt_id="a1", test_id="test-1",
             score_pct=60.0, grade=3,
@@ -287,7 +433,7 @@ class TestResultPayloads:
             )],
         )
         payload = payload_of(result)
-        assert payload["status"] == "ok"
+        assert "status" not in payload
         assert payload["score_pct"] == 60.0
         assert payload["grade"] == 3
         assert payload["items"] == [{
@@ -300,23 +446,37 @@ class TestResultPayloads:
         }]
 
     def test_grade_attempt_error_payload_keeps_ids(self):
+        """В ветке ошибки тоже нет `status` — признак ошибки это `error`."""
         result = GradeAttemptResult.err(
             task_id="t1", error="boom", attempt_id="a1", test_id="test-1",
         )
         payload = payload_of(result)
-        assert payload["status"] == "error"
+        assert "status" not in payload
+        assert payload["error"] == "boom"
         assert payload["attempt_id"] == "a1"
         assert payload["test_id"] == "test-1"
 
     def test_results_carry_no_type_field(self):
         """Тип задачи задаёт имя канала — поля type в payload нет."""
         results = [
-            IngestResult.ok(task_id="t1", material_id="m1", chunks_indexed=1),
+            IngestResult.ok(material_id="m1"),
             CreateTestResult.err(task_id="t1", error="boom", test_id="test-1"),
             GradeAttemptResult.err(task_id="t1", error="boom"),
         ]
         for result in results:
             assert "type" not in payload_of(result)
+
+    def test_no_result_carries_input_msg_id(self):
+        """`input_msg_id` в контракте заказчика нет вообще: correlation идёт
+        по task_id / material_id."""
+        results = [
+            IngestResult.ok(material_id="m1"),
+            IngestResult.err(error="boom", material_id="m1"),
+            CreateTestResult.err(task_id="t1", error="boom", test_id="test-1"),
+            GradeAttemptResult.err(task_id="t1", error="boom"),
+        ]
+        for result in results:
+            assert "input_msg_id" not in payload_of(result)
 
 
 # ============================================================================

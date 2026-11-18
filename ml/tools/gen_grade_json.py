@@ -12,9 +12,9 @@ import asyncio
 import json
 
 from app.contracts import GradeAttemptResult, GradeAttemptTask
+from app.models import QuestionRow
 from app.services.grader import Grader
 from app.services.open_answer_judge import Verdict
-from app.services.test_store import QuestionRow
 
 
 TEST_ID = "b7f3c1a2-5d84-4e19-9c07-2a6f8b41d3e5"

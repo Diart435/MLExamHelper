@@ -30,14 +30,11 @@ from app.contracts import (
 
 
 OUT = ROOT / "docs" / "contracts" / "examples"
-INPUT_MSG_ID = "1766000000000-0"
 
 MATERIAL_ID = "5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04"
-COURSE_ID = "f7b2d48c-3a91-4f62-8d15-6e9c4a2b7d30"
 TASK_ID = "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27"
 TEST_ID = "9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90"
 ATTEMPT_ID = "4d8f2b76-1e35-4c9a-b027-8f6a3d1e5b42"
-USER_ID = "8c1d4a29-6e73-4b85-9f02-3a7e5c9d1b68"
 
 
 def _dump(name: str, payload: dict[str, Any]) -> None:
@@ -51,28 +48,18 @@ def main() -> None:
     ingest_task = IngestTask(
         material_id=MATERIAL_ID,
         storage_key="materials/5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04/lecture.pdf",
-        task_id=TASK_ID,
-        course_id=COURSE_ID,
     )
     _dump("ingest-be-to-ml.json", ingest_task._as_dict())
 
-    ingest_result = IngestResult.ok(
-        task_id=TASK_ID,
-        material_id=MATERIAL_ID,
-        chunks_indexed=12,
-    )
-    ingest_result_payload = ingest_result._as_dict()
-    ingest_result_payload["input_msg_id"] = INPUT_MSG_ID
-    _dump("ingest-ml-to-be.json", ingest_result_payload)
+    ingest_result = IngestResult.ok(material_id=MATERIAL_ID)
+    _dump("ingest-ml-to-be.json", ingest_result._as_dict())
 
     create_task = CreateTestTask(
         task_id=TASK_ID,
         test_id=TEST_ID,
         material_ids=[MATERIAL_ID],
         title="Контрольная работа по базам данных",
-        num_questions=3,
         difficulty="medium",
-        course_id=COURSE_ID,
     )
     _dump("create-test-be-to-ml.json", create_task._as_dict())
 
@@ -119,15 +106,12 @@ def main() -> None:
         test=Test(title="Контрольная работа по базам данных", questions=questions),
         test_id=TEST_ID,
     )
-    create_result_payload = create_result._as_dict()
-    create_result_payload["input_msg_id"] = INPUT_MSG_ID
-    _dump("create-test-ml-to-be.json", create_result_payload)
+    _dump("create-test-ml-to-be.json", create_result._as_dict())
 
     grade_task = GradeAttemptTask(
         task_id=TASK_ID,
         attempt_id=ATTEMPT_ID,
         test_id=TEST_ID,
-        user_id=USER_ID,
         answers=[
             StudentAnswer(question_id="18c5e91a-2d74-4f60-b839-7e1a5c0d6b42", student_answer_index=1),
             StudentAnswer(question_id="7a0d3e91-c642-4f88-b125-6d9e2a4c8f31", student_answer_indexes=[0, 1, 2]),
@@ -169,9 +153,7 @@ def main() -> None:
             ),
         ],
     )
-    grade_result_payload = grade_result._as_dict()
-    grade_result_payload["input_msg_id"] = INPUT_MSG_ID
-    _dump("grade-test-ml-to-be.json", grade_result_payload)
+    _dump("grade-test-ml-to-be.json", grade_result._as_dict())
 
 
 if __name__ == "__main__":

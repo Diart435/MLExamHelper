@@ -19,11 +19,12 @@ Worker публикует в зеркальный канал результат�
 Поле 'payload' — JSON-строка. Полная схема dataclass'ов — в `app/contracts.py`.
 Краткая выжимка:
 
-  IngestTask      → IngestResult     { material_id, chunks_indexed }
+  IngestTask      → IngestResult     { material_id, status }
   RAGQuestionTask → RAGQuestionResult{ answer, sources }
   CreateTestTask  → CreateTestResult { test: { title, questions: [...] } }
 
-В каждом результате есть status="ok"|"error" и (для error) поле error.
+В каждом результате есть status="ok"|"error" и (для error) поле error. Исключение —
+grade-test:ml-to-be: там статуса нет, признак ошибки — поле `error`.
 
 === КТО ЧТО ДЕЛАЕТ ===
 - app/handlers/rag.py  — process_ingest / process_question / process_create_test
@@ -46,6 +47,7 @@ from app.contracts import (
     RAGQuestionTask,
 )
 from app.parsers.base import UnsupportedFormatError, download_and_extract
+from app.services.answer_store import AnswerStore
 from app.services.grader import Grader
 from app.services.rag import RAGService
 from app.services.test_generator import TestGenerator
@@ -57,7 +59,6 @@ async def process_ingest(task: dict | IngestTask, rag: RAGService) -> dict:
     Принимает и dict (сырой payload из Redis), и IngestTask (для прямого вызова
     из тестов). На выходе — dict (то, что XADD-ит воркер).
     """
-    raw_task_id = str(task.get("task_id", "")) if isinstance(task, dict) else task.task_id
     raw_mid = (
         task.get("material_id") if isinstance(task, dict) and task.get("material_id") is not None
         else (task.material_id if isinstance(task, IngestTask) else None)
@@ -69,26 +70,22 @@ async def process_ingest(task: dict | IngestTask, rag: RAGService) -> dict:
     except (KeyError, ValueError, TypeError) as e:
         # material_id известен из raw dict — передаём в err, чтобы backend обновил status_material
         return IngestResult.err(
-            raw_task_id, f"invalid ingest task: {e}", material_id=raw_mid,
+            f"invalid ingest task: {e}", material_id=raw_mid,
         )._as_dict()
 
     try:
         text = await download_and_extract(t.storage_key)
-        chunks_indexed = await rag.index_material(t.material_id, text)
-        return IngestResult.ok(
-            task_id=t.task_id,
-            material_id=t.material_id,
-            chunks_indexed=chunks_indexed,
-        )._as_dict()
+        await rag.index_material(t.material_id, text)
+        return IngestResult.ok(material_id=t.material_id)._as_dict()
     except UnsupportedFormatError as e:
         logger.error(f"Ingest failed for {t.storage_key}: {e}")
-        return IngestResult.err(t.task_id, f"unsupported format: {e}", material_id=t.material_id)._as_dict()
+        return IngestResult.err(f"unsupported format: {e}", material_id=t.material_id)._as_dict()
     except FileNotFoundError as e:
         logger.error(f"Ingest failed for {t.storage_key}: {e}")
-        return IngestResult.err(t.task_id, str(e), material_id=t.material_id)._as_dict()
+        return IngestResult.err(str(e), material_id=t.material_id)._as_dict()
     except Exception as e:
         logger.exception(f"Ingest failed for {t.storage_key}")
-        return IngestResult.err(t.task_id, f"{type(e).__name__}: {e}", material_id=t.material_id)._as_dict()
+        return IngestResult.err(f"{type(e).__name__}: {e}", material_id=t.material_id)._as_dict()
 
 
 async def process_question(task: dict | RAGQuestionTask, rag: RAGService) -> dict:
@@ -135,11 +132,18 @@ async def process_create_test(
     task: dict | CreateTestTask,
     rag: RAGService,
     generator: TestGenerator | None = None,
+    answer_store: AnswerStore | None = None,
 ) -> dict:
     """Handle задачу из канала create-test:be-to-ml: сгенерировать тест через LLM.
 
     Архитектура: handler валидирует задачу и формат ответа, держит LLM-вызовы
     и парсинг в TestGenerator. Сам по себе — тонкий, не делает работы.
+
+    Эталоны правильных ответов (`answer_key`) по контракту v4.1 ВЫХОДЯТ наружу:
+    backend пишет их в `test_questions.answer_key`. Дополнительно ML складывает
+    их в Redis (`AnswerStore`) — это резервная копия эталона на случай, если
+    в БД его нет (старые тесты) или Redis нужен как страховка. Если хранилища
+    нет — тест всё равно создаётся, при проверке сработает LLM-судья.
     """
     try:
         t = task if isinstance(task, CreateTestTask) else CreateTestTask.from_dict(task)
@@ -155,6 +159,16 @@ async def process_create_test(
     gen = generator or TestGenerator(rag=rag)
     try:
         test = await gen.generate(t)
+        if answer_store is not None:
+            try:
+                await answer_store.save(t.test_id, test.questions)
+            except Exception as e:
+                # Эталоны не сохранились — тест всё равно отдаём: при проверке
+                # попытки сработает LLM-судья как страховка.
+                logger.warning(
+                    f"create_test: не удалось сохранить эталоны в Redis "
+                    f"({type(e).__name__}: {e}) — проверка пойдёт через LLM-судью"
+                )
         return CreateTestResult.ok(
             task_id=t.task_id,
             test=test,
@@ -172,13 +186,16 @@ async def process_create_test(
 async def process_grade_attempt(
     task: dict | GradeAttemptTask,
     grader: Grader | None = None,
+    answer_store: AnswerStore | None = None,
 ) -> dict:
     """Handle задачу из канала grade-test:be-to-ml: проверка ответов.
 
     Backend прислал попытку — список (question_id, student_answer).
-    Достаём вопросы из test_questions: single_choice проверяем детерминированно
-    (индекс vs answer_key.correct_index), open_answer — LLM-судьёй
-    (services/open_answer_judge.py). Считаем score_pct + grade.
+    Достаём вопросы из test_questions, эталоны — из БД (`answer_key`), затем
+    из Redis (AnswerStore), а если их нет — определяет LLM-судья.
+    single_choice/multi_choice проверяем детерминированно по эталону,
+    open_answer — LLM-судьёй (services/open_answer_judge.py). Считаем
+    score_pct + grade.
     """
     raw_attempt_id = str(task.get("attempt_id", "")) if isinstance(task, dict) else task.attempt_id
     raw_test_id = str(task.get("test_id", "")) if isinstance(task, dict) else task.test_id
@@ -193,7 +210,7 @@ async def process_grade_attempt(
             test_id=raw_test_id or None,
         )._as_dict()
 
-    gr = grader or Grader()
+    gr = grader or Grader(answer_store=answer_store)
     try:
         outcome = await gr.grade(t)
         return GradeAttemptResult.ok(

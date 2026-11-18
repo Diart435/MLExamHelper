@@ -27,9 +27,35 @@ from app.contracts import (
 
 CONTRACTS = ROOT / "docs" / "contracts"
 
+# Полей, которых нет в контракте заказчика, быть не должно ни в примерах,
+# ни в схемах. Проверяем явно: лишнее поле в payload — это молчаливый разъезд
+# с backend'ом.
+#
+# ⚠️ `answer_key` в этот список НЕ входит: по контракту v4.1 эталон правильного
+# ответа выходит в `create-test:ml-to-be` (backend пишет его в
+# `test_questions.answer_key`). В остальных каналах его по-прежнему нет —
+# это проверяется отдельно, см. `answer_key_allowed`.
+FORBIDDEN_FIELDS = ("input_msg_id", "course_id", "chunks_indexed")
+
+# Каналы, в ответе которых `answer_key` допустим.
+ANSWER_KEY_ALLOWED = ("create-test-ml-to-be",)
+
 
 def load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _walk_keys(node: Any) -> set[str]:
+    """Все ключи объектов в JSON-дереве."""
+    keys: set[str] = set()
+    if isinstance(node, dict):
+        keys.update(node.keys())
+        for value in node.values():
+            keys.update(_walk_keys(value))
+    elif isinstance(node, list):
+        for item in node:
+            keys.update(_walk_keys(item))
+    return keys
 
 
 def expected_be_to_ml(channel: str) -> dict[str, Any]:
@@ -38,8 +64,6 @@ def expected_be_to_ml(channel: str) -> dict[str, Any]:
             IngestTask(
                 material_id="5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04",
                 storage_key="materials/5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04/lecture.pdf",
-                task_id="2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
-                course_id="f7b2d48c-3a91-4f62-8d15-6e9c4a2b7d30",
             ).to_json()
         )
     if channel == "create-test-be-to-ml":
@@ -49,9 +73,7 @@ def expected_be_to_ml(channel: str) -> dict[str, Any]:
                 test_id="9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
                 material_ids=["5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04"],
                 title="Контрольная работа по базам данных",
-                num_questions=3,
                 difficulty="medium",
-                course_id="f7b2d48c-3a91-4f62-8d15-6e9c4a2b7d30",
             ).to_json()
         )
     if channel == "grade-test-be-to-ml":
@@ -60,7 +82,6 @@ def expected_be_to_ml(channel: str) -> dict[str, Any]:
                 task_id="2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
                 attempt_id="4d8f2b76-1e35-4c9a-b027-8f6a3d1e5b42",
                 test_id="9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
-                user_id="8c1d4a29-6e73-4b85-9f02-3a7e5c9d1b68",
                 answers=[
                     StudentAnswer(question_id="18c5e91a-2d74-4f60-b839-7e1a5c0d6b42", student_answer_index=1),
                     StudentAnswer(question_id="7a0d3e91-c642-4f88-b125-6d9e2a4c8f31", student_answer_indexes=[0, 1, 2]),
@@ -90,11 +111,36 @@ def main() -> None:
         Draft202012Validator(schema).validate(example)
         assert schema["examples"][0] == example, f"{channel}: schema example differs from file"
 
+        # В примере не должно быть полей, которых нет в контракте заказчика.
+        forbidden = sorted(_walk_keys(example) & set(FORBIDDEN_FIELDS))
+        assert not forbidden, f"{channel}: в примере есть лишние поля {forbidden}"
+
+        # `answer_key` допустим только в ответе create-test.
+        if channel not in ANSWER_KEY_ALLOWED:
+            stray = sorted(_walk_keys(example) & {"answer_key"})
+            assert not stray, (
+                f"{channel}: в примере есть поля answer_key — эталон по контракту "
+                f"выходит только в create-test:ml-to-be"
+            )
+
+        # В схеме тоже: properties не должны упоминать их.
+        schema_keys = _walk_keys(schema.get("properties", {})) | _walk_keys(
+            schema.get("$defs", {})
+        )
+        forbidden_schema = sorted(schema_keys & set(FORBIDDEN_FIELDS))
+        assert not forbidden_schema, (
+            f"{channel}: в схеме есть лишние поля {forbidden_schema}"
+        )
+        if channel not in ANSWER_KEY_ALLOWED:
+            stray_schema = sorted(schema_keys & {"answer_key"})
+            assert not stray_schema, (
+                f"{channel}: в схеме есть поля answer_key — эталон по контракту "
+                f"выходит только в create-test:ml-to-be"
+            )
+
         if channel.endswith("-be-to-ml"):
             expected = expected_be_to_ml(channel)
             assert example == expected, f"{channel}: differs from dataclass serialization"
-        else:
-            assert example["input_msg_id"] == "1766000000000-0", f"{channel}: missing input_msg_id"
 
         print(f"OK {channel}")
 

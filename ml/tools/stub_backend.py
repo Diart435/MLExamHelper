@@ -32,7 +32,7 @@ Stub также повторяет запись результатов в БД (
   python -m tools.stub_backend ingest data/sample.pdf
 
   # Только create_test по уже проиндексированным material_id
-  # (без --num → ML сам решает, сколько вопросов покрывает материал)
+  # (размер теста выбирает ML сам по материалу)
   python -m tools.stub_backend create-test --material-ids 15716 87891 --title "Quiz"
 
   # Проверить попытку по готовому тесту (вопросы читаются из test_questions)
@@ -59,6 +59,7 @@ from redis.asyncio import Redis
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from app.contracts import TASK_TYPES, result_channel, task_channel
+from app.core.db import connect as db_connect
 
 
 # ============================================================================
@@ -180,9 +181,12 @@ async def wait_for_result(
                     matched = payload.get("material_id") == material_id
                 if matched:
                     await redis.xack(stream, STUB_GROUP, msg_id)
+                    status = payload.get("status")
+                    if status is None:
+                        status = "error" if "error" in payload else "ok"
                     logger.info(
                         f"Got result for task_id={task_id} from {stream} {msg_id}: "
-                        f"status={payload.get('status')}"
+                        f"status={status}"
                     )
                     return payload
                 # чужой task_id — у другого consumer'а это бы забрал тот,
@@ -226,6 +230,7 @@ async def cmd_ingest(args: argparse.Namespace) -> int:
         result = await wait_for_result(
             redis, cfg["result_channels"], "", timeout_s=args.timeout, material_id=material_id,
         )
+        await _update_material_status(material_id, result.get("status"))
     finally:
         await redis.aclose()
 
@@ -250,9 +255,8 @@ async def cmd_create_test(args: argparse.Namespace) -> int:
             "title": args.title,
             "difficulty": args.difficulty,
         }
-        # amountQuestions: явное число — «ровно столько вопросов», "min" —
-        # размер выбирает ML сам по материалам (планировщик).
-        task["amountQuestions"] = args.num if args.num is not None else "min"
+        # Контракт v4.1: числа вопросов в payload'е нет — размер выбирает ML
+        # сам (планировщик смотрит на материал).
         await publish_task(redis, cfg["task_channels"]["create_test"], task)
         result = await wait_for_result(redis, cfg["result_channels"], task["task_id"], timeout_s=args.timeout)
     finally:
@@ -263,6 +267,8 @@ async def cmd_create_test(args: argparse.Namespace) -> int:
             result.get("test_id") or task["test_id"],
             result["test"].get("title") or args.title,
             result["test"],
+            amount_questions=len(result["test"].get("questions") or []),
+            difficulty=args.difficulty,
         )
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -295,20 +301,20 @@ async def cmd_demo(args: argparse.Namespace) -> int:
             redis, cfg["result_channels"], "", timeout_s=args.timeout, material_id=material_id,
         )
         print(json.dumps(ingest_result, ensure_ascii=False, indent=2))
+        await _update_material_status(material_id, ingest_result.get("status"))
         if ingest_result.get("status") != "ready":
             return 1
 
         # 2) Create test
         test_task = {
             "task_id": uuid.uuid4().hex,
-            "test_id": uuid.uuid4().hex,
+            "test_id": str(uuid.uuid4()),
             "material_ids": [material_id],
             "title": f"Quiz по {local.stem}",
             "difficulty": args.difficulty,
-            "amountQuestions": args.num if args.num is not None else "min",
         }
-        size = f"{args.num} вопросов" if args.num is not None else "размер выберет ML"
-        print(f"\n[2/2] CREATE_TEST  {size} ({args.difficulty})")
+        # Контракт v4.1: числа вопросов в payload'е нет — размер выбирает ML.
+        print(f"\n[2/2] CREATE_TEST  размер выберет ML ({args.difficulty})")
         await publish_task(redis, cfg["task_channels"]["create_test"], test_task)
         test_result = await wait_for_result(
             redis, cfg["result_channels"], test_task["task_id"], timeout_s=args.timeout,
@@ -319,6 +325,8 @@ async def cmd_demo(args: argparse.Namespace) -> int:
                 test_result.get("test_id") or test_task["test_id"],
                 test_result["test"].get("title") or test_task["title"],
                 test_result["test"],
+                amount_questions=len(test_result["test"].get("questions") or []),
+                difficulty=args.difficulty,
             )
         return 0 if test_result.get("status") == "ok" else 1
     finally:
@@ -330,9 +338,13 @@ async def cmd_grade_attempt(args: argparse.Namespace) -> int:
 
     Вопросы читаются из `test_questions` (их туда положил backend-listener).
     Если ответы не заданы явно — отвечаем автоматически: на single_choice
-    выбираем вариант 0, на multi_choice отмечаем правильные индексы из
-    answer_key, на open_answer пишем текст из --open-text. Так проверяется
-    весь путь, включая LLM-судью.
+    выбираем вариант 0, на multi_choice отмечаем первые два индекса, на
+    open_answer пишем текст из --open-text. Так проверяется весь путь,
+    включая LLM-судью.
+
+    ⚠️ В контракте заказчика поля `user_id` нет: студент известен по
+    `attempt_id`. Эталон правильного ответа (`answer_key`) по контракту v4.1
+    есть и в БД (`test_questions.answer_key`), и в payload'е ML.
     """
     redis, _minio, cfg = make_clients()
     try:
@@ -345,18 +357,16 @@ async def cmd_grade_attempt(args: argparse.Namespace) -> int:
 
         answers = _build_answers(questions, args)
         attempt_id = args.attempt_id or str(uuid.uuid4())
+        user_id = args.user_id or str(STUB_USER)
         task = {
             "task_id": uuid.uuid4().hex,
             "attempt_id": attempt_id,
             "test_id": args.test_id,
-            "user_id": args.user_id or str(STUB_USER),
             "answers": answers,
         }
         # Как настоящий backend: ответы студента пишем в БД сразу при сдаче —
         # student_answer это и есть ответ, а оценка придёт из ML позже.
-        await _persist_submission(
-            task["attempt_id"], task["test_id"], task["user_id"], answers,
-        )
+        await _persist_submission(attempt_id, task["test_id"], user_id, answers)
         await publish_task(redis, cfg["task_channels"]["grade_attempt"], task)
         result = await wait_for_result(
             redis, cfg["result_channels"], task["task_id"], timeout_s=args.timeout,
@@ -364,11 +374,12 @@ async def cmd_grade_attempt(args: argparse.Namespace) -> int:
     finally:
         await redis.aclose()
 
-    if result.get("status") == "ok":
-        await _persist_grading(task["attempt_id"], result)
+    # В grade-ответе поля `status` нет — признак ошибки это `error`.
+    if "error" not in result:
+        await _persist_grading(attempt_id, result)
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if result.get("status") == "ok" else 1
+    return 0 if "error" not in result else 1
 
 
 def _build_answers(questions: list[dict], args: argparse.Namespace) -> list[dict]:
@@ -399,17 +410,18 @@ def _build_answers(questions: list[dict], args: argparse.Namespace) -> list[dict
 def _auto_answer(q: dict, args: argparse.Namespace) -> dict:
     """Ответ по умолчанию для вопроса — по типу вопроса.
 
-    multi_choice отвечаем правильными индексами из answer_key: так
-    автоответы дают полный балл, и разницу с multi_choice видно в score_pct
-    (неверный индекс дал бы 0, а это не проверка пути проверки).
+    Эталона правильного ответа стенд не смотрит (он лежит в `answer_key`
+    в БД), поэтому автоответы «угадывают»: single_choice — вариант 0,
+    multi_choice — первые два индекса. Оценка может быть неполной — это
+    нормально, стенд проверяет путь прохождения, а не правильность
+    оценивания.
     """
     if q["type_question"] == "open_answer":
         return {"text": args.open_text}
     if q["type_question"] == "multi_choice":
-        indexes = (q.get("answer_key") or {}).get("correct_indexes") or []
-        if indexes:
-            return {"indexes": [int(i) for i in indexes]}
-        return {"indexes": [0]}
+        num_options = len(q.get("options") or [])
+        indexes = [i for i in (0, 1) if i < num_options]
+        return {"indexes": indexes or [0]}
     return {"index": 0}
 
 
@@ -456,8 +468,7 @@ async def _ensure_material_row(material_id: str, title: str, source_uri: str) ->
     На `material_chunks` стоит FK на `materials`, поэтому без этой строки ML
     не запишет ни одного чанка (и create_test не найдёт контекст).
     """
-    import asyncpg
-    conn = await asyncpg.connect(_dsn())
+    conn = await db_connect(_dsn())
     try:
         await conn.execute(
             """INSERT INTO users (user_id, email, password_hash, first_name, last_name)
@@ -482,13 +493,34 @@ async def _ensure_material_row(material_id: str, title: str, source_uri: str) ->
         await conn.close()
 
 
+async def _update_material_status(material_id: str, status: str | None) -> None:
+    """Перевести материал в статус по ответу ML на ingest.
+
+    `ingest:ml-to-be`: `status: "ready"` → материал готов, `status: "error"` →
+    материал в ошибке (текст ошибки backend хранит у себя). Допустимые значения
+    колонки `status_material`: queued, processing, ready, error.
+    """
+    new_status = status if status in ("ready", "error") else "error"
+    conn = await db_connect(_dsn())
+    try:
+        await conn.execute(
+            "UPDATE materials SET status_material = $2 WHERE material_id = $1",
+            uuid.UUID(material_id), new_status,
+        )
+    finally:
+        await conn.close()
+
+
 async def _fetch_questions(test_id: str) -> list[dict]:
-    """Вопросы теста из `test_questions` — их туда пишет backend-listener."""
-    import asyncpg
-    conn = await asyncpg.connect(_dsn())
+    """Вопросы теста из `test_questions` — их туда пишет backend-listener.
+
+    Эталон (`answer_key`) в таблице может быть (контракт v4.1) — но стенду он
+    не нужен: автоответы стенда «угадывают».
+    """
+    conn = await db_connect(_dsn())
     try:
         rows = await conn.fetch(
-            """SELECT question_id::text AS qid, type_question, options, answer_key
+            """SELECT question_id::text AS qid, type_question, options
                FROM test_questions WHERE test_id = $1 ORDER BY question_id""",
             uuid.UUID(test_id),
         )
@@ -497,21 +529,21 @@ async def _fetch_questions(test_id: str) -> list[dict]:
     out: list[dict] = []
     for r in rows:
         opts = r["options"]
-        if isinstance(opts, str):
-            opts = json.loads(opts)
-        key = r["answer_key"]
-        if isinstance(key, str):
-            key = json.loads(key) if key else {}
         out.append({
             "question_id": r["qid"],
             "type_question": r["type_question"],
             "options": list(opts) if opts else [],
-            "answer_key": key or {},
         })
     return out
 
 
-async def _persist_test(test_id: str, title: str, test: dict) -> None:
+async def _persist_test(
+    test_id: str,
+    title: str,
+    test: dict,
+    amount_questions: str | int = "min",
+    difficulty: str = "medium",
+) -> None:
     """Сохранить сгенерированный тест — ровно то, что делает backend-listener.
 
     ML не пишет в `tests`/`test_questions`: он только возвращает JSON. Backend
@@ -521,38 +553,97 @@ async def _persist_test(test_id: str, title: str, test: dict) -> None:
     `source_chunk_id` пишем через подзапрос: если чанка в `material_chunks` нет
     (ML работал с in-memory store или чанк удалили) — получим NULL, а не ошибку
     FK на весь вопрос.
+
+    `answer_key` (эталон правильного ответа, контракт v4.1) пишем, если в
+    `test_questions` есть такая колонка. Колонка появится у backend'а после его
+    миграции, а на старой схеме её нет — тогда вопрос пишется без эталона, и
+    grader возьмёт эталон из Redis (или определит его LLM-судьёй).
+
+    Порядок вопроса в БД сейчас не сохраняется: для него нужна колонка
+    `test_questions.question_order` (требование к backend'у). ML это не мешает —
+    при проверке ML сопоставляет вопросы по `question_id` и по нормализованному
+    тексту.
     """
-    import asyncpg
-    conn = await asyncpg.connect(_dsn())
+    conn = await db_connect(_dsn())
     try:
         await conn.execute(
-            """INSERT INTO tests (test_id, course_id, title, mode, status_test)
-               VALUES ($1, $2, $3, 'training', 'ready')
-               ON CONFLICT (test_id) DO UPDATE SET title = EXCLUDED.title""",
-            uuid.UUID(test_id), STUB_COURSE, title[:255],
+            """INSERT INTO tests
+                 (test_id, course_id, title, amount_questions, status_test, difficulty)
+               VALUES ($1, $2, $3, $4, 'ready', $5)
+               ON CONFLICT (test_id) DO UPDATE SET
+                 title = EXCLUDED.title,
+                 amount_questions = EXCLUDED.amount_questions,
+                 difficulty = EXCLUDED.difficulty""",
+            uuid.UUID(test_id), STUB_COURSE, title[:255], str(amount_questions), difficulty,
         )
-        for q in test.get("questions", []):
+        has_answer_key = await _has_column(conn, "test_questions", "answer_key")
+        for index, q in enumerate(test.get("questions", []), start=1):
             chunk_id = q.get("source_chunk_id")
             try:
                 chunk_uuid = uuid.UUID(chunk_id) if chunk_id else None
             except (ValueError, AttributeError, TypeError):
                 chunk_uuid = None
-            await conn.execute(
-                """INSERT INTO test_questions
-                     (question_id, test_id, type_question, text_question,
-                      options, answer_key, key_points, source_chunk_id)
-                   VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb,
-                           (SELECT chunk_id FROM material_chunks WHERE chunk_id = $8::uuid))""",
-                uuid.uuid4(), uuid.UUID(test_id),
-                q.get("type", "single_choice"),
-                q.get("text", ""),
-                json.dumps(q.get("options", []), ensure_ascii=False),
-                json.dumps(q.get("answer_key", {}), ensure_ascii=False),
-                json.dumps(q.get("key_points", []), ensure_ascii=False),
-                chunk_uuid,
-            )
+            ordinal = q.get("id", index)
+            question_id = uuid.uuid5(uuid.UUID(test_id), f"q:{ordinal}")
+            if has_answer_key:
+                await conn.execute(
+                    """INSERT INTO test_questions
+                         (question_id, test_id, type_question, text_question,
+                          options, key_points, answer_key, source_chunk_id)
+                       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb,
+                               (SELECT chunk_id FROM material_chunks WHERE chunk_id = $8::uuid))
+                       ON CONFLICT (question_id) DO UPDATE SET
+                         type_question = EXCLUDED.type_question,
+                         text_question = EXCLUDED.text_question,
+                         options = EXCLUDED.options,
+                         key_points = EXCLUDED.key_points,
+                         answer_key = EXCLUDED.answer_key,
+                         source_chunk_id = EXCLUDED.source_chunk_id""",
+                    question_id, uuid.UUID(test_id),
+                    q.get("type", "single_choice"),
+                    q.get("text", ""),
+                    q.get("options", []),
+                    q.get("key_points", []),
+                    q.get("answer_key") or {},
+                    chunk_uuid,
+                )
+            else:
+                await conn.execute(
+                    """INSERT INTO test_questions
+                         (question_id, test_id, type_question, text_question,
+                          options, key_points, source_chunk_id)
+                       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb,
+                               (SELECT chunk_id FROM material_chunks WHERE chunk_id = $7::uuid))
+                       ON CONFLICT (question_id) DO UPDATE SET
+                         type_question = EXCLUDED.type_question,
+                         text_question = EXCLUDED.text_question,
+                         options = EXCLUDED.options,
+                         key_points = EXCLUDED.key_points,
+                         source_chunk_id = EXCLUDED.source_chunk_id""",
+                    question_id, uuid.UUID(test_id),
+                    q.get("type", "single_choice"),
+                    q.get("text", ""),
+                    q.get("options", []),
+                    q.get("key_points", []),
+                    chunk_uuid,
+                )
     finally:
         await conn.close()
+
+
+async def _has_column(conn, table: str, column: str) -> bool:
+    """Есть ли колонка в таблице — по information_schema.columns.
+
+    Нужна для `test_questions.answer_key`: колонка появляется у backend'а с его
+    миграцией, а на старой схеме её нет. Без проверки INSERT падал бы с
+    UndefinedColumnError.
+    """
+    row = await conn.fetchrow(
+        """SELECT 1 AS present FROM information_schema.columns
+           WHERE table_name = $1 AND column_name = $2""",
+        table, column,
+    )
+    return row is not None
 
 
 async def _persist_submission(
@@ -561,10 +652,11 @@ async def _persist_submission(
     """Создать попытку и строки ответов — как backend при сдаче.
 
     student_answer пишется здесь: это и есть ответ студента, и колонка
-    NOT NULL. Оценка (score, feedback) придёт из ML позже.
+    NOT NULL. NOT NULL-колонки `is_correct` и `correct_answer` пока заполняем
+    заглушкой (`false` и пустой JSON-объект): реальные значения придут позже,
+    из вердикта ML (см. `_persist_grading`).
     """
-    import asyncpg
-    conn = await asyncpg.connect(_dsn())
+    conn = await db_connect(_dsn())
     try:
         await conn.execute(
             """INSERT INTO users (user_id, email, password_hash, first_name, last_name)
@@ -579,22 +671,31 @@ async def _persist_submission(
             uuid.UUID(attempt_id), uuid.UUID(test_id), uuid.UUID(user_id),
         )
         for a in answers:
+            question_id = uuid.UUID(a["question_id"])
+            # uuid5 ждёт имя строкой, а question_id здесь уже UUID.
+            answer_id = uuid.uuid5(uuid.UUID(attempt_id), str(question_id))
             await conn.execute(
                 """INSERT INTO attempt_answers
-                     (answer_id, attempt_id, question_id, student_answer, score, feedback)
-                   VALUES ($1, $2, $3, $4::jsonb, NULL, NULL)
+                     (answer_id, attempt_id, question_id, is_correct, student_answer,
+                      correct_answer, score, feedback)
+                   VALUES ($1, $2, $3, false, $4::jsonb, '{}'::jsonb, NULL, NULL)
                    ON CONFLICT (answer_id) DO NOTHING""",
-                uuid.uuid4(), uuid.UUID(attempt_id), uuid.UUID(a["question_id"]),
-                json.dumps(a.get("student_answer", {}), ensure_ascii=False),
+                answer_id, uuid.UUID(attempt_id), question_id,
+                a.get("student_answer", {}),
             )
     finally:
         await conn.close()
 
 
 async def _persist_grading(attempt_id: str, result: dict) -> None:
-    """Сохранить результат проверки — эмуляция ветки grade_attempt у listener'а."""
-    import asyncpg
-    conn = await asyncpg.connect(_dsn())
+    """Сохранить результат проверки — эмуляция ветки grade_attempt у listener'а.
+
+    В `items[]` вердикта ML приходят `is_correct` и текст `correct_answer`.
+    `correct_answer` — JSONB, и codec'а asyncpg (см. `app/core/db.py`) пишет
+    его как JSON-скаляр: обычная строка остаётся строкой, в БД будет, например,
+    `"Read committed"`, а не объект.
+    """
+    conn = await db_connect(_dsn())
     try:
         await conn.execute(
             """UPDATE student_attempts
@@ -603,10 +704,17 @@ async def _persist_grading(attempt_id: str, result: dict) -> None:
             uuid.UUID(attempt_id), result.get("score_pct"), result.get("grade"),
         )
         for item in result.get("items", []):
+            correct_answer = item.get("correct_answer")
+            # Колонка NOT NULL: если ML не прислал correct_answer — пишем пустой
+            # объект, иначе UPDATE упал бы на нарушении ограничения.
             await conn.execute(
-                """UPDATE attempt_answers SET score = $2, feedback = $3
-                   WHERE attempt_id = $1 AND question_id = $4""",
-                uuid.UUID(attempt_id), item.get("score"), item.get("feedback"),
+                """UPDATE attempt_answers
+                   SET is_correct = $2, correct_answer = $3::jsonb,
+                       score = $4, feedback = $5
+                   WHERE attempt_id = $1 AND question_id = $6""",
+                uuid.UUID(attempt_id), bool(item.get("is_correct", False)),
+                correct_answer if correct_answer is not None else {},
+                item.get("score"), item.get("feedback"),
                 uuid.UUID(item["question_id"]),
             )
     finally:
@@ -632,8 +740,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_test = sub.add_parser("create-test", help="отправить create_test-задачу")
     p_test.add_argument("--material-ids", nargs="+", required=True, help="UUID'ы материалов")
     p_test.add_argument("--title", default="Тест")
-    p_test.add_argument("--num", type=int, default=None,
-                         help="число вопросов (1..30). Без флага ML выбирает его сам")
     p_test.add_argument("--difficulty", default="medium", choices=["easy", "medium", "hard"])
     p_test.add_argument("--test-id", default=None)
     p_test.add_argument("--timeout", type=float, default=300.0)
@@ -656,8 +762,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_demo = sub.add_parser("demo", help="полный цикл: ingest + create_test на одном файле")
     p_demo.add_argument("--file", default="data/sample.pdf")
-    p_demo.add_argument("--num", type=int, default=None,
-                        help="число вопросов (1..30). Без флага ML выбирает его сам")
     p_demo.add_argument("--difficulty", default="medium", choices=["easy", "medium", "hard"])
     p_demo.add_argument("--timeout", type=float, default=300.0)
     p_demo.set_defaults(func=cmd_demo)

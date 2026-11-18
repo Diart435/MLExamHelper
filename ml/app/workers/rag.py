@@ -39,6 +39,7 @@ from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.redis_client import get_redis
 from app.handlers.rag import process_create_test, process_grade_attempt, process_ingest, process_question
+from app.services.answer_store import AnswerStore
 from app.services.rag import RAGService
 
 
@@ -57,6 +58,9 @@ class RAGWorker:
         self.consumer = s.consumer_name
         self.reclaim_idle_ms = s.reclaim_idle_ms
         self.reclaim_max_attempts = s.reclaim_max_attempts
+        # Эталоны правильных ответов: по контракту заказчика они не отдаются
+        # наружу и в БД backend'а их нет, поэтому ML держит их у себя в Redis.
+        self.answer_store = AnswerStore(self.redis)
         # Один тип задачи — один канал в каждом направлении.
         self.task_channels = {t: task_channel(t) for t in TASK_TYPES}
         self.result_channels = {t: result_channel(t) for t in TASK_TYPES}
@@ -184,14 +188,25 @@ class RAGWorker:
         if task_type == "rag_question":
             return await process_question(task, self.rag)
         if task_type == "create_test":
-            return await process_create_test(task, self.rag)
+            return await process_create_test(task, self.rag, answer_store=self.answer_store)
         if task_type == "grade_attempt":
-            return await process_grade_attempt(task)
-        return {
-            "task_id": str(task.get("task_id", "")),
-            "status": "error",
-            "error": f"unknown task type: {task_type!r}",
-        }
+            return await process_grade_attempt(task, answer_store=self.answer_store)
+        return self._error_result(
+            task_type, str(task.get("task_id", "")), f"unknown task type: {task_type!r}"
+        )
+
+    @staticmethod
+    def _error_result(task_type: str, task_id: str, error: str) -> dict:
+        """Ошибка в форме, которую ждёт канал результата этого типа задачи.
+
+        В `grade-test:ml-to-be` поля `status` нет — там признак ошибки само
+        наличие `error`. Во всех остальных каналах `status: "error"` обязателен.
+        """
+        result: dict = {"task_id": task_id}
+        if task_type != "grade_attempt":
+            result["status"] = "error"
+        result["error"] = error
+        return result
 
     async def _handle(self, msg_id: str, fields: dict, channel: str) -> None:
         task_type = self.channel_types.get(channel) or channel_task_type(channel)
@@ -204,22 +219,17 @@ class RAGWorker:
             # Отвечаем ошибкой вместо молчаливого XACK: сообщение без ответа
             # backend'у неотличимо от «задача ещё в работе».
             await self._publish(
-                {
-                    "task_id": "",
-                    "status": "error",
-                    "error": f"payload is not valid JSON: {e}",
-                },
+                self._error_result(task_type, "", f"payload is not valid JSON: {e}"),
                 msg_id, channel, result_channel,
             )
             return
 
         if not isinstance(task, dict):
             await self._publish(
-                {
-                    "task_id": "",
-                    "status": "error",
-                    "error": f"payload must be a JSON object, got {type(task).__name__}",
-                },
+                self._error_result(
+                    task_type, "",
+                    f"payload must be a JSON object, got {type(task).__name__}",
+                ),
                 msg_id, channel, result_channel,
             )
             return
@@ -228,12 +238,9 @@ class RAGWorker:
             result = await self._route(task_type, task)
         except Exception as e:
             logger.exception(f"Handler crashed for msg {msg_id}")
-            result = {
-                "task_id": str(task.get("task_id", "")),
-                "status": "error",
-                "error": f"{type(e).__name__}: {e}",
-            }
-        result["input_msg_id"] = msg_id
+            result = self._error_result(
+                task_type, str(task.get("task_id", "")), f"{type(e).__name__}: {e}"
+            )
 
         await self._publish(result, msg_id, channel, result_channel)
 

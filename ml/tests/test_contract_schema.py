@@ -13,14 +13,19 @@ backend уже отвергнет сообщение.
   b. пример — валиден по своей схеме (с разбором ошибок, а не `assert False`);
   c. `examples[0]` в схеме — тот же payload, что лежит в файле-примере;
   d/e. пример — то, что реально сериализуют dataclass'ы `app/contracts.py`
-     (`to_json()`); для ML → BE дополнительно учитывается `input_msg_id`,
-     который воркер добавляет при публикации;
+     (`to_json()`);
   f. имя канала в `$id` и описании схемы — то, что реально использует код
      (`task_channel()` / `result_channel()`);
-  g. набор файлов полон: шесть схем и шесть примеров, лишних нет.
+  g. набор файлов полон: шесть схем и шесть примеров, лишних нет;
+  h. в примерах и схемах нет полей, которых нет в контракте заказчика
+     (`input_msg_id`, `course_id`, `user_id`, `answer_key`, `chunks_indexed`).
 
 Требование (g) — не формальность: осиротевшая схема (канал переименовали, а
 файл забыли) валидировала бы саму себя и молча разъезжалась бы с кодом.
+
+Требование (h) — то же самое, только про лишние поля: поле, которого нет в
+контракте заказчика, в payload'е — это молчаливый разъезд с backend'ом, и
+backend об этом узнаёт только в рантайме.
 
 Тест детерминированный: ни сети, ни БД, ни LLM.
 
@@ -67,6 +72,7 @@ from app.contracts import (  # noqa: E402
     IngestTask,
     StudentAnswer,
     Test,
+    TestQuestion,
     channel_task_type,
     result_channel,
     task_channel,
@@ -132,27 +138,18 @@ def expected_task_payload(channel: str, example: dict[str, Any]) -> dict[str, An
             IngestTask(
                 material_id=example["material_id"],
                 storage_key=example["storage_key"],
-                task_id=example.get("task_id", ""),
-                course_id=example.get("course_id"),
             ).to_json()
         )
 
     if task_type == "create_test":
-        raw_n = example.get("amountQuestions")
-        if isinstance(raw_n, str):
-            # Строковый режим: ML сам выбирает размер теста.
-            num_questions = None
-        else:
-            num_questions = None if raw_n is None else int(raw_n)
+        # Контракт v4.1: числа вопросов в задаче нет — размер выбирает ML.
         return json.loads(
             CreateTestTask(
                 task_id=example["task_id"],
                 test_id=example["test_id"],
                 material_ids=list(example["material_ids"]),
                 title=example["title"],
-                num_questions=num_questions,
                 difficulty=example.get("difficulty", "medium"),
-                course_id=example.get("course_id"),
             ).to_json()
         )
 
@@ -162,7 +159,6 @@ def expected_task_payload(channel: str, example: dict[str, Any]) -> dict[str, An
                 task_id=example["task_id"],
                 attempt_id=example["attempt_id"],
                 test_id=example["test_id"],
-                user_id=example["user_id"],
                 answers=[StudentAnswer.from_dict(a) for a in example["answers"]],
             ).to_json()
         )
@@ -173,23 +169,39 @@ def expected_task_payload(channel: str, example: dict[str, Any]) -> dict[str, An
 def expected_result_payload(channel: str, example: dict[str, Any]) -> dict[str, Any]:
     """То, что ML отправит в канал — сериализация dataclass'а результата.
 
-    `input_msg_id` в dataclass'е нет: воркер добавляет его при публикации
-    (`app/workers/rag.py`). Значение берём из файла-примера, поэтому тест не
-    зависит от конкретного Redis Stream ID.
+    Статус у grade-ответа внутри dataclass'а остался (для удобства вызывающего
+    кода), но наружу не сериализуется: в контракте заказчика признак ошибки —
+    поле `error`.
     """
     task_type = channel_task_type(channel)
-    input_msg_id = example.get("input_msg_id")
 
     if task_type == "ingest":
         result = IngestResult(
-            task_id=example.get("task_id", ""),
             status=example["status"],
             material_id=example.get("material_id"),
-            chunks_indexed=example.get("chunks_indexed"),
             error=example.get("error"),
         )
     elif task_type == "create_test":
-        test = Test.from_dict(example["test"]) if example.get("test") else None
+        # `Test.from_dict` — валидатор для выхода LLM-генератора: там
+        # `answer_key` обязателен. Собираем вопросы напрямую, перенося эталон
+        # из примера (контракт v4.1: `answer_key` выходит наружу).
+        test = None
+        if example.get("test"):
+            test = Test(
+                title=example["test"]["title"],
+                questions=[
+                    TestQuestion(
+                        id=int(q["id"]),
+                        text=str(q["text"]),
+                        type_question=str(q["type"]),
+                        options=list(q.get("options") or []),
+                        answer_key=dict(q.get("answer_key") or {}),
+                        key_points=list(q.get("key_points") or []),
+                        source_chunk_id=q.get("source_chunk_id"),
+                    )
+                    for q in example["test"]["questions"]
+                ],
+            )
         result = CreateTestResult(
             task_id=example.get("task_id", ""),
             status=example["status"],
@@ -198,9 +210,11 @@ def expected_result_payload(channel: str, example: dict[str, Any]) -> dict[str, 
             error=example.get("error"),
         )
     elif task_type == "grade_attempt":
+        # Статус в примере не выводим: в grade-ответе его нет.
+        status = "ok" if "error" not in example else "error"
         result = GradeAttemptResult(
             task_id=example.get("task_id", ""),
-            status=example["status"],
+            status=status,
             attempt_id=example.get("attempt_id"),
             test_id=example.get("test_id"),
             score_pct=example.get("score_pct"),
@@ -211,10 +225,7 @@ def expected_result_payload(channel: str, example: dict[str, Any]) -> dict[str, 
     else:
         raise AssertionError(f"нет контракта для типа задачи {task_type!r}")
 
-    payload = json.loads(result.to_json())
-    if input_msg_id is not None:
-        payload["input_msg_id"] = input_msg_id
-    return payload
+    return json.loads(result.to_json())
 
 
 # ---------------------------------------------------------------------------
@@ -319,7 +330,7 @@ class TestTaskExampleMatchesDataclass:
 
 
 # ---------------------------------------------------------------------------
-#  e. Пример ML → BE == сериализация dataclass'а результата + input_msg_id
+#  e. Пример ML → BE == сериализация dataclass'а результата
 # ---------------------------------------------------------------------------
 
 class TestResultExampleMatchesDataclass:
@@ -332,24 +343,95 @@ class TestResultExampleMatchesDataclass:
         expected = expected_result_payload(channel, payload)
         assert payload == expected, (
             f"{channel}: файл-пример расходится с сериализацией результата "
-            f"(to_json() + input_msg_id). "
+            f"(to_json()). "
             f"Ожидалось: {json.dumps(expected, ensure_ascii=False, sort_keys=True)}"
         )
 
-    @pytest.mark.parametrize(
-        "channel",
-        [ch for ch in ALL_CHANNELS if ch.endswith(f":{ML_TO_BE}")],
-    )
-    def test_result_example_carries_input_msg_id(self, channel: str):
-        """`input_msg_id` добавляет воркер при публикации — в примере он обязан
-        быть, иначе backend не сможет сопоставить результат с запросом."""
-        payload = load_json(example_path(channel))
-        assert "input_msg_id" in payload, (
-            f"{channel}: в примере результата нет поля input_msg_id"
+
+# ---------------------------------------------------------------------------
+#  h. Лишних полей нет ни в примерах, ни в схемах
+# ---------------------------------------------------------------------------
+
+# Поля, которых нет в контракте заказчика. Если такое поле появится в
+# payload'е — это молчаливый разъезд с backend'ом.
+#
+# ⚠️ `answer_key` НЕ входит в список: по контракту v4.1 эталон правильного
+# ответа выходит в `create-test:ml-to-be` (backend пишет его в
+# `test_questions.answer_key`). В остальных каналах его по-прежнему нет —
+# это проверяется отдельно, см. ANSWER_KEY_ALLOWED.
+FORBIDDEN_FIELDS = ("input_msg_id", "course_id", "user_id", "chunks_indexed")
+
+# Каналы, в ответе которых `answer_key` допустим.
+ANSWER_KEY_ALLOWED = ("create-test:ml-to-be",)
+
+
+def walk_keys(node: Any) -> set[str]:
+    """Все ключи объектов в JSON-дереве."""
+    keys: set[str] = set()
+    if isinstance(node, dict):
+        keys.update(node.keys())
+        for value in node.values():
+            keys.update(walk_keys(value))
+    elif isinstance(node, list):
+        for item in node:
+            keys.update(walk_keys(item))
+    return keys
+
+
+class TestNoForbiddenFields:
+    @pytest.mark.parametrize("channel", CHANNEL_IDS)
+    def test_example_has_no_forbidden_fields(self, channel: str):
+        example = load_json(example_path(channel))
+        found = sorted(walk_keys(example) & set(FORBIDDEN_FIELDS))
+        assert not found, (
+            f"{channel}: в примере есть поля, которых нет в контракте "
+            f"заказчика: {found}"
         )
-        assert isinstance(payload["input_msg_id"], str) and payload["input_msg_id"], (
-            f"{channel}: input_msg_id должен быть непустой строкой"
+
+    @pytest.mark.parametrize("channel", CHANNEL_IDS)
+    def test_schema_has_no_forbidden_fields(self, channel: str):
+        schema = load_json(schema_path(channel))
+        found = sorted(walk_keys(schema) & set(FORBIDDEN_FIELDS))
+        assert not found, (
+            f"{channel}: в схеме есть поля, которых нет в контракте "
+            f"заказчика: {found}"
         )
+
+    @pytest.mark.parametrize("channel", CHANNEL_IDS)
+    def test_embedded_example_has_no_forbidden_fields(self, channel: str):
+        schema = load_json(schema_path(channel))
+        for index, embedded in enumerate(schema.get("examples") or []):
+            found = sorted(walk_keys(embedded) & set(FORBIDDEN_FIELDS))
+            assert not found, (
+                f"{channel}: в examples[{index}] схемы есть поля, которых "
+                f"нет в контракте заказчика: {found}"
+            )
+
+    @pytest.mark.parametrize("channel", CHANNEL_IDS)
+    def test_answer_key_only_in_create_test_result(self, channel: str):
+        """Эталон `answer_key` по контракту v4.1 выходит только в ответе
+        `create-test:ml-to-be` — в остальных каналах его быть не должно."""
+        example = load_json(example_path(channel))
+        found = sorted(walk_keys(example) & {"answer_key"})
+        if channel in ANSWER_KEY_ALLOWED:
+            assert found, f"{channel}: в ответе должен быть эталон answer_key"
+        else:
+            assert not found, (
+                f"{channel}: в примере есть answer_key — эталон по контракту "
+                f"выходит только в create-test:ml-to-be"
+            )
+
+    @pytest.mark.parametrize("channel", CHANNEL_IDS)
+    def test_schema_answer_key_only_in_create_test_result(self, channel: str):
+        schema = load_json(schema_path(channel))
+        found = sorted(walk_keys(schema) & {"answer_key"})
+        if channel in ANSWER_KEY_ALLOWED:
+            assert found, f"{channel}: в схеме должен быть описан answer_key"
+        else:
+            assert not found, (
+                f"{channel}: в схеме есть answer_key — эталон по контракту "
+                f"выходит только в create-test:ml-to-be"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -445,3 +527,83 @@ class TestContractFileSet:
                 f"{channel}: payload должен быть JSON-объектом, "
                 f"а не {type(payload).__name__}"
             )
+
+
+# ---------------------------------------------------------------------------
+#  i. Контракт v4.1: числа вопросов нет, эталон answer_key — есть
+# ---------------------------------------------------------------------------
+
+class TestContractV41:
+    """Контракт v4.1: `amountQuestions` убран из задачи, `answer_key` вернулся
+    в ответ на создание теста."""
+
+    def test_create_test_task_schema_has_no_amount_questions(self):
+        schema = load_json(schema_path("create-test:be-to-ml"))
+        assert "amountQuestions" not in schema.get("properties", {})
+        assert "amountQuestions" not in schema.get("required", [])
+
+    def test_create_test_task_example_has_no_amount_questions(self):
+        example = load_json(example_path("create-test:be-to-ml"))
+        assert "amountQuestions" not in example
+
+    def test_create_test_task_schema_accepts_legacy_payload(self):
+        """Legacy-payload с `amountQuestions` должен остаться валидным.
+
+        `additionalProperties` в схеме не запрещён, поэтому лишнее поле
+        `amountQuestions` не ломает валидацию старых сообщений из Redis
+        Streams."""
+        schema = load_json(schema_path("create-test:be-to-ml"))
+        example = load_json(example_path("create-test:be-to-ml"))
+        legacy = {**example, "amountQuestions": 7}
+        Draft202012Validator(schema).validate(legacy)
+
+    def test_create_test_result_schema_requires_answer_key(self):
+        """Эталон правильного ответа обязателен у каждого вопроса."""
+        schema = load_json(schema_path("create-test:ml-to-be"))
+        question = schema["$defs"]["question"]
+        assert "answer_key" in question["required"]
+        assert question["properties"]["answer_key"] == {
+            "$ref": "#/$defs/answer_key",
+        }
+
+    def test_answer_key_schema_shape(self):
+        schema = load_json(schema_path("create-test:ml-to-be"))
+        answer_key = schema["$defs"]["answer_key"]
+        assert answer_key["type"] == "object"
+        assert answer_key["additionalProperties"] is False
+        assert answer_key["minProperties"] == 1
+        props = answer_key["properties"]
+        assert props["correct_index"]["type"] == "integer"
+        assert props["correct_index"]["minimum"] == 0
+        assert props["correct_indexes"]["type"] == "array"
+        assert props["correct_indexes"]["items"]["minimum"] == 0
+        assert props["reference_answer"]["type"] == "string"
+        assert props["explanation"]["type"] == "string"
+
+    def test_question_without_answer_key_fails_validation(self):
+        """Вопрос без эталона — невалиден по схеме: backend не сможет проверить
+        ответ."""
+        schema = load_json(schema_path("create-test:ml-to-be"))
+        example = load_json(example_path("create-test:ml-to-be"))
+        broken = json.loads(json.dumps(example))
+        broken["test"]["questions"][0].pop("answer_key")
+        errors = list(Draft202012Validator(schema).iter_errors(broken))
+        assert errors, "вопрос без answer_key должен не проходить валидацию"
+
+    def test_answer_key_with_unknown_field_fails_validation(self):
+        """`additionalProperties: false` — лишние ключи в эталоне запрещены."""
+        schema = load_json(schema_path("create-test:ml-to-be"))
+        example = load_json(example_path("create-test:ml-to-be"))
+        broken = json.loads(json.dumps(example))
+        broken["test"]["questions"][0]["answer_key"]["criteria"] = ["пункт"]
+        errors = list(Draft202012Validator(schema).iter_errors(broken))
+        assert errors, "answer_key с лишним ключом должен не проходить валидацию"
+
+    def test_empty_answer_key_fails_validation(self):
+        """Пустой эталон бесполезен — `minProperties: 1` его не пускает."""
+        schema = load_json(schema_path("create-test:ml-to-be"))
+        example = load_json(example_path("create-test:ml-to-be"))
+        broken = json.loads(json.dumps(example))
+        broken["test"]["questions"][0]["answer_key"] = {}
+        errors = list(Draft202012Validator(schema).iter_errors(broken))
+        assert errors, "пустой answer_key должен не проходить валидацию"

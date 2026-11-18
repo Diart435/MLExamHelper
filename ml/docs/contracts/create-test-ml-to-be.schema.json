@@ -2,44 +2,52 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ai-exam:contract:create-test:ml-to-be",
   "title": "Результат генерации теста — канал create-test:ml-to-be",
-  "description": "Payload результата от ML к backend со сгенерированным тестом либо с ошибкой генерации.",
   "type": "object",
   "oneOf": [
     {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["status", "task_id", "test_id", "test"],
+      "required": [
+        "status",
+        "task_id",
+        "test_id",
+        "test"
+      ],
       "properties": {
-        "status": {"const": "ok"},
-        "task_id": {"type": "string", "minLength": 1},
-        "test_id": {"type": "string", "minLength": 1},
-        "test": {"$ref": "#/$defs/test"},
-        "input_msg_id": {
+        "status": {
+          "const": "ok"
+        },
+        "task_id": {
           "type": "string",
-          "minLength": 1,
-          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+          "minLength": 1
+        },
+        "test_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test": {
+          "$ref": "#/$defs/test"
         }
       }
     },
     {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["status", "error"],
+      "required": [
+        "status",
+        "error"
+      ],
       "properties": {
-        "status": {"const": "error"},
+        "status": {
+          "const": "error"
+        },
         "task_id": {
-          "type": "string",
-          "description": "Корреляция. Поле присутствует всегда, но может быть пустой строкой: при битом payload идентификатор задачи неизвестен."
+          "type": "string"
         },
         "test_id": {
-          "type": "string",
-          "description": "Тест, для которого не удалось сгенерировать результат. Может отсутствовать, если payload не удалось разобрать."
+          "type": "string"
         },
-        "error": {"type": "string", "minLength": 1},
-        "input_msg_id": {
+        "error": {
           "type": "string",
-          "minLength": 1,
-          "description": "Необязательный Redis Stream ID исходного сообщения; добавляется ML-воркером."
+          "minLength": 1
         }
       }
     }
@@ -47,119 +55,105 @@
   "$defs": {
     "test": {
       "type": "object",
-      "additionalProperties": false,
-      "required": ["title", "questions"],
+      "required": [
+        "title",
+        "questions"
+      ],
       "properties": {
-        "title": {"type": "string", "minLength": 1},
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
         "questions": {
           "type": "array",
           "minItems": 1,
-          "items": {"$ref": "#/$defs/question"}
+          "items": {
+            "$ref": "#/$defs/question"
+          }
         }
       }
     },
     "question": {
       "type": "object",
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["id", "type", "text", "options", "answer_key", "key_points", "source_chunk_id"],
-          "properties": {
-            "id": {"type": "integer", "minimum": 0},
-            "type": {"const": "single_choice"},
-            "text": {"type": "string", "minLength": 1},
-            "options": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 4,
-              "items": {"type": "string"}
-            },
-            "answer_key": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["correct_index", "explanation"],
-              "properties": {
-                "correct_index": {"type": "integer", "minimum": 0},
-                "explanation": {"type": "string"}
-              }
-            },
-            "key_points": {
-              "type": "array",
-              "maxItems": 0,
-              "items": {"type": "string"}
-            },
-            "source_chunk_id": {"type": ["string", "null"]}
+      "required": [
+        "id",
+        "type",
+        "text",
+        "options",
+        "key_points",
+        "answer_key",
+        "source_chunk_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "single_choice",
+            "multi_choice",
+            "open_answer"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
           }
         },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["id", "type", "text", "options", "answer_key", "key_points", "source_chunk_id"],
-          "properties": {
-            "id": {"type": "integer", "minimum": 0},
-            "type": {"const": "multi_choice"},
-            "text": {"type": "string", "minLength": 1},
-            "options": {
-              "type": "array",
-              "minItems": 4,
-              "maxItems": 6,
-              "items": {"type": "string"}
-            },
-            "answer_key": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["correct_indexes", "explanation"],
-              "properties": {
-                "correct_indexes": {
-                  "type": "array",
-                  "minItems": 2,
-                  "maxItems": 3,
-                  "items": {"type": "integer", "minimum": 0}
-                },
-                "explanation": {"type": "string"}
-              }
-            },
-            "key_points": {
-              "type": "array",
-              "maxItems": 0,
-              "items": {"type": "string"}
-            },
-            "source_chunk_id": {"type": ["string", "null"]}
+        "key_points": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
           }
         },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["id", "type", "text", "options", "answer_key", "key_points", "source_chunk_id"],
-          "properties": {
-            "id": {"type": "integer", "minimum": 0},
-            "type": {"const": "open_answer"},
-            "text": {"type": "string", "minLength": 1},
-            "options": {
-              "type": "array",
-              "maxItems": 0,
-              "items": {"type": "string"}
-            },
-            "answer_key": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["reference_answer", "explanation"],
-              "properties": {
-                "reference_answer": {"type": "string", "minLength": 1},
-                "explanation": {"type": "string"}
-              }
-            },
-            "key_points": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 4,
-              "items": {"type": "string"}
-            },
-            "source_chunk_id": {"type": ["string", "null"]}
-          }
+        "answer_key": {
+          "$ref": "#/$defs/answer_key"
+        },
+        "source_chunk_id": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
-      ]
+      }
+    },
+    "answer_key": {
+      "type": "object",
+      "description": "Эталон правильного ответа. Ключ зависит от типа вопроса: single_choice — correct_index, multi_choice — correct_indexes, open_answer — reference_answer. У всех типов допустимо необязательное explanation.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "correct_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correct_indexes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "reference_answer": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        }
+      }
     }
   },
   "examples": [
@@ -180,11 +174,11 @@
               "REPEATABLE READ",
               "SERIALIZABLE"
             ],
+            "key_points": [],
             "answer_key": {
               "correct_index": 1,
               "explanation": "READ UNCOMMITTED допускает грязные чтения."
             },
-            "key_points": [],
             "source_chunk_id": "18c5e91a-2d74-4f60-b839-7e1a5c0d6b42"
           },
           {
@@ -198,6 +192,7 @@
               "Каскадное удаление",
               "Шифрование"
             ],
+            "key_points": [],
             "answer_key": {
               "correct_indexes": [
                 0,
@@ -206,7 +201,6 @@
               ],
               "explanation": "Первичный ключ, уникальность и ссылочная целостность являются стандартными ограничениями."
             },
-            "key_points": [],
             "source_chunk_id": "7a0d3e91-c642-4f88-b125-6d9e2a4c8f31"
           },
           {
@@ -214,19 +208,18 @@
             "type": "open_answer",
             "text": "Объясните назначение транзакции и принцип атомарности.",
             "options": [],
-            "answer_key": {
-              "reference_answer": "Транзакция объединяет операции в единую логическую единицу работы; атомарность гарантирует выполнение всех операций либо откат всех изменений.",
-              "explanation": "Ответ должен называть единицу работы и гарантию all-or-nothing."
-            },
             "key_points": [
               "Транзакция — единая логическая единица работы.",
               "При ошибке изменения откатываются целиком."
             ],
+            "answer_key": {
+              "reference_answer": "Транзакция объединяет операции в единую логическую единицу работы; атомарность гарантирует выполнение всех операций либо откат всех изменений.",
+              "explanation": "Ответ должен называть единицу работы и гарантию all-or-nothing."
+            },
             "source_chunk_id": null
           }
         ]
-      },
-      "input_msg_id": "1766000000000-0"
+      }
     }
   ]
 }

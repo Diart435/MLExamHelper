@@ -28,7 +28,7 @@
         ...                            # отдать ошибку в ingest:ml-to-be
 
 Сборка ответа:
-    result = IngestResult.ok(task_id="", material_id="uuid-material", chunks_indexed=29)
+    result = IngestResult.ok(material_id="uuid-material")
     await redis.xadd(result_channel("ingest"), {"payload": result.to_json()})
 
 === BEST PRACTICE ===
@@ -40,7 +40,10 @@
   task_id, чтобы сопоставить результат с запросом. Канал задаёт ТИП задачи,
   task_id — КАКУЮ именно: в одном канале может висеть несколько задач.
 - `status` в результатах: "ok" | "error", для ingest — "ready" | "error".
-  При error — поле `error` обязательно.
+  При error — поле `error` обязательно. В grade-ответе статуса нет: признак
+  ошибки — наличие поля `error`.
+- Контракт заказчика — источник правды: лишних полей в payload нет, а
+  недостающие читаются терпимо (`from_dict` игнорирует неизвестные ключи).
 """
 
 from __future__ import annotations
@@ -128,13 +131,12 @@ class IngestTask:
     """Скачать файл из MinIO и проиндексировать в vector store.
 
     Backend заливает файл в MinIO (bucket=MINIO_BUCKET), затем шлёт эту задачу.
-    В контракте у задачи нет `task_id`: корреляция идёт по material_id —
-    одна индексация соответствует одному материалу.
+    В контракте у задачи ровно два поля: `material_id` и `storage_key`.
+    Корреляция идёт по material_id — одна индексация соответствует одному
+    материалу, поэтому `task_id` в контракте нет.
     """
     material_id: str                       # UUID-строка от backend; int-иды больше не используются
     storage_key: str                       # путь внутри MinIO bucket, например "uploads/lec.pdf"
-    task_id: str = ""                      # необязателен: корреляция по material_id
-    course_id: str | None = None           # опц., ml не использует; для логов/tracing
     TYPE: ClassVar[str] = "ingest"
 
     def to_json(self) -> str:
@@ -142,19 +144,17 @@ class IngestTask:
 
     def _as_dict(self) -> dict[str, Any]:
         return {
-            **({"task_id": self.task_id} if self.task_id else {}),
             "material_id": self.material_id,
             "storage_key": self.storage_key,
-            **({"course_id": self.course_id} if self.course_id is not None else {}),
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "IngestTask":
+        # Терпимо к лишним полям (task_id/course_id от старого контракта) —
+        # просто игнорируем их.
         return cls(
-            task_id=str(d.get("task_id") or ""),
             material_id=str(d["material_id"]),         # было int() — бек шлёт UUID-строку
             storage_key=str(d["storage_key"]),
-            course_id=d.get("course_id"),
         )
 
 
@@ -203,10 +203,16 @@ class CreateTestTask:
     контекст из всех, отдаёт в LLM с JSON-output, парсит, валидирует, возвращает
     структурированный Test.
 
-    num_questions = None → число вопросов определяет ML сам (планировщик смотрит
-    на материал и решает, сколько фактов в нём разбирается). Заданное число →
-    ровно столько, как просил backend (нужно старым клиентам, которые число
-    ещё присылают).
+    ⚠️ Контракт v4.1: числа вопросов в payload'е НЕТ. Размер теста ML выбирает
+    сам — отдельным вызовом планировщика (`services/test_planner.py`), который
+    смотрит на материал и решает, сколько фактов в нём разбирается (1..30).
+    Backend после получения теста сам пишет `tests.amount_questions =
+    len(questions)`.
+
+    Внутреннее поле `num_questions` осталось: им пользуются внутренние вызовы
+    и тесты (прямой запуск генератора с заданным числом вопросов). В JSON оно
+    не сериализуется, а из входящего payload'а игнорируется — старые сообщения
+    в Redis Streams не должны ронять разбор.
     """
     task_id: str
     test_id: str                           # uuid теста, который хранит backend
@@ -214,7 +220,7 @@ class CreateTestTask:
     title: str
     num_questions: int | None = None
     difficulty: Difficulty = "medium"
-    course_id: str | None = None           # uuid-строка (раньше было int)
+    course_id: str | None = None           # внутри кода только; в JSON не сериализуется
     TYPE: ClassVar[str] = "create_test"
 
     def __post_init__(self) -> None:
@@ -235,16 +241,13 @@ class CreateTestTask:
         return json.dumps(self._as_dict(), ensure_ascii=False)
 
     def _as_dict(self) -> dict[str, Any]:
+        # Контракт v4.1: числа вопросов в payload'е нет — размер выбирает ML.
         return {
             "task_id": self.task_id,
             "test_id": self.test_id,
             "material_ids": list(self.material_ids),
             "title": self.title,
-            # Явное число — «ровно столько вопросов». "min" — размер выбирает
-            # ML сам по материалу (планировщик).
-            "amountQuestions": self.num_questions if self.num_questions is not None else "min",
             "difficulty": self.difficulty,
-            **({"course_id": self.course_id} if self.course_id is not None else {}),
         }
 
     @classmethod
@@ -252,21 +255,17 @@ class CreateTestTask:
         mids = d.get("material_ids") or []
         if not isinstance(mids, list) or not mids:
             raise ValueError("material_ids must be a non-empty list")
-        # Число вопросов необязательно: каноническое имя — amountQuestions,
-        # num_questions принимаем как legacy (в Redis Streams остались payload'ы
-        # прежнего формата). "min"/"auto"/None — «ML выбирает размер сам».
-        raw_n = d.get("amountQuestions")
-        if raw_n is None:
-            raw_n = d.get("num_questions")
-        if isinstance(raw_n, str) and raw_n.strip().lower() in ("min", "auto", ""):
-            raw_n = None
-        # Лимиты num_questions и difficulty проверяет __post_init__
+        # ⚠️ Контракт v4.1: `amountQuestions` (и legacy `num_questions`) из
+        # payload'а ИГНОРИРУЮТСЯ — числа вопросов в контракте больше нет,
+        # размер выбирает ML (планировщик). Старые сообщения в Redis Streams
+        # остались лежать — их нельзя ронять, поэтому просто читаем мимо.
+        # Лимиты difficulty проверяет __post_init__.
         return cls(
             task_id=str(d["task_id"]),
             test_id=str(d["test_id"]),
             material_ids=[str(x) for x in mids],
             title=str(d["title"]),
-            num_questions=None if raw_n is None else int(raw_n),
+            num_questions=None,
             difficulty=str(d.get("difficulty", "medium")),  # type: ignore[arg-type]
             course_id=d.get("course_id"),
         )
@@ -283,12 +282,14 @@ class IngestResult:
     В контракте статус успеха — "ready" (материал проиндексирован), а не "ok":
     это тот же смысл, что у `materials.status_material` в БД. Ошибка — "error"
     с обязательным полем `error`.
+
+    В контракте ровно два поля: `material_id` и `status` (+ `error` в ветке
+    ошибки). Ни `task_id`, ни `chunks_indexed` в JSON нет — корреляция идёт по
+    material_id, а число чанков backend'у не нужно.
     """
-    task_id: str
     status: IngestStatus
     material_id: str | None = None         # UUID-строка от backend; в err-ветке включается,
                                             # если известен — чтобы backend мог обновить status_material
-    chunks_indexed: int | None = None
     error: str | None = None
 
     def to_json(self) -> str:
@@ -296,24 +297,20 @@ class IngestResult:
 
     def _as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {}
-        if self.task_id:
-            out["task_id"] = self.task_id
         if self.material_id is not None:
             out["material_id"] = self.material_id
         out["status"] = self.status
-        if self.status == "ready":
-            out["chunks_indexed"] = self.chunks_indexed
-        else:
+        if self.status != "ready":
             out["error"] = self.error or "unknown error"
         return out
 
     @classmethod
-    def ok(cls, task_id: str, material_id: str, chunks_indexed: int) -> "IngestResult":
-        return cls(task_id=task_id, status="ready", material_id=material_id, chunks_indexed=chunks_indexed)
+    def ok(cls, material_id: str) -> "IngestResult":
+        return cls(status="ready", material_id=material_id)
 
     @classmethod
-    def err(cls, task_id: str, error: str, material_id: str | None = None) -> "IngestResult":
-        return cls(task_id=task_id, status="error", error=error, material_id=material_id)
+    def err(cls, error: str, material_id: str | None = None) -> "IngestResult":
+        return cls(status="error", error=error, material_id=material_id)
 
 
 @dataclass
@@ -360,6 +357,14 @@ class TestQuestion:
     типов вопросов). `key_points` — список опорных пунктов; у закрытых вопросов
     список пустой.
 
+    ⚠️ Контракт v4.1: `answer_key` ВЫХОДИТ наружу — по одному объекту на
+    вопрос. Это эталон правильного ответа: backend пишет его в колонку
+    `test_questions.answer_key` (она есть в ERD заказчика). Redis-эталон с TTL
+    30 дней — ненадёжное хранилище, а LLM-фолбэк при проверке уже давал
+    неверный вердикт (назвал 2 правильных варианта вместо 3). Поэтому эталон
+    лежит в БД, а Redis (`services/answer_store.py`) остаётся резервной
+    копией.
+
     `source_chunk_id` — UUID чанка, из которого взят вопрос (nullable). LLM
     возвращает короткий алиас в `source_chunk_ref`, генератор разворачивает его
     в UUID — модель не выдумывает UUID'ы, а выбирает из списка реальных.
@@ -379,16 +384,16 @@ class TestQuestion:
     source_chunk_ref: str | None = None      # внутренний алиас чанка от LLM
 
     def to_dict(self) -> dict[str, Any]:
-        # Имя поля типа в контракте — `type`. `answer_key` обязателен: backend
-        # кладёт его в test_questions.answer_key, а грейдер берёт оттуда
-        # эталон при проверке попытки — без него тест нечем оценивать.
+        # Имя поля типа в контракте — `type`. `answer_key` (контракт v4.1)
+        # уходит наружу: это эталон правильного ответа, backend пишет его в
+        # `test_questions.answer_key`.
         return {
             "id": self.id,
             "type": self.type_question,
             "text": self.text,
             "options": list(self.options),
-            "answer_key": dict(self.answer_key),
             "key_points": list(self.key_points),
+            "answer_key": dict(self.answer_key),
             "source_chunk_id": self.source_chunk_id,
         }
 
@@ -638,12 +643,16 @@ class GradeAttemptTask:
 
     Backend при отправке этой задачи уже создал запись в student_attempts
     (started_at = NOW()). Наш результат запишет finished_at + score + grade.
+
+    В контракте `user_id` нет: студент и так известен по `attempt_id`, а поле
+    внутри dataclass'а осталось только для логов/идемпотентности и наружу не
+    сериализуется.
     """
     task_id: str
     attempt_id: str                        # uuid попытки
     test_id: str                           # uuid теста
-    user_id: str                           # uuid студента (для логов/идемпотентности)
-    answers: list[StudentAnswer]
+    user_id: str = ""                      # внутри кода только; в JSON не сериализуется
+    answers: list[StudentAnswer] = field(default_factory=list)
     TYPE: ClassVar[str] = "grade_attempt"
 
     def to_json(self) -> str:
@@ -654,7 +663,6 @@ class GradeAttemptTask:
             "task_id": self.task_id,
             "attempt_id": self.attempt_id,
             "test_id": self.test_id,
-            "user_id": self.user_id,
             "answers": [
                 {"question_id": a.question_id, "student_answer": _student_answer_payload(a)}
                 for a in self.answers
@@ -670,7 +678,9 @@ class GradeAttemptTask:
             task_id=str(d["task_id"]),
             attempt_id=str(d["attempt_id"]),
             test_id=str(d["test_id"]),
-            user_id=str(d["user_id"]),
+            # user_id в контракте нет, но если backend пришлёт — не считаем
+            # это ошибкой, просто игнорируем.
+            user_id=str(d.get("user_id") or ""),
             answers=[StudentAnswer.from_dict(a) for a in raw],
         )
 
@@ -703,6 +713,13 @@ class GradedItem:
 
 @dataclass
 class GradeAttemptResult:
+    """Результат проверки попытки.
+
+    ⚠️ В контракте заказчика поля `status` НЕТ — ни в ветке успеха, ни в ветке
+    ошибки. Признак ошибки — наличие поля `error`. Поле `status` оставлено
+    внутри dataclass'а для удобства вызывающего кода, но наружу не
+    сериализуется.
+    """
     task_id: str
     status: TaskStatus
     attempt_id: str | None = None          # чтобы backend нашёл строку в student_attempts
@@ -716,7 +733,7 @@ class GradeAttemptResult:
         return json.dumps(self._as_dict(), ensure_ascii=False)
 
     def _as_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {"task_id": self.task_id, "status": self.status}
+        out: dict[str, Any] = {"task_id": self.task_id}
         if self.attempt_id is not None:
             out["attempt_id"] = self.attempt_id
         if self.test_id is not None:
