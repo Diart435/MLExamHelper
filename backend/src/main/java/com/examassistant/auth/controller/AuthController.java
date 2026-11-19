@@ -169,10 +169,11 @@ public class AuthController {
         VkUserInfoResponse vkInfo = vkAuthService.authenticate(
                 request.getCode(),
                 request.getCodeVerifier(),
-                request.getDeviceId()
+                request.getDeviceId(),
+                request.getState()
         );
 
-        User user = userService.findOrCreateByVk(vkInfo);
+        User user = userService.findOrCreateByVk(vkInfo.getUser());
 
         String accessToken = jwtService.generate(user.getUserId(), user.getEmail());
 
