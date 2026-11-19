@@ -1,6 +1,7 @@
 package com.examassistant.auth.service;
 
 import com.examassistant.auth.DTO.UserDTO;
+import com.examassistant.auth.DTO.VkUserInfoResponse;
 import com.examassistant.auth.entity.User;
 import com.examassistant.auth.repository.UserRepository;
 import com.examassistant.common.exception.InvalidCredentialsException;
@@ -69,5 +70,22 @@ public class UserService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setUpdatedAt(OffsetDateTime.now());
+    }
+
+    @Transactional
+    public User findOrCreateByVk(VkUserInfoResponse vkInfo){
+        return userRepository.findByVkId(vkInfo.getUserId())
+                .or(() -> userRepository.findByEmail(vkInfo.getEmail()))
+                .orElseGet(() -> {
+                    User newUser = new User();
+                    newUser.setVkId(vkInfo.getUserId());
+                    newUser.setEmail(vkInfo.getEmail() == null ? "" : vkInfo.getEmail());
+                    newUser.setFirstName(vkInfo.getFirstName());
+                    newUser.setLastName(vkInfo.getLastName());
+                    newUser.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+                    newUser.setCreatedAt(OffsetDateTime.now());
+                    newUser.setUpdatedAt(OffsetDateTime.now());
+                    return userRepository.save(newUser);
+                });
     }
 }

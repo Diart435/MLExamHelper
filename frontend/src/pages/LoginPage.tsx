@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { initiateVkLogin } from '../api/vkAuth';
 import './LoginPage.css';
 
 const LoginPage = () => {
@@ -99,6 +100,15 @@ const LoginPage = () => {
 
         <button type="submit" className="submit-btn" disabled={isLoading}>
           {isLoading ? 'Вход...' : 'Войти'}
+        </button>
+
+        <button 
+          type="button" 
+          className="btn-vk-login"
+          onClick={initiateVkLogin}
+          disabled={isLoading}
+        >
+          Войти через VK ID
         </button>
 
         <div className="form-footer">

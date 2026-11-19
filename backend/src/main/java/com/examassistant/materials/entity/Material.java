@@ -1,7 +1,7 @@
 package com.examassistant.materials.entity;
 
-import com.examassistant.materials.enums.STATUS_MATERIAL;
-import com.examassistant.materials.enums.TYPE_MATERIAL;
+import com.examassistant.materials.enums.StatusMaterial;
+import com.examassistant.materials.enums.TypeMaterial;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -25,7 +25,7 @@ public class Material {
 
     @Column(name = "type_material", nullable = false)
     @Enumerated(value = EnumType.STRING)
-    private TYPE_MATERIAL typeMaterial;
+    private TypeMaterial typeMaterial;
 
     @Column(name = "title", nullable = false)
     private String title;
@@ -35,7 +35,7 @@ public class Material {
 
     @Column(name = "status_material", nullable = false)
     @Enumerated(value = EnumType.STRING)
-    private STATUS_MATERIAL statusMaterial;
+    private StatusMaterial statusMaterial;
 
     @Column(name = "material_size", nullable = false)
     private long materialSize;

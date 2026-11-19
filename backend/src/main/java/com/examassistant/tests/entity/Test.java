@@ -1,6 +1,7 @@
 package com.examassistant.tests.entity;
 
-import com.examassistant.tests.enums.TestDifficulty;
+import com.examassistant.common.enums.TestAmountQuestions;
+import com.examassistant.common.enums.TestDifficulty;
 import com.examassistant.tests.enums.TestStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,6 +25,10 @@ public class Test {
 
     @Column(name = "title", nullable = false)
     private String title;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "amount_questions", nullable = false)
+    private TestAmountQuestions amountQuestions;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

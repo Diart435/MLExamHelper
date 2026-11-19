@@ -51,8 +51,12 @@ public class CoursesService implements CourseService {
 
     @Transactional(readOnly = true)
     public Course getById(UUID id, UUID userId) {
-        return courseRepository.findById(id)
+        Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new CourseNotFoundException(id.toString()));
+        if (!course.getOwnerId().equals(userId)) {
+            throw new CourseForbiddenException("This course is not yours");
+        }
+        return course;
     }
 
     @Transactional(readOnly = true)

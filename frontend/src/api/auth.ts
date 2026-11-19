@@ -22,26 +22,26 @@ export interface AuthResponse {
 
 // Вход в систему
 export const login = async (data: LoginRequest): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/api/auth/login', data);
+  const response = await apiClient.post<AuthResponse>('/auth/login', data);
   return response.data;
 };
 
 // Регистрация
 export const register = async (data: RegisterRequest): Promise<AuthResponse> => {
-  const response = await apiClient.post<AuthResponse>('/api/auth/register', data);
+  const response = await apiClient.post<AuthResponse>('/auth/register', data);
   return response.data;
 };
 
 // Обновление токена
 export const refresh = async (): Promise<{ accessToken: string }> => {
-  const response = await apiClient.post<{ accessToken: string }>('/api/auth/refresh');
+  const response = await apiClient.post<{ accessToken: string }>('/auth/refresh');
   return response.data;
 };
 
 // Выход из системы
 export const logout = async (): Promise<void> => {
   try {
-    await apiClient.post('/api/auth/logout');
+    await apiClient.post('/auth/logout');
   } catch (error) {
     console.error('Ошибка при запросе на выход:', error);
   } finally {

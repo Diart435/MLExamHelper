@@ -9,6 +9,7 @@ import com.examassistant.materials.DTO.MaterialResponse;
 import com.examassistant.materials.entity.Material;
 import com.examassistant.materials.mapper.MaterialMapper;
 import com.examassistant.materials.repository.MaterialRepository;
+import com.examassistant.messaging.Producer;
 import com.examassistant.support.TestFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,9 +52,11 @@ class MaterialServiceTest {
     private MaterialMapper materialMapper;
     @Mock
     private CourseService courseService;
+    @Mock
+    private Producer redisProducer;
 
     @InjectMocks
-    private MaterialService materialService;
+    private MaterialsService materialService;
 
     @Test
     void save_pdf_uploadsFileAndReturnsResponse() throws IOException {

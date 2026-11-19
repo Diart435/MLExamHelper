@@ -42,7 +42,7 @@ export interface GetCoursesParams {
 }
 
 // ===== API =====
-const BASE = '/api/courses';
+const BASE = '/courses';
 
 export const coursesApi = {
   /** GET /api/courses?title=...&page=0&size=10&sort=createdAt,desc */
