@@ -3,9 +3,9 @@ package com.examassistant.auth.service;
 import com.examassistant.auth.DTO.VkTokenResponse;
 import com.examassistant.auth.DTO.VkUserInfoResponse;
 import com.examassistant.common.exception.InvalidTokenException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -19,8 +19,6 @@ import java.time.Duration;
 @Service
 @Slf4j
 public class VkAuthService {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Value("${vk.client.id}")     private String clientId;
     @Value("${vk.service.token}") private String serviceToken;
@@ -54,50 +52,41 @@ public class VkAuthService {
         form.add("state",         state);
         form.add("service_token", serviceToken);
 
-        String rawTokens = post("/oauth2/auth", form);
-        log.info("VK TOKEN RESPONSE: {}", rawTokens);
+        VkTokenResponse tokens = restClient.post()
+                .uri("/oauth2/auth")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (req, res) -> {
+                    String body = new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                    log.error("VK /oauth2/auth error (HTTP {}): {}", res.getStatusCode(), body);
+                    throw new InvalidTokenException("VK ID вернул ошибку при обмене кода: " + body);
+                })
+                .body(VkTokenResponse.class);
 
-        VkTokenResponse tokens = parse(rawTokens, VkTokenResponse.class);
         if (tokens == null || tokens.getAccessToken() == null) {
-            throw new InvalidTokenException("Не удалось получить токены от VK");
+            throw new InvalidTokenException("Не удалось получить access_token от VK");
         }
 
         MultiValueMap<String, String> userForm = new LinkedMultiValueMap<>();
-        userForm.add("client_id",    clientId);
-        userForm.add("access_token", tokens.getAccessToken());
-
-        String rawUser = post("/oauth2/user_info", userForm);
-        log.info("VK USER RESPONSE: {}", rawUser);
-
-        VkUserInfoResponse info = parse(rawUser, VkUserInfoResponse.class);
-        if (info == null || info.getUser() == null) {
-            throw new InvalidTokenException("VK не вернул данные пользователя");
-        }
-        return info;
-    }
-
-    private String post(String uri, MultiValueMap<String, String> form) {
-        return restClient.post()
-                .uri(uri)
+        userForm.add("client_id", clientId);
+        VkUserInfoResponse info = restClient.post()
+                .uri("/oauth2/user_info")
+                .header("Authorization", "Bearer " + tokens.getAccessToken())
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(form)
-                .exchange((request, response) -> {
-                    String body = new String(response.getBody().readAllBytes(),
-                            StandardCharsets.UTF_8);
-                    if (response.getStatusCode().isError()) {
-                        log.error("VK {} -> HTTP {} : {}", uri, response.getStatusCode(), body);
-                        throw new InvalidTokenException("VK ID вернул ошибку: " + body);
-                    }
-                    return body;
-                });
-    }
+                .body(userForm)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (req, res) -> {
+                    String body = new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                    log.error("VK /oauth2/user_info error (HTTP {}): {}", res.getStatusCode(), body);
+                    throw new InvalidTokenException("VK не вернул данные пользователя: " + body);
+                })
+                .body(VkUserInfoResponse.class);
 
-    private <T> T parse(String raw, Class<T> type) {
-        try {
-            return MAPPER.readValue(raw, type);
-        } catch (Exception e) {
-            log.error("Не удалось распарсить ответ VK: {}", raw, e);
-            throw new InvalidTokenException("Некорректный ответ от VK");
+        if (info == null || info.getUser() == null) {
+            throw new InvalidTokenException("VK вернул пустые данные пользователя");
         }
+
+        return info;
     }
 }
