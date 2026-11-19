@@ -20,16 +20,15 @@ import java.time.Duration;
 @Slf4j
 public class VkAuthService {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     @Value("${vk.client.id}")     private String clientId;
     @Value("${vk.service.token}") private String serviceToken;
     @Value("${vk.redirect.uri}")  private String redirectUri;
 
     private final RestClient restClient;
-    private final ObjectMapper objectMapper;
 
-    public VkAuthService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-
+    public VkAuthService() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
         factory.setReadTimeout(Duration.ofSeconds(10));
@@ -45,32 +44,30 @@ public class VkAuthService {
                                            String deviceId,
                                            String state) {
 
-        // ===== 1. Обмен кода на токены =====
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type",    "authorization_code");
         form.add("code_verifier", codeVerifier);
-        form.add("redirect_uri",  redirectUri);      // обязательный
+        form.add("redirect_uri",  redirectUri);
         form.add("code",          code);
         form.add("client_id",     clientId);
-        form.add("device_id",     deviceId);         // snake_case!
-        form.add("state",         state);            // обязательный
-        form.add("service_token", serviceToken);     // НЕ client_secret
+        form.add("device_id",     deviceId);
+        form.add("state",         state);
+        form.add("service_token", serviceToken);
 
         String rawTokens = post("/oauth2/auth", form);
-        log.info("VK token response: {}", rawTokens);
+        log.info("VK TOKEN RESPONSE: {}", rawTokens);
 
         VkTokenResponse tokens = parse(rawTokens, VkTokenResponse.class);
         if (tokens == null || tokens.getAccessToken() == null) {
             throw new InvalidTokenException("Не удалось получить токены от VK");
         }
 
-        // ===== 2. Данные пользователя — ТОЛЬКО POST =====
         MultiValueMap<String, String> userForm = new LinkedMultiValueMap<>();
         userForm.add("client_id",    clientId);
         userForm.add("access_token", tokens.getAccessToken());
 
         String rawUser = post("/oauth2/user_info", userForm);
-        log.info("VK user_info response: {}", rawUser);
+        log.info("VK USER RESPONSE: {}", rawUser);
 
         VkUserInfoResponse info = parse(rawUser, VkUserInfoResponse.class);
         if (info == null || info.getUser() == null) {
@@ -78,6 +75,7 @@ public class VkAuthService {
         }
         return info;
     }
+
     private String post(String uri, MultiValueMap<String, String> form) {
         return restClient.post()
                 .uri(uri)
@@ -96,7 +94,7 @@ public class VkAuthService {
 
     private <T> T parse(String raw, Class<T> type) {
         try {
-            return objectMapper.readValue(raw, type);
+            return MAPPER.readValue(raw, type);
         } catch (Exception e) {
             log.error("Не удалось распарсить ответ VK: {}", raw, e);
             throw new InvalidTokenException("Некорректный ответ от VK");

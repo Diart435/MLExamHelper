@@ -93,7 +93,7 @@ public class UserService {
         u.setVkId(vkId);
         u.setEmail(vk.getEmail() != null && !vk.getEmail().isBlank()
                 ? vk.getEmail()
-                : "vk_" + vkId + "@vk.local");        // email может не прийти!
+                : "vk_" + vkId + "@vk.local");
         u.setFirstName(vk.getFirstName() != null ? vk.getFirstName() : "Пользователь");
         u.setLastName(vk.getLastName()  != null ? vk.getLastName()  : "");
         u.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
