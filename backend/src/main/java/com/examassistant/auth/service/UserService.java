@@ -97,6 +97,8 @@ public class UserService {
         u.setFirstName(vk.getFirstName() != null ? vk.getFirstName() : "Пользователь");
         u.setLastName(vk.getLastName()  != null ? vk.getLastName()  : "");
         u.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+        u.setCreatedAt(OffsetDateTime.now());
+        u.setUpdatedAt(OffsetDateTime.now());
         return userRepository.save(u);
     }
 }
