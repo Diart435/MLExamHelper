@@ -24,6 +24,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -146,5 +149,76 @@ public class MaterialsService implements MaterialService {
         UUID taskId = UUID.randomUUID();
         ProcessMaterialRedisRequest req = new ProcessMaterialRedisRequest(taskId, material.getMaterialId(), material.getSourceUri());
         redisProducer.publishMaterialProcess(req);
+    }
+
+    @Transactional
+    public void deleteAll(List<UUID> materialIds, UUID userId) {
+        List<UUID> distinctIds = List.copyOf(new LinkedHashSet<>(materialIds));
+        List<Material> materials = materialRepository.findAllById(distinctIds);
+
+        if (materials.size() != distinctIds.size()) {
+            Set<UUID> foundIds = materials.stream()
+                    .map(Material::getMaterialId)
+                    .collect(java.util.stream.Collectors.toSet());
+            List<UUID> missingIds = distinctIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .toList();
+            throw new FileNotFoundException("Materials not found: " + missingIds);
+        }
+
+        Set<UUID> checkedCourseIds = new LinkedHashSet<>();
+        for (Material material : materials) {
+            UUID courseId = material.getCourseId();
+            if (checkedCourseIds.add(courseId)) {
+                if (!courseService.getDTOById(courseId, userId).getOwnerId().equals(userId)) {
+                    throw new FileForbiddenException("This course is not yours");
+                }
+            }
+        }
+
+        for (Material material : materials) {
+            s3Service.delete(material.getSourceUri());
+        }
+        materialRepository.deleteAll(materials);
+    }
+
+    @Transactional
+    public List<MaterialResponse> move(List<UUID> materialIds, UUID targetCourseId, UUID userId) {
+        if (!courseService.getDTOById(targetCourseId, userId).getOwnerId().equals(userId)) {
+            throw new FileForbiddenException("Target course is not yours");
+        }
+
+        List<UUID> distinctIds = List.copyOf(new LinkedHashSet<>(materialIds));
+        List<Material> materials = materialRepository.findAllById(distinctIds);
+
+        if (materials.size() != distinctIds.size()) {
+            Set<UUID> foundIds = materials.stream()
+                    .map(Material::getMaterialId)
+                    .collect(java.util.stream.Collectors.toSet());
+            List<UUID> missingIds = distinctIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .toList();
+            throw new FileNotFoundException("Materials not found: " + missingIds);
+        }
+
+        Set<UUID> checkedSourceCourseIds = new LinkedHashSet<>();
+        for (Material material : materials) {
+            UUID sourceCourseId = material.getCourseId();
+            if (checkedSourceCourseIds.add(sourceCourseId)) {
+                if (!courseService.getDTOById(sourceCourseId, userId).getOwnerId().equals(userId)) {
+                    throw new FileForbiddenException("Source course is not yours");
+                }
+            }
+        }
+
+        for (Material material : materials) {
+            if (!targetCourseId.equals(material.getCourseId())) {
+                material.setCourseId(targetCourseId);
+            }
+        }
+
+        return materialRepository.saveAll(materials).stream()
+                .map(this::toResponse)
+                .toList();
     }
 }
