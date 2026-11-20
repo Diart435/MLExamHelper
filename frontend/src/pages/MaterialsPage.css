@@ -1,5 +1,6 @@
 /* =========================================================
-   СТРАНИЦА МАТЕРИАЛОВ (базовая структура)
+   СТРАНИЦА МАТЕРИАЛОВ
+   Панель загрузки (этап 2)
    ========================================================= */
 
 .materials-page {
@@ -24,6 +25,12 @@
 .materials-page *::before,
 .materials-page *::after {
   box-sizing: border-box;
+}
+
+.materials-page svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .materials-page__pattern {
@@ -105,6 +112,84 @@
 .materials-panel--list {
   padding: 33px 19px 20px;
   min-height: 220px;
+}
+
+.upload-zone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 161px;
+  padding: 20px 24px;
+  border: 3px solid var(--materials-purple);
+  border-radius: 15px;
+  background: #fff;
+  text-align: center;
+}
+
+.upload-zone__icon {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 2px;
+  color: var(--materials-purple-dark);
+}
+
+.upload-zone__title {
+  margin: 0;
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: #000;
+}
+
+.upload-zone__hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--materials-muted);
+}
+
+.upload-zone__formats {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #9a9a9a;
+}
+
+.upload-zone__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.materials-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 43px;
+  padding: 0 28px;
+  border-radius: 14.5px;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.materials-btn--outline {
+  border: 3px solid var(--materials-purple);
+  background: #fff;
+  color: var(--materials-purple-dark);
+}
+
+.materials-btn--outline:hover {
+  background: #f7f2ff;
+  border-color: var(--materials-purple-dark);
 }
 
 .materials-placeholder {
