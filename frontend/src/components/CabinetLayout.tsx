@@ -46,14 +46,18 @@ const CabinetLayout = () => {
   const isCoursesPage = location.pathname === '/courses';
   const isTestsPage = location.pathname === '/tests';
   const isCreateTestPage = location.pathname.includes('/tests/create');
+  const materialsMatch = location.pathname.match(/^\/courses\/([^/]+)\/materials\/?$/);
+  const isMaterialsPage = Boolean(materialsMatch);
+  const materialsCourseId = materialsMatch?.[1];
 
-    useEffect(() => {
-    if (isCreateTestPage && courseId) {
-      coursesApi.getById(courseId)
-        .then((course) => setCourseTitle(course.title))
-        .catch(() => setCourseTitle(''));
-    }
-  }, [isCreateTestPage, courseId]);
+  useEffect(() => {
+    const id = isCreateTestPage ? courseId : isMaterialsPage ? materialsCourseId : undefined;
+    if (!id) return;
+    coursesApi
+      .getById(id)
+      .then((course) => setCourseTitle(course.title))
+      .catch(() => setCourseTitle(''));
+  }, [isCreateTestPage, isMaterialsPage, materialsCourseId, courseId]);
 
   return (
     <div className="menu-page">
@@ -152,7 +156,6 @@ const CabinetLayout = () => {
           Выйти
         </button>
 
-        {/* Шапка КУРСОВ */}
         {isCoursesPage && (
           <div className="courses-header-box">
             <h1 className="courses-title">Курсы</h1>
@@ -162,11 +165,19 @@ const CabinetLayout = () => {
           </div>
         )}
 
-        {/* Шапка ТЕСТОВ */}
         {isTestsPage && (
           <div className="tests-header-box">
             <h1 className="tests-title">Мои тесты</h1>
             <p className="tests-subtitle">Все тесты по всем курсам</p>
+          </div>
+        )}
+
+        {isMaterialsPage && (
+          <div className="courses-header-box">
+            <h1 className="courses-title">Материалы</h1>
+            <p className="courses-subtitle">
+              {courseTitle ? `Курс «${courseTitle}»` : 'Учебные материалы курса'}
+            </p>
           </div>
         )}
 
@@ -178,7 +189,11 @@ const CabinetLayout = () => {
         )}
       </div>
 
-      <div className={`cabinet-outlet${isCoursesPage ? ' cabinet-outlet--courses' : ''}${(isTestsPage || isCreateTestPage) ? ' cabinet-outlet--tests' : ''}`}>
+      <div
+        className={`cabinet-outlet${
+          isCoursesPage || isMaterialsPage ? ' cabinet-outlet--courses' : ''
+        }${isTestsPage || isCreateTestPage ? ' cabinet-outlet--tests' : ''}`}
+      >
         <Outlet />
       </div>
     </div>
