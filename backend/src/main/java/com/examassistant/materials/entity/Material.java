@@ -23,6 +23,9 @@ public class Material {
     @Column(name = "course_id", nullable = false)
     private UUID courseId;
 
+    @Column(name = "user_id", nullable = false, updatable = false)
+    private UUID userId;
+
     @Column(name = "type_material", nullable = false)
     @Enumerated(value = EnumType.STRING)
     private TypeMaterial typeMaterial;

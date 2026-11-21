@@ -49,6 +49,7 @@ public class MaterialsService implements MaterialService {
 
         Material material = new Material();
         material.setTypeMaterial(typeMaterial);
+        material.setUserId(userId);
         material.setMaterialId(materialId);
         material.setCourseId(courseId);
         material.setStatusMaterial(StatusMaterial.PROCESSING);
