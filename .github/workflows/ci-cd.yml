@@ -1,7 +1,7 @@
 name: Check
 on:
   push:
-    branches: [master, dev]
+    branches: master
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -42,5 +42,7 @@ jobs:
           VK_CLIENT_SECRET=${{secrets.VK_CLIENT_SECRET}}
           S3_SIGNING_KEY=${{secrets.S3_SIGNING_KEY}}
           CORS=${{secrets.CORS}}
+          VK_SERVICE_TOKEN=${{secrets.VK_SERVICE_TOKEN}}
+          VK_REDIRECT_URI=${{secrets.VK_REDIRECT_URI}}
           EOF
           docker compose up -d --build

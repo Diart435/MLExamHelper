@@ -26,6 +26,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -165,22 +166,32 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/vk/callback")
-    public ResponseEntity<?> handleVkCallback(@RequestBody VkCallbackRequest request) {
+    public ResponseEntity<Map<String, Object>> vkCallback(
+            @RequestBody VkCallbackRequest request,
+            HttpServletResponse response) {
+
         VkUserInfoResponse vkInfo = vkAuthService.authenticate(
-                request.getCode(),
-                request.getCodeVerifier(),
-                request.getDeviceId()
-        );
+                request.getCode(), request.getCodeVerifier(),
+                request.getDeviceId(), request.getState());
 
-        User user = userService.findOrCreateByVk(vkInfo);
+        User user = userService.findOrCreateByVk(vkInfo.getUser());
 
-        String accessToken = jwtService.generate(user.getUserId(), user.getEmail());
+        String accessToken  = jwtService.generate(user.getUserId(), user.getEmail());
+        String refreshToken = refreshTokenService.create(user.getUserId());
 
-        return ResponseEntity.ok(Map.of(
-                "accessToken", accessToken,
-                "email", user.getEmail(),
-                "firstName", user.getFirstName(),
-                "lastName", user.getLastName()
-        ));
+        ResponseCookie cookie = ResponseCookie.from("refresh_token", refreshToken)
+                .httpOnly(true).secure(true)
+                .path("/api/auth")
+                .maxAge(Duration.ofDays(30))
+                .sameSite("Lax")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("accessToken", accessToken);
+        body.put("email",       user.getEmail());
+        body.put("firstName",   user.getFirstName());
+        body.put("lastName",    user.getLastName());
+        return ResponseEntity.ok(body);
     }
 }

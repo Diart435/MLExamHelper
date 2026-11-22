@@ -43,6 +43,7 @@ COMMENT ON TABLE courses IS 'Учебные курсы';
 CREATE TABLE materials (
     material_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id       UUID NOT NULL,
+    user_id         UUID NOT NULL,
     type_material   VARCHAR(50) NOT NULL, -- file, link, video, web
     title           VARCHAR(255) NOT NULL,
     source_uri      TEXT NOT NULL,       -- путь в S3/MinIO или URL

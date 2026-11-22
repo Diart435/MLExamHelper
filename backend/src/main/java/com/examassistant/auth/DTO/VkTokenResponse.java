@@ -1,12 +1,20 @@
 package com.examassistant.auth.DTO;
 
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
+@NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class VkTokenResponse {
-    private String accessToken;
-    private String refreshToken;
-    private String idToken;
+    @JsonProperty("access_token")  private String accessToken;
+    @JsonProperty("refresh_token") private String refreshToken;
+    @JsonProperty("id_token")      private String idToken;
+    @JsonProperty("token_type")    private String tokenType;
+    @JsonProperty("expires_in")    private Long   expiresIn;
+    @JsonProperty("user_id")       private Long   userId;
+    @JsonProperty("scope")         private String scope;
+    @JsonProperty("state")         private String state;
 }

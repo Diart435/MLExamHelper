@@ -79,13 +79,6 @@ const materialsApi = {
     const res = await apiClient.put<MaterialResponse>(`/materials/change/${id}`, { title });
     return res.data;
   },
-  move: async (materialIds: string[], targetCourseId: string): Promise<MaterialResponse[]> => {
-    const res = await apiClient.post<MaterialResponse[]>('/materials/move', {
-      materialIds,
-      targetCourseId,
-    });
-    return res.data;
-  },
 };
 
 /* ===================== ХЕЛПЕРЫ ===================== */
@@ -241,14 +234,10 @@ const MaterialsPage = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [moveOpen, setMoveOpen] = useState(false);
-  const [moveTargetCourseId, setMoveTargetCourseId] = useState('');
-  const [moving, setMoving] = useState(false);
-  const [moveError, setMoveError] = useState<string | null>(null);
-
   /* ---------- выбор курса (общий режим /materials) ---------- */
 
   useEffect(() => {
+    if (isCourseMode) return;
     let cancelled = false;
     setCoursesLoading(true);
     coursesApi
@@ -267,7 +256,7 @@ const MaterialsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isCourseMode]);
 
   const selectedCourse = useMemo(
     () => courseOptions.find((course) => course.courseId === selectedCourseId) ?? null,
@@ -603,38 +592,6 @@ const MaterialsPage = () => {
     }
   };
 
-  const openMoveModal = () => {
-    if (selected.size === 0) return;
-    setMoveTargetCourseId('');
-    setMoveError(null);
-    setMoveOpen(true);
-  };
-
-  const closeMoveModal = () => {
-    if (moving) return;
-    setMoveOpen(false);
-    setMoveError(null);
-  };
-
-  const handleMoveSelected = async () => {
-    if (!moveTargetCourseId || selected.size === 0 || moving) return;
-
-    setMoving(true);
-    setMoveError(null);
-    try {
-      await materialsApi.move([...selected], moveTargetCourseId);
-      setMoveOpen(false);
-      setMoveTargetCourseId('');
-      setSelected(new Set());
-      setUploadNotice('Материалы перенесены.');
-      reload(true);
-    } catch (err) {
-      setMoveError(getErrorMessage(err, 'Не удалось перенести материалы'));
-    } finally {
-      setMoving(false);
-    }
-  };
-
   const resetFilters = () => {
     setQuery('');
     setTypeFilter('ALL');
@@ -881,8 +838,10 @@ const MaterialsPage = () => {
                   type="button"
                   className="materials-toolbar__action"
                   disabled={selected.size === 0}
-                  title="Перенести выбранные материалы"
-                  onClick={openMoveModal}
+                  title="Перенести выбранные материалы (заглушка)"
+                  onClick={() => {
+                    // Заглушка: реальный перенос материалов — ответственность другого участника/задачи.
+                  }}
                 >
                   Перенести
                 </button>
@@ -1088,63 +1047,6 @@ const MaterialsPage = () => {
           </div>
         </section>
       </div>
-
-      {moveOpen && (
-        <div className="materials-modal-overlay" onClick={closeMoveModal} role="presentation">
-          <div
-            className="materials-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Перенос материалов"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 className="materials-modal__title">Перенести материалы</h2>
-            <p className="materials-modal__text">
-              Выбрано материалов: {selected.size}. Выберите курс, в который нужно перенести выбранные материалы.
-            </p>
-
-            <label className="materials-modal__field">
-              <span className="materials-modal__label">Целевой курс</span>
-              <select
-                className="materials-modal__select"
-                value={moveTargetCourseId}
-                onChange={(event) => setMoveTargetCourseId(event.target.value)}
-                disabled={moving || coursesLoading}
-              >
-                <option value="">Выберите курс</option>
-                {courseOptions
-                  .filter((course) => course.courseId !== effectiveCourseId)
-                  .map((course) => (
-                    <option key={course.courseId} value={course.courseId}>
-                      {course.title}
-                    </option>
-                  ))}
-              </select>
-            </label>
-
-            {moveError && <div className="materials-modal__error" role="status">{moveError}</div>}
-
-            <div className="materials-modal__actions">
-              <button
-                type="button"
-                className="materials-btn materials-btn--outline"
-                onClick={closeMoveModal}
-                disabled={moving}
-              >
-                Отмена
-              </button>
-              <button
-                type="button"
-                className="materials-btn materials-btn--primary"
-                onClick={() => void handleMoveSelected()}
-                disabled={!moveTargetCourseId || moving}
-              >
-                {moving ? 'Перенос…' : 'Перенести'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
