@@ -7,7 +7,7 @@ import {
   type ChangeEvent,
   type DragEvent,
 } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import apiClient from '../api/client';
 import { coursesApi, type CourseDto } from '../api/courses';
 import './MaterialsPage.css';
@@ -44,13 +44,19 @@ interface MaterialPage {
 
 const PAGE_SIZE = 6;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const ALL_COURSES = ''; // пустая строка = «Все курсы»
 
 /* ===================== API МАТЕРИАЛОВ ===================== */
 
 const materialsApi = {
-  getByCourse: async (courseId: string, page = 0, size = PAGE_SIZE): Promise<MaterialPage> => {
+  /** courseId не передан → материалы по всем курсам */
+  getPage: async (
+    courseId?: string,
+    page = 0,
+    size = PAGE_SIZE,
+  ): Promise<MaterialPage> => {
     const params = new URLSearchParams();
-    params.set('courseId', courseId);
+    if (courseId) params.set('courseId', courseId); // ← ключевое изменение
     params.set('page', String(page));
     params.set('size', String(size));
     params.set('sort', 'createdAt,desc');
@@ -200,10 +206,22 @@ const EmptyIcon = () => (
 /* ===================== СТРАНИЦА ===================== */
 
 const MaterialsPage = () => {
-  const { courseId } = useParams<{ courseId: string }>();
+const { courseId } = useParams<{ courseId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isCourseMode = Boolean(courseId);
 
-  const [selectedCourseId, setSelectedCourseId] = useState('');
+  const selectedCourseId = searchParams.get('courseId') ?? ALL_COURSES;
+
+  const selectCourse = useCallback(
+    (id: string) => {
+      const next = new URLSearchParams(searchParams);
+      if (id) next.set('courseId', id);
+      else next.delete('courseId');
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
   const [courseOptions, setCourseOptions] = useState<CourseDto[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [coursePickerOpen, setCoursePickerOpen] = useState(false);
@@ -234,10 +252,9 @@ const MaterialsPage = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  /* ---------- выбор курса (общий режим /materials) ---------- */
+  /* ---------- список курсов (нужен и для пикера, и для колонки «Курс») ---------- */
 
   useEffect(() => {
-    if (isCourseMode) return;
     let cancelled = false;
     setCoursesLoading(true);
     coursesApi
@@ -256,11 +273,22 @@ const MaterialsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [isCourseMode]);
+  }, []);
+
+  const courseTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    courseOptions.forEach((course) => map.set(course.courseId, course.title));
+    return map;
+  }, [courseOptions]);
 
   const selectedCourse = useMemo(
     () => courseOptions.find((course) => course.courseId === selectedCourseId) ?? null,
     [courseOptions, selectedCourseId],
+  );
+
+  const currentCourseTitle = useMemo(
+    () => (courseId ? courseTitleById.get(courseId) ?? null : null),
+    [courseId, courseTitleById],
   );
 
   useEffect(() => {
@@ -295,32 +323,26 @@ const MaterialsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!effectiveCourseId) {
-      setMaterials([]);
-      setTotalElements(0);
-      setTotalPages(0);
-      setListError(null);
-      setLoading(false);
-      setSelected(new Set());
-      return;
-    }
-
+    // Больше НЕ выходим при отсутствии курса: пустой courseId = все материалы
     let cancelled = false;
     setLoading(true);
 
     const fetchPage = async () => {
       try {
-        const data = await materialsApi.getByCourse(effectiveCourseId, page, PAGE_SIZE);
+        const data = await materialsApi.getPage(
+          effectiveCourseId || undefined,
+          page,
+          PAGE_SIZE,
+        );
         if (cancelled) return;
 
-        setMaterials(data.content);
-        setTotalElements(data.totalElements);
-        setTotalPages(data.totalPages);
+        setMaterials(data.content ?? []);
+        setTotalElements(data.totalElements ?? 0);
+        setTotalPages(data.totalPages ?? 0);
         setListError(null);
 
-        // Убираем из выбранных материалы, которых больше нет в списке
         setSelected((prev) => {
-          const ids = new Set(data.content.map((material) => material.materialId));
+          const ids = new Set((data.content ?? []).map((material) => material.materialId));
           const next = new Set([...prev].filter((id) => ids.has(id)));
           return next.size === prev.size ? prev : next;
         });
@@ -338,7 +360,6 @@ const MaterialsPage = () => {
     };
   }, [effectiveCourseId, page, reloadKey]);
 
-  // Пока есть материалы в обработке — тихо обновляем список
   const hasProcessing = materials.some(
     (material) => normalizeStatus(material.statusMaterial) === 'PROCESSING',
   );
@@ -601,7 +622,8 @@ const MaterialsPage = () => {
 
   /* ---------- рендер ---------- */
 
-  const hasCourse = Boolean(effectiveCourseId);
+  const canUpload = Boolean(effectiveCourseId);
+  const showCourseColumn = !isCourseMode;
 
   return (
     <div className="materials-page">
@@ -614,12 +636,12 @@ const MaterialsPage = () => {
 
           <div className="materials-panel materials-panel--upload">
             <div
-              className={`upload-zone${dragActive ? ' is-dragging' : ''}${!hasCourse ? ' is-disabled' : ''}`}
-              onClick={hasCourse ? onPickClick : undefined}
-              onDragEnter={hasCourse ? handleDragOver : undefined}
-              onDragOver={hasCourse ? handleDragOver : undefined}
-              onDragLeave={hasCourse ? handleDragLeave : undefined}
-              onDrop={hasCourse ? handleDrop : undefined}
+              className={`upload-zone${dragActive ? ' is-dragging' : ''}${!canUpload ? ' is-disabled' : ''}`}
+              onClick={canUpload ? onPickClick : undefined}
+              onDragEnter={canUpload ? handleDragOver : undefined}
+              onDragOver={canUpload ? handleDragOver : undefined}
+              onDragLeave={canUpload ? handleDragLeave : undefined}
+              onDrop={canUpload ? handleDrop : undefined}
             >
               <input
                 ref={fileInputRef}
@@ -629,7 +651,7 @@ const MaterialsPage = () => {
                 className="upload-zone__input"
                 onChange={handleFileInput}
                 tabIndex={-1}
-                disabled={!hasCourse}
+                disabled={!canUpload}
               />
 
               <span className="upload-zone__icon">
@@ -637,9 +659,9 @@ const MaterialsPage = () => {
               </span>
               <h2 className="upload-zone__title">Загрузите материалы</h2>
               <p className="upload-zone__hint">
-                {hasCourse
+                {canUpload
                   ? 'Перетащите файлы сюда или выберите на устройстве'
-                  : 'Сначала выберите курс, чтобы загрузить материалы'}
+                  : 'Выберите курс в фильтре ниже, чтобы загрузить материалы'}
               </p>
               <p className="upload-zone__formats">PDF или DOCX · до 50 МБ</p>
 
@@ -669,7 +691,7 @@ const MaterialsPage = () => {
                   type="button"
                   className="materials-btn materials-btn--outline"
                   onClick={onPickClick}
-                  disabled={uploading || !hasCourse}
+                  disabled={uploading || !canUpload}
                 >
                   Выберите файлы
                 </button>
@@ -702,7 +724,7 @@ const MaterialsPage = () => {
         {/* ---------- ПАНЕЛЬ МАТЕРИАЛОВ ---------- */}
         <section className="materials-block">
           <div className="materials-tab">
-            Материалы
+            {isCourseMode ? 'Материалы курса' : 'Мои материалы'}
             <span className="materials-tab__count">{totalElements}</span>
           </div>
 
@@ -780,16 +802,11 @@ const MaterialsPage = () => {
               <span className="materials-toolbar__selected-count">Выбрано: {selected.size}</span>
 
               {isCourseMode ? (
-                /*
-                  Область ответственности другого участника (переход/контекст курса из карточки курса).
-                  Текущее видение: здесь можно показывать фиксированное поле текущего курса
-                  (read-only), например название курса из URL-контекста, без возможности смены.
-                  Пример:
-                  <div className="materials-course-field is-readonly" title={courseTitle}>
-                    <span className="materials-course-field__label">{courseTitle || 'Текущий курс'}</span>
-                  </div>
-                */
-                <div className="materials-course-field materials-course-field--empty" aria-hidden="true" />
+                <div className="materials-course-field is-readonly" title={currentCourseTitle ?? ''}>
+                  <span className="materials-course-field__label">
+                    {currentCourseTitle ?? 'Текущий курс'}
+                  </span>
+                </div>
               ) : (
                 <div className="materials-course-picker" ref={coursePickerRef}>
                   <button
@@ -800,13 +817,27 @@ const MaterialsPage = () => {
                     aria-expanded={coursePickerOpen}
                   >
                     <span className="materials-course-field__label">
-                      {selectedCourse?.title ?? 'Выберите курс'}
+                      {selectedCourse?.title ?? 'Все курсы'}
                     </span>
                     <span className="materials-course-field__chevron" aria-hidden="true">▾</span>
                   </button>
 
                   {coursePickerOpen && (
                     <div className="materials-course-picker__menu" role="listbox" aria-label="Выбор курса">
+                      {/* Пункт «Все курсы» — всегда доступен */}
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={selectedCourseId === ALL_COURSES}
+                          className={`materials-course-picker__option${selectedCourseId === ALL_COURSES ? ' is-selected' : ''}`}
+                          onClick={() => {
+                            selectCourse(ALL_COURSES);
+                            setCoursePickerOpen(false);
+                          }}
+                        >
+                          Все курсы
+                        </button>
+
                       {coursesLoading ? (
                         <div className="materials-course-picker__empty">Загрузка курсов…</div>
                       ) : courseOptions.length === 0 ? (
@@ -820,7 +851,7 @@ const MaterialsPage = () => {
                             aria-selected={selectedCourseId === course.courseId}
                             className={`materials-course-picker__option${selectedCourseId === course.courseId ? ' is-selected' : ''}`}
                             onClick={() => {
-                              setSelectedCourseId(course.courseId);
+                              selectCourse(course.courseId);
                               setCoursePickerOpen(false);
                             }}
                           >
@@ -874,14 +905,6 @@ const MaterialsPage = () => {
                     Повторить
                   </button>
                 </div>
-              ) : !hasCourse ? (
-                <div className="materials-state">
-                  <span className="materials-state__icon">
-                    <EmptyIcon />
-                  </span>
-                  <p>Выберите курс</p>
-                  <span>Выберите курс в области выше, чтобы просмотреть его материалы.</span>
-                </div>
               ) : visibleMaterials.length === 0 ? (
                 <div className="materials-state">
                   <span className="materials-state__icon">
@@ -890,7 +913,9 @@ const MaterialsPage = () => {
                   <p>{materials.length === 0 ? 'Материалов пока нет' : 'Ничего не найдено'}</p>
                   <span>
                     {materials.length === 0
-                      ? 'Загрузите первый PDF или DOCX — он появится в этом списке.'
+                      ? canUpload
+                        ? 'Загрузите первый PDF или DOCX — он появится в этом списке.'
+                        : 'Выберите курс в фильтре выше и загрузите первый материал.'
                       : 'Попробуйте изменить поисковый запрос или сбросить фильтры.'}
                   </span>
                 </div>
@@ -907,6 +932,7 @@ const MaterialsPage = () => {
                         />
                       </th>
                       <th>Название</th>
+                      {showCourseColumn && <th className="col-course">Курс</th>}
                       <th className="col-type">Тип</th>
                       <th className="col-size">Размер</th>
                       <th className="col-date">Дата загрузки</th>
@@ -919,6 +945,7 @@ const MaterialsPage = () => {
                       const status = normalizeStatus(material.statusMaterial);
                       const meta = STATUS_META[status];
                       const isBusy = busyId === material.materialId;
+                      const courseTitle = courseTitleById.get(material.courseId);
 
                       return (
                         <tr
@@ -949,6 +976,14 @@ const MaterialsPage = () => {
                               </button>
                             </div>
                           </td>
+
+                          {showCourseColumn && (
+                            <td className="col-course">
+                              <span className="material-course-pill" title={courseTitle ?? ''}>
+                                {courseTitle ?? '—'}
+                              </span>
+                            </td>
+                          )}
 
                           <td className="col-type">
                             <span className="material-type-pill">{material.typeMaterial}</span>

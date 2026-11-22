@@ -1168,3 +1168,29 @@
     justify-content: flex-start;
   }
 }
+
+.materials-table .col-course {
+  width: 160px;
+  max-width: 180px;
+}
+
+.material-course-pill {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: #f3ecff;
+  color: #6b3fc4;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Read-only поле текущего курса */
+.materials-course-field.is-readonly {
+  cursor: default;
+  background: #f7f7f8;
+  color: #413838;
+}
