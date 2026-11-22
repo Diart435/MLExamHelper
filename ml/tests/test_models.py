@@ -12,10 +12,14 @@
     нормализуется в плоский список критериев — единственное исключение;
   - `answer_key=None` — «эталона нет», а не ошибка;
   - лишние поля в `AnswerKey` игнорируются (обратная совместимость с новым
-    backend'ом), но неверный тип ИЗВЕСТНОГО поля — ошибка.
+    backend'ом), но неверный тип ИЗВЕСТНОГО поля — ошибка;
+  - `question_id` из Postgres приходит объектом `UUID` → приводится к строке
+    (домен ждёт строку, а Pydantic не сужает `UUID` → `str` сам).
 """
 
 from __future__ import annotations
+
+import uuid
 
 import pytest
 from pydantic import ValidationError
@@ -121,3 +125,22 @@ class TestOptions:
     def test_string_instead_of_list_is_rejected(self):
         with pytest.raises(ValidationError):
             _row(options="A, B")
+
+
+# ---------------------------------------------------------------------------
+# question_id
+# ---------------------------------------------------------------------------
+
+class TestQuestionId:
+    def test_uuid_object_becomes_string(self):
+        """Колонка uuid отдаётся asyncpg объектом UUID — домен ждёт строку.
+
+        Без этого вся проверка попытки падала с ValidationError.
+        """
+        qid = uuid.uuid4()
+        row = _row(question_id=qid)
+        assert row.question_id == str(qid)
+        assert isinstance(row.question_id, str)
+
+    def test_string_stays_string(self):
+        assert _row(question_id="q1").question_id == "q1"

@@ -14,6 +14,7 @@ legacy-форма `key_points` (объект `{points, explanation, criteria}`),
 """
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -89,6 +90,16 @@ class QuestionRow(BaseModel):
     options: list[str] = Field(default_factory=list)
     key_points: list[str] = Field(default_factory=list)
     answer_key: AnswerKey = Field(default_factory=AnswerKey)
+
+    @field_validator("question_id", mode="before")
+    @classmethod
+    def _uuid_to_str(cls, v: Any) -> Any:
+        """Колонка uuid приходит из Postgres объектом UUID — домен ждёт строку.
+
+        Pydantic не сужает `UUID` → `str` сам, а вопросы приходят из БД
+        именно как UUID.
+        """
+        return str(v) if isinstance(v, uuid.UUID) else v
 
     @field_validator("key_points", mode="before")
     @classmethod

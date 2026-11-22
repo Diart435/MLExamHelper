@@ -3,6 +3,7 @@ import json
 import re
 from typing import Any, Awaitable, Callable
 
+from openai import APIStatusError
 from openai import AsyncOpenAI
 from openai import BadRequestError
 from loguru import logger
@@ -29,6 +30,13 @@ MAX_TOKENS = 1024
 # ответ обрывался по finish_reason=length, и content приходил пустым (null),
 # то есть задача падала без внятной причины.
 MAX_TOKENS_JSON = 16384
+
+# Бюджет для маленьких JSON-ответов (судьи: {score, feedback}, {correct_indexes, explanation}).
+# Отдельный от MAX_TOKENS_JSON по измерению: OpenRouter для free-моделей сверяет
+# запрошенный max_tokens с остатком кредита на запрос — при max_tokens=16384
+# приходил HTTP 402 («can only afford 4415»), а 1024 проходит. Генератору тестов
+# нужен большой бюджет, судье — маленький.
+MAX_TOKENS_SMALL_JSON = 1024
 
 # Ретрай. Free-модели OpenRouter периодически отвечают пустым content или
 # choices=None (rate-limit, перегрев провайдера и т.п.) — это транзиентно,
@@ -60,6 +68,15 @@ class _UnsupportedResponseFormat(RuntimeError):
 
     Не транзиентно: повторять тот же формат бессмысленно — надо ослабить
     требования (json_schema → json_object → свободный текст).
+    """
+
+
+class _LLMCreditError(RuntimeError):
+    """Провайдер вернул HTTP 402 (Payment Required) — не хватило кредита.
+
+    Не транзиентно: тот же запрос повторять бессмысленно, кредит сам не
+    появится. Раньше 402 уезжал в _TransientLLMError, цикл ретраил его
+    три раза и писал в лог «transient» — а это не сетевой сбой.
     """
 
 
@@ -108,6 +125,7 @@ class LLMClient:
         system_prompt: str | None = None,
         max_retries: int = 3,
         schema: dict[str, Any] | None = None,
+        max_tokens: int | None = None,
     ) -> Any:
         """JSON-вызов LLM: парсит ответ, прогоняет через `validator(data)`.
 
@@ -123,8 +141,15 @@ class LLMClient:
             ("верни ТОЛЬКО валидный JSON, без пояснений").
           - Возвращает результат `validator(data)`.
 
+        `max_tokens` — бюджет ответа. None → дефолт по формату (MAX_TOKENS_JSON
+        для json). Маленькие ответы (судьи) стоит просить явно: OpenRouter
+        сверяет запрошенный max_tokens с остатком кредита, и большой бюджет
+        упирается в HTTP 402.
+
         Raises:
             RuntimeError: после исчерпания попыток (parse/validate/transient).
+            _LLMCreditError: провайдер вернул 402 — ретраить бессмысленно,
+                исключение вылетает сразу.
         """
         last_err: Exception | None = None
         fmt = "json_schema" if schema is not None else "json_object"
@@ -137,7 +162,9 @@ class LLMClient:
                 )
 
             try:
-                content = await self._chat_once_raw(sys_prompt, user_message, fmt=fmt, schema=schema)
+                content = await self._chat_once_raw(
+                    sys_prompt, user_message, fmt=fmt, schema=schema, max_tokens=max_tokens
+                )
             except _UnsupportedResponseFormat as e:
                 logger.info(f"chat_json: формат {fmt} не поддержан ({e}), ослабляем требования")
                 fmt = _FORMAT_DEGRADE.get(fmt, "plain")
@@ -186,15 +213,23 @@ class LLMClient:
         *,
         fmt: str = "plain",
         schema: dict[str, Any] | None = None,
+        max_tokens: int | None = None,
     ) -> str:
         """Один сырой вызов.
 
         fmt: "plain" — свободный текст; "json_object" — любой JSON-объект;
         "json_schema" — JSON, соответствующий `schema` (constrained decoding).
 
+        max_tokens: None → дефолт по формату (MAX_TOKENS для plain,
+        MAX_TOKENS_JSON для json). Явно заданное значение важно для судьей:
+        OpenRouter сверяет max_tokens с остатком кредита и на большом бюджете
+        отдаёт 402.
+
         Бросает _UnsupportedResponseFormat, если провайдер отверг формат ответа,
-        и _TransientLLMError на остальных сбоях.
+        _LLMCreditError на 402 и _TransientLLMError на остальных сбоях.
         """
+        if max_tokens is None:
+            max_tokens = MAX_TOKENS if fmt == "plain" else MAX_TOKENS_JSON
         kwargs: dict[str, Any] = dict(
             model=self._model,
             messages=[
@@ -202,7 +237,7 @@ class LLMClient:
                 {"role": "user", "content": user_message},
             ],
             temperature=0.2,
-            max_tokens=MAX_TOKENS if fmt == "plain" else MAX_TOKENS_JSON,
+            max_tokens=max_tokens,
         )
         if fmt == "json_schema" and schema is not None:
             kwargs["response_format"] = {
@@ -217,7 +252,16 @@ class LLMClient:
         except BadRequestError as e:
             # 400 — провайдер не понял запрос. Чаще всего это неподдерживаемый
             # формат ответа, а не «неверный ключ»: разбираемся пониже уровнем.
+            # Важно: BadRequestError — подкласс APIStatusError, поэтому эта
+            # ветка должна стоять ПЕРЕД общей веткой APIStatusError.
             raise _UnsupportedResponseFormat(f"{type(e).__name__}: {e}") from e
+        except APIStatusError as e:
+            # 402 — не хватило кредита (в openai SDK нет PaymentRequiredError,
+            # поэтому сверяем status_code). Это не сетевой сбой: повторять
+            # тот же запрос бессмысленно, ретрай-цикл его не ловит.
+            if getattr(e, "status_code", None) == 402:
+                raise _LLMCreditError(f"{type(e).__name__}: {e}") from e
+            raise _TransientLLMError(f"{type(e).__name__}: {e}") from e
         except Exception as e:
             raise _TransientLLMError(f"{type(e).__name__}: {e}") from e
 

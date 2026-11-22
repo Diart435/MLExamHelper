@@ -41,8 +41,11 @@ class FakeLLM:
         self.error = error
         self.calls: list[dict] = []
 
-    async def chat_json(self, user_message, *, validator, system_prompt=None, max_retries=3, schema=None):
-        self.calls.append({"user": user_message, "system": system_prompt, "schema": schema})
+    async def chat_json(self, user_message, *, validator, system_prompt=None, max_retries=3, schema=None, max_tokens=None):
+        self.calls.append({
+            "user": user_message, "system": system_prompt, "schema": schema,
+            "max_tokens": max_tokens,
+        })
         if self.error:
             raise self.error
         return validator(self.verdict or {})

@@ -459,8 +459,11 @@ def _make_fake_llm(responses: list[str]) -> LLMClient:
     iter_resp = iter(responses)
     llm.calls = []  # type: ignore[attr-defined]
 
-    async def fake_chat_json(user_message, *, validator, system_prompt=None, max_retries=3, schema=None):
-        llm.calls.append({"user": user_message, "system": system_prompt, "schema": schema})
+    async def fake_chat_json(user_message, *, validator, system_prompt=None, max_retries=3, schema=None, max_tokens=None):
+        llm.calls.append({
+            "user": user_message, "system": system_prompt, "schema": schema,
+            "max_tokens": max_tokens,
+        })
         try:
             content = next(iter_resp)
         except StopIteration:

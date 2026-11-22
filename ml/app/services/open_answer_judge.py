@@ -22,7 +22,7 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from app.services.llm import LLMClient
+from app.services.llm import MAX_TOKENS_SMALL_JSON, LLMClient
 
 
 SYSTEM_PROMPT = """\
@@ -151,6 +151,9 @@ class OpenAnswerJudge:
                 system_prompt=SYSTEM_PROMPT,
                 max_retries=2,
                 schema=VERDICT_SCHEMA,
+                # Ответ судьи — 100–200 токенов: большой max_tokens упирается
+                # в кредитный лимит OpenRouter (HTTP 402) на free-моделях.
+                max_tokens=MAX_TOKENS_SMALL_JSON,
             )
         except Exception as e:
             logger.warning(f"OpenAnswerJudge: LLM failed ({type(e).__name__}: {e}) → score=0.0")
