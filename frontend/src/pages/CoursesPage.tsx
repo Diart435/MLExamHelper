@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent, type MouseEvent } from 'react'; 
 import './CoursesPage.css';
+import { useNavigate } from 'react-router-dom';
 
 /* ===================== ИМПОРТЫ ИЗ ТВОИХ API ===================== */
-// Убедись, что deleteCourse экспортируется из '../api/courses'
 import { 
   coursesApi, 
   type CourseUI, 
@@ -57,31 +57,32 @@ interface MaterialPage {
 
 type SortOption = 'newest' | 'progress';
 
-/* ===================== API МАТЕРИАЛОВ (inline, по Swagger) ===================== */
+/* ===================== API МАТЕРИАЛОВ ===================== */
+/* ВАЖНО: baseURL в client.ts уже равен '/api',
+   поэтому здесь пути пишутся БЕЗ префикса /api */
 const materialsApi = {
   getByCourse: async (courseId: string, page = 0, size = 50): Promise<MaterialPage> => {
-    // ИСПРАВЛЕНО: Передаем параметры плоско, как ждет Spring Data Pageable
     const params = new URLSearchParams();
     params.set('courseId', courseId);
     params.set('page', String(page));
     params.set('size', String(size));
     params.set('sort', 'createdAt,desc');
-    
-    const res = await apiClient.get<MaterialPage>('/api/materials', { params });
+
+    const res = await apiClient.get<MaterialPage>('/materials', { params }); 
     return res.data;
   },
   upload: async (courseId: string, file: File): Promise<MaterialResponse> => {
     const form = new FormData();
     form.append('file', file);
     const res = await apiClient.post<MaterialResponse>(
-      `/api/materials/upload?courseId=${courseId}`,
+      `/materials/upload?courseId=${courseId}`, 
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
     return res.data;
   },
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/api/materials/${id}`);
+    await apiClient.delete(`/materials/${id}`); 
   },
 };
 
@@ -91,7 +92,11 @@ const mapMaterialToUI = (api: MaterialResponse): MaterialItem => {
     PDF: 'PDF', TEXT: 'Текст', LINK: 'Ссылка', DOCUMENT: 'Документ', DOCX: 'Документ',
   };
   const statusMap: Record<string, MaterialStatus> = {
-    DONE: 'done', PROCESSING: 'progress', ERROR: 'error', QUEUED: 'progress',
+    READY: 'done',  
+    DONE: 'done',
+    PROCESSING: 'progress',
+    QUEUED: 'progress',
+    ERROR: 'error',
   };
   return {
     id: api.materialId,
@@ -176,7 +181,6 @@ const CreateCourseModal = ({ isOpen, onClose, onCreate }: CreateCourseModalProps
   );
 };
 
-
 /* ===================== СТРАНИЦА КУРСА (МАТЕРИАЛЫ + ТЕСТЫ) ===================== */
 interface CourseViewProps {
   course: CourseUI;
@@ -184,11 +188,11 @@ interface CourseViewProps {
 }
 
 const CourseView = ({ course, onBack }: CourseViewProps) => {
+  const navigate = useNavigate();
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [loadingMat, setLoadingMat] = useState(true);
   const [tests] = useState<TestItem[]>([]);
 
-  // Загрузка материалов при монтировании/смене курса
   const fetchMaterials = useCallback(async () => {
     setLoadingMat(true);
     try {
@@ -206,18 +210,16 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
   return (
     <div className="course-page">
       <div className="course-columns">
-        
+
         {/* ЛЕВАЯ КОЛОНКА: МАТЕРИАЛЫ */}
         <section className="tabbed-section">
-          {/* Заголовок теперь СНАРУЖИ белого блока */}
           <h2 className="panel-title tab-header">Материалы ({materials.length})</h2>
-          
-          {/* Белый блок без верхней границы */}
+
           <div className="course-panel tabbed-panel">
-            <button 
-              className="btn-open-black" 
+            <button
+              className="btn-open-black"
               type="button"
-              onClick={() => window.location.href = `/courses/${course.id}/materials`}
+              onClick={() => navigate(`/materials?courseId=${course.id}`)}
             >
               Открыть материалы
             </button>
@@ -249,12 +251,12 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
         {/* ПРАВАЯ КОЛОНКА: ТЕСТЫ */}
         <section className="tabbed-section">
           <h2 className="panel-title tab-header">Тесты курса</h2>
-          
+
           <div className="course-panel tabbed-panel">
-            <button 
-              className="btn-open-black" 
+            <button
+              className="btn-open-black"
               type="button"
-              onClick={() => window.location.href = '/tests'}
+              onClick={() => navigate('/tests')}
             >
               Открыть тесты
             </button>
@@ -277,7 +279,7 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
           </div>
         </section>
       </div>
-      
+
       <button className="btn-back" type="button" onClick={onBack}>← Ко всем курсам</button>
     </div>
   );
@@ -303,17 +305,16 @@ const CoursesPage = () => {
     setLoading(true);
     setError(null);
     try {
-      // ИСПРАВЛЕНО: Передаем параметры плоско, как требует твой бэкенд
       const params: GetCoursesParams = {
         title: searchQuery || undefined,
         page: currentPage,
         size: pageSize,
         sort: sortBy === 'newest' ? 'createdAt,desc' : 'title,asc',
       };
-      
+
       const pageResponse = await coursesApi.getAll(params);
       const uiCourses = pageResponse.content.map((dto) => mapCourseDtoToUI(dto));
-      
+
       setCourses(uiCourses);
       setTotalPages(pageResponse.totalPages);
     } catch (err: any) {
@@ -332,19 +333,18 @@ const CoursesPage = () => {
   const handleCreateCourse = async (data: { name: string; description: string }) => {
     try {
       await coursesApi.create({ title: data.name, courseDescription: data.description });
-      await fetchCourses(); // Перезагружаем список, чтобы получить реальный UUID
+      await fetchCourses();
     } catch (err: any) {
       console.error('Ошибка создания курса:', err);
       throw new Error(err.response?.data?.message || 'Не удалось создать курс');
     }
   };
 
-  const handleDeleteCourse = async (courseId: string, e: React.MouseEvent) => {
+  const handleDeleteCourse = async (courseId: string, e: MouseEvent) => {
     e.stopPropagation();
     if (!window.confirm('Удалить курс безвозвратно?')) return;
     try {
-      // Убедись, что в src/api/courses.ts есть export const deleteCourse
-      await coursesApi.delete(courseId); 
+      await coursesApi.delete(courseId);
       setCourses((prev) => prev.filter((c) => c.id !== courseId));
       if (courses.length === 1 && currentPage > 0) {
         setCurrentPage((p) => p - 1);
