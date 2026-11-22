@@ -46,23 +46,97 @@ const PAGE_SIZE = 6;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALL_COURSES = ''; // пустая строка = «Все курсы»
 
+/* ===================== АГРЕГАЦИЯ «ВСЕ КУРСЫ» ===================== */
+/* ← ДОБАВЛЕНО: бэкенд требует courseId, поэтому для режима «Все курсы»
+   собираем материалы по каждому курсу на клиенте и кэшируем результат. */
+
+let allMaterialsCache: { items: MaterialResponse[]; ts: number } | null = null;
+const ALL_CACHE_TTL = 15_000;
+
+const invalidateAllMaterialsCache = () => {
+  allMaterialsCache = null;
+};
+
+const fetchAllMaterials = async (): Promise<MaterialResponse[]> => {
+  if (allMaterialsCache && Date.now() - allMaterialsCache.ts < ALL_CACHE_TTL) {
+    return allMaterialsCache.items;
+  }
+
+  const coursesRes = await coursesApi.getAll({ size: 100 });
+  const courses = coursesRes.content ?? [];
+
+  const chunks = await Promise.all(
+    courses.map(async (course) => {
+      const acc: MaterialResponse[] = [];
+      try {
+        let p = 0;
+        // тянем все страницы курса, чтобы не потерять материалы сверх лимита
+        while (p < 50) {
+          const res = await apiClient.get<MaterialPage>('/materials', {
+            params: {
+              courseId: course.courseId,
+              page: p,
+              size: 100,
+              sort: 'createdAt,desc',
+            },
+          });
+          const data = res.data;
+          const batch = data.content ?? [];
+          acc.push(...batch);
+          if (data.last || batch.length === 0) break;
+          p += 1;
+        }
+      } catch {
+        // один недоступный курс не должен ломать весь список
+      }
+      return acc;
+    }),
+  );
+
+  const items = chunks.flat().sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  allMaterialsCache = { items, ts: Date.now() };
+  return items;
+};
+
 /* ===================== API МАТЕРИАЛОВ ===================== */
 
 const materialsApi = {
-  /** courseId не передан → материалы по всем курсам */
+  /** courseId передан → серверный запрос; не передан → агрегируем на клиенте */
   getPage: async (
     courseId?: string,
     page = 0,
     size = PAGE_SIZE,
   ): Promise<MaterialPage> => {
-    const params = new URLSearchParams();
-    if (courseId) params.set('courseId', courseId); // ← ключевое изменение
-    params.set('page', String(page));
-    params.set('size', String(size));
-    params.set('sort', 'createdAt,desc');
+    if (courseId) {
+      const params = new URLSearchParams();
+      params.set('courseId', courseId);
+      params.set('page', String(page));
+      params.set('size', String(size));
+      params.set('sort', 'createdAt,desc');
 
-    const res = await apiClient.get<MaterialPage>('/materials', { params });
-    return res.data;
+      const res = await apiClient.get<MaterialPage>('/materials', { params });
+      return res.data;
+    }
+
+    // ← ДОБАВЛЕНО: режим «Все курсы»
+    const all = await fetchAllMaterials();
+    const start = page * size;
+    const slice = all.slice(start, start + size);
+    const pages = Math.ceil(all.length / size);
+
+    return {
+      content: slice,
+      totalElements: all.length,
+      totalPages: pages,
+      number: page,
+      size,
+      first: page === 0,
+      last: pages === 0 || page >= pages - 1,
+      empty: slice.length === 0,
+    };
   },
   getById: async (id: string): Promise<MaterialResponse> => {
     const res = await apiClient.get<MaterialResponse>(`/materials/${id}`);
@@ -76,13 +150,16 @@ const materialsApi = {
       form,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
+    invalidateAllMaterialsCache(); // ← ДОБАВЛЕНО
     return res.data;
   },
   remove: async (id: string): Promise<void> => {
     await apiClient.delete(`/materials/${id}`);
+    invalidateAllMaterialsCache(); // ← ДОБАВЛЕНО
   },
   rename: async (id: string, title: string): Promise<MaterialResponse> => {
     const res = await apiClient.put<MaterialResponse>(`/materials/change/${id}`, { title });
+    invalidateAllMaterialsCache(); // ← ДОБАВЛЕНО
     return res.data;
   },
 };
@@ -206,7 +283,7 @@ const EmptyIcon = () => (
 /* ===================== СТРАНИЦА ===================== */
 
 const MaterialsPage = () => {
-const { courseId } = useParams<{ courseId: string }>();
+  const { courseId } = useParams<{ courseId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const isCourseMode = Boolean(courseId);
 
@@ -319,11 +396,11 @@ const { courseId } = useParams<{ courseId: string }>();
   const reload = useCallback((silent = false) => {
     if (!silent) setLoading(true);
     setListError(null);
+    invalidateAllMaterialsCache(); // ← ДОБАВЛЕНО: после мутаций берём свежие данные
     setReloadKey((prev) => prev + 1);
   }, []);
 
   useEffect(() => {
-    // Больше НЕ выходим при отсутствии курса: пустой courseId = все материалы
     let cancelled = false;
     setLoading(true);
 
@@ -824,19 +901,18 @@ const { courseId } = useParams<{ courseId: string }>();
 
                   {coursePickerOpen && (
                     <div className="materials-course-picker__menu" role="listbox" aria-label="Выбор курса">
-                      {/* Пункт «Все курсы» — всегда доступен */}
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={selectedCourseId === ALL_COURSES}
-                          className={`materials-course-picker__option${selectedCourseId === ALL_COURSES ? ' is-selected' : ''}`}
-                          onClick={() => {
-                            selectCourse(ALL_COURSES);
-                            setCoursePickerOpen(false);
-                          }}
-                        >
-                          Все курсы
-                        </button>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={selectedCourseId === ALL_COURSES}
+                        className={`materials-course-picker__option${selectedCourseId === ALL_COURSES ? ' is-selected' : ''}`}
+                        onClick={() => {
+                          selectCourse(ALL_COURSES);
+                          setCoursePickerOpen(false);
+                        }}
+                      >
+                        Все курсы
+                      </button>
 
                       {coursesLoading ? (
                         <div className="materials-course-picker__empty">Загрузка курсов…</div>
@@ -865,17 +941,6 @@ const { courseId } = useParams<{ courseId: string }>();
               )}
 
               <div className="materials-toolbar__actions">
-                <button
-                  type="button"
-                  className="materials-toolbar__action"
-                  disabled={selected.size === 0}
-                  title="Перенести выбранные материалы (заглушка)"
-                  onClick={() => {
-                    // Заглушка: реальный перенос материалов — ответственность другого участника/задачи.
-                  }}
-                >
-                  Перенести
-                </button>
                 <button
                   type="button"
                   className="materials-toolbar__action materials-toolbar__action--danger"
