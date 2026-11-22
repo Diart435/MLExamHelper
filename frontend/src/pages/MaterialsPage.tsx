@@ -7,8 +7,9 @@ import {
   type ChangeEvent,
   type DragEvent,
 } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import apiClient from '../api/client';
+import { coursesApi, type CourseDto } from '../api/courses';
 import './MaterialsPage.css';
 
 /* ===================== ТИПЫ ===================== */
@@ -165,18 +166,6 @@ const DocIcon = () => (
   </svg>
 );
 
-const RefreshIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path
-      d="M20 12a8 8 0 11-2.34-5.66M20 4v4.5h-4.5"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
 const TrashIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path d="M4 7h16M9 7V4.5h6V7m-9 0l1 13h10l1-13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
@@ -212,13 +201,20 @@ const EmptyIcon = () => (
 
 const MaterialsPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
-  const navigate = useNavigate();
+  const isCourseMode = Boolean(courseId);
+
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [courseOptions, setCourseOptions] = useState<CourseDto[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false);
+
+  const effectiveCourseId = courseId ?? selectedCourseId;
 
   const [materials, setMaterials] = useState<MaterialResponse[]>([]);
   const [totalElements, setTotalElements] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
   const [query, setQuery] = useState('');
@@ -232,10 +228,61 @@ const MaterialsPage = () => {
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coursePickerRef = useRef<HTMLDivElement>(null);
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  /* ---------- выбор курса (общий режим /materials) ---------- */
+
+  useEffect(() => {
+    if (isCourseMode) return;
+    let cancelled = false;
+    setCoursesLoading(true);
+    coursesApi
+      .getAll({ size: 100 })
+      .then((data) => {
+        if (cancelled) return;
+        setCourseOptions(data.content ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCourseOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCoursesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCourseMode]);
+
+  const selectedCourse = useMemo(
+    () => courseOptions.find((course) => course.courseId === selectedCourseId) ?? null,
+    [courseOptions, selectedCourseId],
+  );
+
+  useEffect(() => {
+    if (!coursePickerOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!coursePickerRef.current?.contains(event.target as Node)) {
+        setCoursePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [coursePickerOpen]);
+
+  useEffect(() => {
+    setPage(0);
+    setSelected(new Set());
+    setPendingFiles([]);
+    setUploadError(null);
+    setUploadNotice(null);
+    setListError(null);
+    setCoursePickerOpen(false);
+  }, [effectiveCourseId]);
 
   /* ---------- загрузка данных ---------- */
 
@@ -248,12 +295,22 @@ const MaterialsPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!courseId) return;
+    if (!effectiveCourseId) {
+      setMaterials([]);
+      setTotalElements(0);
+      setTotalPages(0);
+      setListError(null);
+      setLoading(false);
+      setSelected(new Set());
+      return;
+    }
+
     let cancelled = false;
+    setLoading(true);
 
     const fetchPage = async () => {
       try {
-        const data = await materialsApi.getByCourse(courseId, page, PAGE_SIZE);
+        const data = await materialsApi.getByCourse(effectiveCourseId, page, PAGE_SIZE);
         if (cancelled) return;
 
         setMaterials(data.content);
@@ -279,7 +336,7 @@ const MaterialsPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [courseId, page, reloadKey]);
+  }, [effectiveCourseId, page, reloadKey]);
 
   // Пока есть материалы в обработке — тихо обновляем список
   const hasProcessing = materials.some(
@@ -354,7 +411,7 @@ const MaterialsPage = () => {
   /* ---------- загрузка файлов ---------- */
 
   const onPickClick = () => {
-    if (uploading) return;
+    if (uploading || !effectiveCourseId) return;
     fileInputRef.current?.click();
   };
 
@@ -413,7 +470,7 @@ const MaterialsPage = () => {
   };
 
   const handleUpload = async () => {
-    if (!courseId || !pendingFiles.length || uploading) return;
+    if (!effectiveCourseId || !pendingFiles.length || uploading) return;
 
     setUploading(true);
     setUploadError(null);
@@ -425,7 +482,7 @@ const MaterialsPage = () => {
 
     for (const file of files) {
       try {
-        await materialsApi.upload(courseId, file);
+        await materialsApi.upload(effectiveCourseId, file);
         uploaded += 1;
       } catch (err) {
         failed.push(`${file.name}: ${getErrorMessage(err, 'ошибка загрузки')}`);
@@ -544,22 +601,7 @@ const MaterialsPage = () => {
 
   /* ---------- рендер ---------- */
 
-  if (!courseId) {
-    return (
-      <div className="materials-page">
-        <div className="materials-page__pattern" aria-hidden="true" />
-        <div className="materials-page__content">
-          <div className="materials-state is-error">
-            <p>Курс не найден</p>
-            <span>Вернитесь к списку курсов и откройте материалы нужного курса.</span>
-            <button type="button" className="materials-state__retry" onClick={() => navigate('/courses')}>
-              Ко всем курсам
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const hasCourse = Boolean(effectiveCourseId);
 
   return (
     <div className="materials-page">
@@ -572,12 +614,12 @@ const MaterialsPage = () => {
 
           <div className="materials-panel materials-panel--upload">
             <div
-              className={`upload-zone${dragActive ? ' is-dragging' : ''}`}
-              onClick={onPickClick}
-              onDragEnter={handleDragOver}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              className={`upload-zone${dragActive ? ' is-dragging' : ''}${!hasCourse ? ' is-disabled' : ''}`}
+              onClick={hasCourse ? onPickClick : undefined}
+              onDragEnter={hasCourse ? handleDragOver : undefined}
+              onDragOver={hasCourse ? handleDragOver : undefined}
+              onDragLeave={hasCourse ? handleDragLeave : undefined}
+              onDrop={hasCourse ? handleDrop : undefined}
             >
               <input
                 ref={fileInputRef}
@@ -587,13 +629,18 @@ const MaterialsPage = () => {
                 className="upload-zone__input"
                 onChange={handleFileInput}
                 tabIndex={-1}
+                disabled={!hasCourse}
               />
 
               <span className="upload-zone__icon">
                 <UploadIcon />
               </span>
               <h2 className="upload-zone__title">Загрузите материалы</h2>
-              <p className="upload-zone__hint">Перетащите файлы сюда или выберите на устройстве</p>
+              <p className="upload-zone__hint">
+                {hasCourse
+                  ? 'Перетащите файлы сюда или выберите на устройстве'
+                  : 'Сначала выберите курс, чтобы загрузить материалы'}
+              </p>
               <p className="upload-zone__formats">PDF или DOCX · до 50 МБ</p>
 
               {pendingFiles.length > 0 && (
@@ -622,7 +669,7 @@ const MaterialsPage = () => {
                   type="button"
                   className="materials-btn materials-btn--outline"
                   onClick={onPickClick}
-                  disabled={uploading}
+                  disabled={uploading || !hasCourse}
                 >
                   Выберите файлы
                 </button>
@@ -729,42 +776,84 @@ const MaterialsPage = () => {
               </button>
             </div>
 
-            <div className="materials-toolbar">
-              <div className="materials-toolbar__search">
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Поиск по названию"
-                  aria-label="Быстрый поиск материалов"
-                />
-              </div>
+            <div className="materials-toolbar materials-toolbar--actions">
+              <span className="materials-toolbar__selected-count">Выбрано: {selected.size}</span>
 
-              <button
-                type="button"
-                className="materials-toolbar__apply"
-                onClick={() => reload()}
-                title="Обновить список"
-              >
-                <span className="materials-toolbar__apply-icon">
-                  <RefreshIcon />
-                </span>
-                Обновить
-              </button>
-
-              {selected.size > 0 && (
-                <>
-                  <span className="materials-toolbar__selected">Выбрано: {selected.size}</span>
+              {isCourseMode ? (
+                /*
+                  Область ответственности другого участника (переход/контекст курса из карточки курса).
+                  Текущее видение: здесь можно показывать фиксированное поле текущего курса
+                  (read-only), например название курса из URL-контекста, без возможности смены.
+                  Пример:
+                  <div className="materials-course-field is-readonly" title={courseTitle}>
+                    <span className="materials-course-field__label">{courseTitle || 'Текущий курс'}</span>
+                  </div>
+                */
+                <div className="materials-course-field materials-course-field--empty" aria-hidden="true" />
+              ) : (
+                <div className="materials-course-picker" ref={coursePickerRef}>
                   <button
                     type="button"
-                    className="materials-toolbar__delete"
-                    onClick={() => void handleDeleteSelected()}
-                    disabled={deleting}
+                    className={`materials-course-field${coursePickerOpen ? ' is-open' : ''}`}
+                    onClick={() => setCoursePickerOpen((prev) => !prev)}
+                    aria-haspopup="listbox"
+                    aria-expanded={coursePickerOpen}
                   >
-                    {deleting ? 'Удаление…' : 'Удалить'}
+                    <span className="materials-course-field__label">
+                      {selectedCourse?.title ?? 'Выберите курс'}
+                    </span>
+                    <span className="materials-course-field__chevron" aria-hidden="true">▾</span>
                   </button>
-                </>
+
+                  {coursePickerOpen && (
+                    <div className="materials-course-picker__menu" role="listbox" aria-label="Выбор курса">
+                      {coursesLoading ? (
+                        <div className="materials-course-picker__empty">Загрузка курсов…</div>
+                      ) : courseOptions.length === 0 ? (
+                        <div className="materials-course-picker__empty">Курсы не найдены</div>
+                      ) : (
+                        courseOptions.map((course) => (
+                          <button
+                            key={course.courseId}
+                            type="button"
+                            role="option"
+                            aria-selected={selectedCourseId === course.courseId}
+                            className={`materials-course-picker__option${selectedCourseId === course.courseId ? ' is-selected' : ''}`}
+                            onClick={() => {
+                              setSelectedCourseId(course.courseId);
+                              setCoursePickerOpen(false);
+                            }}
+                          >
+                            {course.title}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
+
+              <div className="materials-toolbar__actions">
+                <button
+                  type="button"
+                  className="materials-toolbar__action"
+                  disabled={selected.size === 0}
+                  title="Перенести выбранные материалы (заглушка)"
+                  onClick={() => {
+                    // Заглушка: реальный перенос материалов — ответственность другого участника/задачи.
+                  }}
+                >
+                  Перенести
+                </button>
+                <button
+                  type="button"
+                  className="materials-toolbar__action materials-toolbar__action--danger"
+                  disabled={selected.size === 0 || deleting}
+                  onClick={() => void handleDeleteSelected()}
+                >
+                  {deleting ? 'Удаление…' : 'Удалить'}
+                </button>
+              </div>
             </div>
 
             <div className="materials-table-wrap">
@@ -784,6 +873,14 @@ const MaterialsPage = () => {
                   >
                     Повторить
                   </button>
+                </div>
+              ) : !hasCourse ? (
+                <div className="materials-state">
+                  <span className="materials-state__icon">
+                    <EmptyIcon />
+                  </span>
+                  <p>Выберите курс</p>
+                  <span>Выберите курс в области выше, чтобы просмотреть его материалы.</span>
                 </div>
               ) : visibleMaterials.length === 0 ? (
                 <div className="materials-state">

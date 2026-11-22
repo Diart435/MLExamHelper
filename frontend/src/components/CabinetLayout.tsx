@@ -47,17 +47,21 @@ const CabinetLayout = () => {
   const isTestsPage = location.pathname === '/tests';
   const isCreateTestPage = location.pathname.includes('/tests/create');
   const materialsMatch = location.pathname.match(/^\/courses\/([^/]+)\/materials\/?$/);
-  const isMaterialsPage = Boolean(materialsMatch);
+  const isMaterialsRoute = location.pathname === '/materials' || location.pathname === '/materials/';
+  const isMaterialsPage = Boolean(materialsMatch) || isMaterialsRoute;
   const materialsCourseId = materialsMatch?.[1];
 
   useEffect(() => {
-    const id = isCreateTestPage ? courseId : isMaterialsPage ? materialsCourseId : undefined;
-    if (!id) return;
+    const id = isCreateTestPage ? courseId : materialsCourseId;
+    if (!id) {
+      setCourseTitle('');
+      return;
+    }
     coursesApi
       .getById(id)
       .then((course) => setCourseTitle(course.title))
       .catch(() => setCourseTitle(''));
-  }, [isCreateTestPage, isMaterialsPage, materialsCourseId, courseId]);
+  }, [isCreateTestPage, materialsCourseId, courseId]);
 
   return (
     <div className="menu-page">
@@ -100,7 +104,7 @@ const CabinetLayout = () => {
             Курсы
           </NavLink>
           <NavLink
-            to="/menu"
+            to="/materials"
             className={({ isActive }) =>
               `menu-item item-materials v15_944${isActive ? ' menu-item-active' : ''}`
             }
@@ -176,7 +180,9 @@ const CabinetLayout = () => {
           <div className="courses-header-box">
             <h1 className="courses-title">Материалы</h1>
             <p className="courses-subtitle">
-              {courseTitle ? `Курс «${courseTitle}»` : 'Учебные материалы курса'}
+              {materialsCourseId
+                ? (courseTitle ? `Курс «${courseTitle}»` : 'Учебные материалы курса')
+                : 'Все материалы'}
             </p>
           </div>
         )}
