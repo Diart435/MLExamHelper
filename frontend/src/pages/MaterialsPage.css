@@ -1168,3 +1168,119 @@
     justify-content: flex-start;
   }
 }
+
+/* ===================== МОДАЛКА ПЕРЕНОСА ===================== */
+
+.materials-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(40, 40, 40, 0.35);
+}
+
+.materials-modal {
+  width: min(560px, 100%);
+  padding: 28px;
+  border: 3px solid var(--materials-border);
+  border-radius: 19.5px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(40, 40, 40, 0.18);
+}
+
+.materials-modal__title {
+  margin: 0 0 10px;
+  font-family: 'BrokenLed', 'Poppins', sans-serif;
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.1;
+  color: #000;
+}
+
+.materials-modal__text {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #3c3c3c;
+}
+
+.materials-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.materials-modal__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--materials-muted);
+}
+
+.materials-modal__select {
+  width: 100%;
+  height: 48px;
+  padding: 0 44px 0 16px;
+  border: 3px solid var(--materials-purple);
+  border-radius: 14.5px;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 10'%3E%3Cpath d='M1 1l7 7 7-7' fill='none' stroke='%23292929' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
+  background-size: 14px 9px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--materials-text);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.materials-modal__select:focus-visible {
+  outline: 0;
+  border-color: var(--materials-purple-dark);
+  box-shadow: 0 0 0 4px rgba(190, 159, 246, 0.18);
+}
+
+.materials-modal__select:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.materials-modal__error {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 1px solid #f3b7b7;
+  border-radius: 10px;
+  background: #ffecec;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #a12b2b;
+}
+
+.materials-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .materials-modal {
+    padding: 22px 18px;
+  }
+
+  .materials-modal__title {
+    font-size: 24px;
+  }
+
+  .materials-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .materials-modal__actions .materials-btn {
+    width: 100%;
+  }
+}
