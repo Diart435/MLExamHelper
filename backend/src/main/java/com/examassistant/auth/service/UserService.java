@@ -1,6 +1,7 @@
 package com.examassistant.auth.service;
 
 import com.examassistant.auth.DTO.UserDTO;
+import com.examassistant.auth.DTO.VkUserInfoResponse;
 import com.examassistant.auth.entity.User;
 import com.examassistant.auth.repository.UserRepository;
 import com.examassistant.common.exception.InvalidCredentialsException;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -69,5 +71,34 @@ public class UserService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setUpdatedAt(OffsetDateTime.now());
+    }
+
+    @Transactional
+    public User findOrCreateByVk(VkUserInfoResponse.VkUser vk) {
+        String vkId = String.valueOf(vk.getUserId());
+
+        Optional<User> byVk = userRepository.findByVkId(vkId);
+        if (byVk.isPresent()) return byVk.get();
+
+        if (vk.getEmail() != null && !vk.getEmail().isBlank()) {
+            Optional<User> byEmail = userRepository.findByEmail(vk.getEmail());
+            if (byEmail.isPresent()) {
+                User u = byEmail.get();
+                u.setVkId(vkId);
+                return userRepository.save(u);
+            }
+        }
+
+        User u = new User();
+        u.setVkId(vkId);
+        u.setEmail(vk.getEmail() != null && !vk.getEmail().isBlank()
+                ? vk.getEmail()
+                : "vk_" + vkId + "@vk.local");
+        u.setFirstName(vk.getFirstName() != null ? vk.getFirstName() : "Пользователь");
+        u.setLastName(vk.getLastName()  != null ? vk.getLastName()  : "");
+        u.setPasswordHash(passwordEncoder.encode(UUID.randomUUID().toString()));
+        u.setCreatedAt(OffsetDateTime.now());
+        u.setUpdatedAt(OffsetDateTime.now());
+        return userRepository.save(u);
     }
 }

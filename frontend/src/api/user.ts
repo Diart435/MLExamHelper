@@ -19,14 +19,14 @@ export interface ChangePasswordRequest {
 }
 
 export const getMe = async (): Promise<User> => {
-  const response = await apiClient.get<User>('/api/user/me');
+  const response = await apiClient.get<User>('/user/me');
   return response.data;
 };
 
 export const changePersonal = async (data: ChangePersonalRequest): Promise<void> => {
-  await apiClient.put('/api/user/change/personal', data);
+  await apiClient.put('/user/change/personal', data);
 };
 
 export const changePassword = async (data: ChangePasswordRequest): Promise<void> => {
-  await apiClient.put('/api/user/change/password', data);
+  await apiClient.put('/user/change/password', data);
 };

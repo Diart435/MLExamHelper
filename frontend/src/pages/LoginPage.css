@@ -500,6 +500,39 @@ input, button { outline: 0; }
   transform: scale(0.98);
 }
 
+/* ===================== КНОПКА VK ID ===================== */
+.btn-vk-login {
+  position: absolute;
+  left: calc(50% - 176.5px); /* Строго по левому краю полей ввода и кнопки "Войти" */
+  top: 758px; /* 738px (низ кнопки "Войти") + 20px комфортного отступа */
+  width: 353px;
+  height: 56px;
+  background: #0077FF;
+  color: #fff;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16px;
+  font-family: 'Poppins', sans-serif;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+.btn-vk-login:hover {
+  background: #0066DD;
+}
+
+.btn-vk-login:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Сдвигаем футер вниз, чтобы освободить место */
+.form-footer {
+  top: 840px !important; /* 758px + 56px (низ кнопки VK) + 26px отступа */
+}
+
 /* Адаптивность для мобильных */
 @media (max-width: 1024px) {
   .course-columns {

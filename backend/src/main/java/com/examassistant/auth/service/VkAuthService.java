@@ -1,0 +1,92 @@
+package com.examassistant.auth.service;
+
+import com.examassistant.auth.DTO.VkTokenResponse;
+import com.examassistant.auth.DTO.VkUserInfoResponse;
+import com.examassistant.common.exception.InvalidTokenException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+
+@Service
+@Slf4j
+public class VkAuthService {
+
+    @Value("${vk.client.id}")     private String clientId;
+    @Value("${vk.service.token}") private String serviceToken;
+    @Value("${vk.redirect.uri}")  private String redirectUri;
+
+    private final RestClient restClient;
+
+    public VkAuthService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(10));
+
+        this.restClient = RestClient.builder()
+                .baseUrl("https://id.vk.ru")
+                .requestFactory(factory)
+                .build();
+    }
+
+    public VkUserInfoResponse authenticate(String code,
+                                           String codeVerifier,
+                                           String deviceId,
+                                           String state) {
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type",    "authorization_code");
+        form.add("code_verifier", codeVerifier);
+        form.add("redirect_uri",  redirectUri);
+        form.add("code",          code);
+        form.add("client_id",     clientId);
+        form.add("device_id",     deviceId);
+        form.add("state",         state);
+        form.add("service_token", serviceToken);
+
+        VkTokenResponse tokens = restClient.post()
+                .uri("/oauth2/auth")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (req, res) -> {
+                    String body = new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                    log.error("VK /oauth2/auth error (HTTP {}): {}", res.getStatusCode(), body);
+                    throw new InvalidTokenException("VK ID вернул ошибку при обмене кода: " + body);
+                })
+                .body(VkTokenResponse.class);
+
+        if (tokens == null || tokens.getAccessToken() == null) {
+            throw new InvalidTokenException("Не удалось получить access_token от VK");
+        }
+
+        MultiValueMap<String, String> userForm = new LinkedMultiValueMap<>();
+        userForm.add("client_id", clientId);
+        VkUserInfoResponse info = restClient.post()
+                .uri("/oauth2/user_info")
+                .header("Authorization", "Bearer " + tokens.getAccessToken())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(userForm)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (req, res) -> {
+                    String body = new String(res.getBody().readAllBytes(), StandardCharsets.UTF_8);
+                    log.error("VK /oauth2/user_info error (HTTP {}): {}", res.getStatusCode(), body);
+                    throw new InvalidTokenException("VK не вернул данные пользователя: " + body);
+                })
+                .body(VkUserInfoResponse.class);
+
+        if (info == null || info.getUser() == null) {
+            throw new InvalidTokenException("VK вернул пустые данные пользователя");
+        }
+
+        return info;
+    }
+}

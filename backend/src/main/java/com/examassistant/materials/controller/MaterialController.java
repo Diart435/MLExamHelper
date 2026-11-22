@@ -2,8 +2,10 @@ package com.examassistant.materials.controller;
 
 import com.examassistant.common.DTO.ApiError;
 import com.examassistant.common.exception.FileUploadException;
+import com.examassistant.materials.DTO.BulkDeleteMaterialsRequest;
 import com.examassistant.materials.DTO.ChangeFileNameRequest;
 import com.examassistant.materials.DTO.MaterialResponse;
+import com.examassistant.materials.DTO.MoveMaterialsRequest;
 import com.examassistant.materials.mapper.MaterialMapper;
 import com.examassistant.materials.service.MaterialsService;
 import com.examassistant.security.model.CustomUserDetails;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Materials", description = "Endpoints for managing materials")
@@ -129,6 +132,49 @@ public class MaterialController {
             @AuthenticationPrincipal CustomUserDetails user
             ){
         materialService.delete(id, user.getUserId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Move materials to another course", description = "Moves selected materials to target course if user owns source and target courses.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Materials moved"),
+            @ApiResponse(responseCode = "400", description = "Validation error",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @PostMapping("/move")
+    public ResponseEntity<List<MaterialResponse>> moveMaterials(
+            @Valid @RequestBody MoveMaterialsRequest request,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        return ResponseEntity.ok(
+                materialService.move(request.getMaterialIds(), request.getTargetCourseId(), user.getUserId())
+        );
+    }
+
+    @Operation(summary = "Bulk delete materials", description = "Deletes selected materials if user owns their courses.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Materials deleted"),
+            @ApiResponse(responseCode = "400", description = "Validation error",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @DeleteMapping("/bulk")
+    public ResponseEntity<Void> deleteMaterials(
+            @Valid @RequestBody BulkDeleteMaterialsRequest request,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        materialService.deleteAll(request.getMaterialIds(), user.getUserId());
         return ResponseEntity.noContent().build();
     }
 }

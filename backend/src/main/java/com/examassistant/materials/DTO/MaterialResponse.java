@@ -9,6 +9,7 @@ import java.util.UUID;
 public class MaterialResponse {
     private UUID materialId;
     private UUID courseId;
+    private UUID userId;
     private String title;
     private String typeMaterial;
     private String statusMaterial;
