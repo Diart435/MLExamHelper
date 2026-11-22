@@ -15,6 +15,7 @@ import ResultsPage from './pages/ResultsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import WelcomePage from './pages/WelcomePage';
 import CreateTestPage from './pages/CreateTestPage';
+import VkCallbackPage from './pages/VkCallbackPage';
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -61,11 +62,13 @@ function App() {
         <Route path="/main-register" element={<MainRegistrationPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
-
+        <Route path="/auth/vk/callback" element={<VkCallbackPage />} />
+        
         <Route element={<ProtectedRoute><CabinetLayout /></ProtectedRoute>}>
           <Route path="/menu" element={<MainPage />} />
           <Route path="/menu/settings" element={<SettingsPage />} />
           <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/materials" element={<MaterialsPage />} />
           <Route path="/courses/:courseId/materials" element={<MaterialsPage />} />
           <Route path="/tests" element={<TestsPage />} />
           <Route path="/results" element={<ResultsPage />} />
