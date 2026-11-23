@@ -1,5 +1,14 @@
 # План: Redis-контракт v4.1 (backend + ML)
 
+> ⚠️ **План написан для другого репозитория** (`C:\MLExamHelper`, ветка-основание `master` `176e5de`) и под состояние ML, где контракт был ещё v4.0. Как **карта работы в backend'е** он годится; как описание формата — нет.
+>
+> Расхождения с действующим контрактом **v4.2** (repo `tp_ivt_team5_2026`, ветка `ml/redis-jobs`) разобраны в **`backend-redis-requirements.md` §0.1**:
+> - §1.3 / D3 — плоская форма вопроса (`correct_index` на верхнем уровне) **неверна**: у вопроса есть `type` и **вложенный** `answer_key`;
+> - D5 — фиксированные 10 вопросов **неверно**: размер выбирает ML-планировщик по материалу (1..30), `difficulty` задаёт микс типов и на количество вопросов **не влияет**;
+> - §1.3 — `items[]` ML шлёт полный набор (`is_correct`, `correct_answer`, `feedback`), а не минимальный.
+>
+> Источник правды по формату — `ml/app/contracts.py` и `ml/docs/contracts/*.schema.json`. ML-часть плана (блок 8, блок 9) выполнена по этому контракту; см. `backend-redis-requirements.md` §4.6–§4.7 (порядок `XADD → XACK → XDEL`, reclaim по интервалу, ядовитое сообщение).
+
 **Статус:** план, файлы проекта не изменялись.
 **Источник истины:** `C:\test\backend-redis-requirements.md` (v4.1).
 **Репозиторий:** `C:\MLExamHelper`, ветка-основание — текущий `master` (`176e5de`).
@@ -50,7 +59,7 @@ XADD <канал> * payload '<JSON одной строкой>'
 - `{"indexes":[...]}` — multi_choice;
 - `{"text":"..."}` — open_answer.
 
-Запрещены: `task_id` в ingest, `amount_questions`/`course_id` в create-test, `user_id` в grade, `type`, `input_msg_id`.
+Запрещены: `task_id` в ingest, `amount_questions`/`course_id` в create-test, `user_id` в grade, `type`, `input_msg_id`. Payload `create-test:be-to-ml` — **ровно 5 ключей**: `task_id`, `test_id`, `material_ids`, `title`, `difficulty`.
 
 ### 1.3. Результаты ML → BE
 
@@ -99,8 +108,8 @@ XADD <канал> * payload '<JSON одной строкой>'
 | D2 | Доступ к попытке | только владелец; чужой `GET /api/attempts/{id}` → 404 |
 | D3 | Внутренняя форма вопроса | старая: `id/text/options/correct_index/source_chunk_id`; backend пишет `single_choice`, `answer_key={"correct_index":N}` |
 | D4 | Поля `items[]` | принимать `is_correct`/`correct_answer`/`feedback`, если есть; иначе выводить (`score >= 0.5`, `answer_key`) |
-| D5 | Число вопросов | ML-константа `DEFAULT_NUM_QUESTIONS = 10`; `difficulty` влияет только на содержание |
-| D6 | `tests.amount_questions` | оставить значение из запроса; фактическое число = `questions.size()` |
+| D5 | Число вопросов | ~~ML-константа `DEFAULT_NUM_QUESTIONS = 10`; `difficulty` влияет только на содержание~~ **Устарело (v4.2):** размер выбирает ML-планировщик по материалу (1..30) — по числу проверяемых фактов; `difficulty` задаёт только микс типов, на количество вопросов не влияет |
+| D6 | `tests.amount_questions` | ~~оставить значение из запроса~~ **Устарело (v4.2):** значение в колонке — всегда **число**: `"0"` при создании теста, затем фактическое число `questions.size()` из ответа ML. Бакетов `min`/`med`/`max` в `tests` не бывает |
 
 D1–D6 подтвердить до начала реализации.
 
@@ -138,7 +147,7 @@ D1–D6 подтвердить до начала реализации.
 
 **Изменяются:**
 
-- `messaging/CreateTestRedisRequest.java` — убрать `amountQuestions`, `courseId`; `difficulty` — `String`.
+- `messaging/CreateTestRedisRequest.java` — убрать `amountQuestions`, `courseId`; `difficulty` — `String`. ✅ сделано (и в `tests/DTO/CreateTestRequest.java` — поле `amountQuestions` тоже убрано).
 - `messaging/Producer.java` — `publishIngest`, `publishCreateTest`, `publishGradeTest`.
 - `messaging/producer/RedisProducer.java` — один `payload`, `ObjectMapper.writeValueAsString`; producer не пишет в БД.
 - `materials/service/MaterialsService.java` — ingest без `task_id`.
@@ -281,7 +290,7 @@ ALTER TABLE attempt_answers
 
 - `TASK_CHANNEL_SLUGS`, `task_channel()`, `result_channel()`;
 - `IngestTask` без `task_id`; `IngestResult` с `material_id`, `status=ready|error`;
-- `CreateTestTask` без `num_questions`/`course_id`; `DEFAULT_NUM_QUESTIONS = 10`;
+- `CreateTestTask` без `num_questions`/`course_id`; ~~`DEFAULT_NUM_QUESTIONS = 10`~~ — **устарело (v4.2)**: размер выбирает планировщик по материалу, фиксированной константы нет;
 - `StudentAnswer` — `index|indexes|text`;
 - `GradeAttemptResult` без `status`/`overall_feedback`; error `{task_id, error}`;
 - `parse_task` по slug/полному каналу.
@@ -303,7 +312,7 @@ ALTER TABLE attempt_answers
 **Остальное:**
 
 - `handlers/ingest.py` — `material_id` вместо `task_id`.
-- `handlers/create_test.py` — `DEFAULT_NUM_QUESTIONS`.
+- `handlers/create_test.py` — ~~`DEFAULT_NUM_QUESTIONS`~~ → планировщик `test_planner.plan_test(llm, digest)`.
 - `handlers/grade_attempt.py` — убрать LLM/`overall_feedback`.
 - `services/grader.py` — single/multi/open; open → 0 без падения; все вопросы теста.
 - `db/questions.py` — `ORDER BY question_order, question_id`.
@@ -322,7 +331,7 @@ ALTER TABLE attempt_answers
 
 1. `docker compose up -d --build postgres redis seaweedfs backend ml`.
 2. Регистрация → курс → загрузка PDF → материал `ready`.
-3. Создать тест → `CREATING` → polling до `CREATED`; 10 вопросов, `question_order` 1..10, `answer_key`, `question_id` = uuid5.
+3. Создать тест → `CREATING` → polling до `CREATED`; вопросов — сколько насчитал планировщик по материалу (1..30), `question_order` 1..N, `answer_key`, `question_id` = uuid5. ~~10 вопросов~~ — устаревшее ожидание (v4.2).
 4. `GET /api/tests/{id}/questions` — без `answer_key`.
 5. `POST /api/tests/{id}/attempts` → 202; polling `GET /api/attempts/{id}` до `finished`.
 6. Redis: `XPENDING` пуст, `XLEN` не растёт, `XINFO GROUPS` содержит `ml-backend` на трёх каналах.
@@ -390,7 +399,7 @@ docker compose exec redis redis-cli XPENDING grade-test:ml-to-be ml-backend
 Подтвердить D1–D6, особенно:
 
 - D1 — нужен ли `GET /api/tests/{id}/questions`;
-- D5 — всегда ли 10 вопросов;
-- D6 — оставлять ли `amount_questions` из запроса.
+- ~~D5 — всегда ли 10 вопросов~~ — **снято в v4.2**: размер выбирает ML-планировщик по материалу (1..30), фиксированного 10 больше нет;
+- ~~D6 — оставлять ли `amount_questions` из запроса~~ — **снято в v4.1/v4.2**: поля размера в задаче нет вовсе, а в `tests.amount_questions` backend пишет число (`"0"` → фактическое число).
 
 После подтверждения переключить агента в **Build** и начать с ветки от `master` и миграции `006`.

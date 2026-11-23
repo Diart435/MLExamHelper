@@ -5,12 +5,12 @@ ML хранит chunks в своём vector_store, но `test_questions` — э�
 text_question / options / key_points / answer_key для каждого question_id из
 attempt'а.
 
-⚠️ Колонка `answer_key` в `test_questions` есть (контракт v4.1: backend пишет
-туда эталон, который ML отдал в `create-test:ml-to-be`), но в СТАРЫХ схемах её
-может не быть — на живой стендовой БД `ml_live` колонки ещё нет, а на боевой
-она появится после миграции backend'а. Поэтому запрос идёт с фолбэком: если
-Postgres не знает колонку, повторяем запрос без неё и подставляем пустой
-эталон (тогда включится Redis/LLM-страховка).
+⚠️ Порядок вопросов задаёт backend миграцией 006: колонка `question_order`
+(1..N). Без неё сортировка по `question_id` (случайный UUID) даёт произвольный
+порядок. Колонки `question_order` и `answer_key` в СТАРЫХ схемах отсутствуют
+(на живой стендовой БД `ml_live` их нет, на боевой появятся после миграции
+backend'а). Поэтому запрос идёт списком кандидатов: пробуем самый полный,
+при `UndefinedColumnError` / `UndefinedTableError` переходим к следующему.
 
 Подключаемся тем же пулом asyncpg, что и PgVectorStore. Singleton-обёртка
 с lazy connect — `Grader` и `TestStore` создаются на каждый task, поэтому
@@ -29,6 +29,50 @@ from loguru import logger
 
 from app.core.db import install_json_codecs
 from app.models import QuestionRow
+
+
+# Кандидаты запроса — от самого полного к самому простому.
+#
+# 1) Есть и `question_order`, и `answer_key` — новая схема (миграция backend'а 006).
+# 2) Есть `answer_key`, но нет `question_order` — порядок вопросов тогда
+#    произвольный (сортировка по UUID), но эталон доступен.
+# 3) Нет ни `question_order`, ни `answer_key` — старая схема: эталон пустой,
+#    сработает Redis/LLM-страховка.
+#
+# Колонку `question_order` в SELECT НЕ выбираем: `QuestionRow` её не знает,
+# а модель на границе БД должна остаться неизменной.
+_QUERY_CANDIDATES: tuple[tuple[str, str], ...] = (
+    (
+        "question_order, answer_key",
+        """
+        SELECT question_id, type_question, text_question,
+               options, key_points, answer_key
+        FROM test_questions
+        WHERE test_id = $1
+        ORDER BY question_order, question_id
+        """,
+    ),
+    (
+        "answer_key",
+        """
+        SELECT question_id, type_question, text_question,
+               options, key_points, answer_key
+        FROM test_questions
+        WHERE test_id = $1
+        ORDER BY question_id
+        """,
+    ),
+    (
+        "ни question_order, ни answer_key",
+        """
+        SELECT question_id, type_question, text_question,
+               options, key_points
+        FROM test_questions
+        WHERE test_id = $1
+        ORDER BY question_id
+        """,
+    ),
+)
 
 
 class TestStore:
@@ -62,39 +106,31 @@ class TestStore:
         await self.close()
 
     async def fetch_questions(self, test_id: str) -> list[QuestionRow]:
-        """Достать ВСЕ вопросы теста в порядке question_id (≈ порядок генерации).
+        """Достать ВСЕ вопросы теста в порядке вопросов теста.
 
-        Колонка `answer_key` может отсутствовать в схеме (старые БД) — тогда
-        повторяем запрос без неё и оставляем эталон пустым.
+        Порядок — по `question_order` (есть в новой схеме), иначе по
+        `question_id`. Эталон `answer_key` — когда колонка есть, иначе пустой
+        (тогда включится Redis/LLM-страховка).
         """
         await self.connect()
         async with self._pool.acquire() as conn:
-            try:
-                rows = await conn.fetch(
-                    """
-                    SELECT question_id, type_question, text_question,
-                           options, key_points, answer_key
-                    FROM test_questions
-                    WHERE test_id = $1
-                    ORDER BY question_id
-                    """,
-                    test_id,
-                )
-            except _undefined_column_errors() as e:
-                logger.warning(
-                    f"TestStore: колонка answer_key недоступна ({type(e).__name__}: {e}) — "
-                    f"читаем вопросы без эталона, сработает Redis/LLM-страховка"
-                )
-                rows = await conn.fetch(
-                    """
-                    SELECT question_id, type_question, text_question,
-                           options, key_points
-                    FROM test_questions
-                    WHERE test_id = $1
-                    ORDER BY question_id
-                    """,
-                    test_id,
-                )
+            rows = None
+            last_error: BaseException | None = None
+            for missing, query in _QUERY_CANDIDATES:
+                try:
+                    rows = await conn.fetch(query, test_id)
+                    break
+                except _undefined_column_errors() as e:
+                    last_error = e
+                    logger.warning(
+                        f"TestStore: нет колонки {missing} "
+                        f"({type(e).__name__}: {e}) — пробуем следующий вариант запроса"
+                    )
+            if rows is None:
+                # Все кандидаты отпали: таблицы нет вовсе (или схема совсем
+                # чужая). Это настоящая поломка БД, а не «нет эталона» —
+                # пробрасываем последнюю ошибку наружу.
+                raise last_error  # type: ignore[misc]
         return [QuestionRow.model_validate(dict(r)) for r in rows]
 
 

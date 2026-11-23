@@ -1,0 +1,18 @@
+$kind: http-request
+name: 5. Материал готов?
+description: Жми ПОВТОРНО, пока statusMaterial = ready.
+url: "{{baseUrl}}/api/materials/{{materialId}}"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200 OK', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      console.log('statusMaterial =', body.statusMaterial);
+      if (String(body.statusMaterial).toLowerCase() !== 'ready') {
+        console.warn('Ещё не готов — жми Send ещё раз через ~15 с');
+      }
+    language: text/javascript
+order: 5000

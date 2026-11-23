@@ -690,10 +690,10 @@ async def _persist_submission(
 async def _persist_grading(attempt_id: str, result: dict) -> None:
     """Сохранить результат проверки — эмуляция ветки grade_attempt у listener'а.
 
-    В `items[]` вердикта ML приходят `is_correct` и текст `correct_answer`.
-    `correct_answer` — JSONB, и codec'а asyncpg (см. `app/core/db.py`) пишет
-    его как JSON-скаляр: обычная строка остаётся строкой, в БД будет, например,
-    `"Read committed"`, а не объект.
+    В `items[]` вердикта ML приходят `is_correct` и эталон-объект
+    `correct_answer` (та же форма, что `test_questions.answer_key`). Колонка
+    JSONB, и codec'а asyncpg (см. `app/core/db.py`) пишет объект как объект:
+    в БД будет, например, `{"correct_index": 1}`, а не JSON-строка.
     """
     conn = await db_connect(_dsn())
     try:

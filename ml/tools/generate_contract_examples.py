@@ -132,24 +132,43 @@ def main() -> None:
                 is_correct=True,
                 score=1.0,
                 feedback="Верно: READ UNCOMMITTED допускает грязные чтения.",
-                correct_answer="READ UNCOMMITTED",
-                student_answer="READ UNCOMMITTED",
+                correct_answer={
+                    "correct_index": 1,
+                    "explanation": "READ UNCOMMITTED допускает грязные чтения.",
+                },
+                student_answer={"index": 1},
             ),
             GradedItem(
                 question_id="7a0d3e91-c642-4f88-b125-6d9e2a4c8f31",
                 is_correct=True,
                 score=1.0,
                 feedback="Верно, выбраны все три поддерживаемых ограничения.",
-                correct_answer="Первичный ключ; Уникальность; Ссылочная целостность",
-                student_answer="Первичный ключ; Уникальность; Ссылочная целостность",
+                correct_answer={
+                    "correct_indexes": [0, 1, 2],
+                    "explanation": (
+                        "Первичный ключ, уникальность и ссылочная целостность "
+                        "являются стандартными ограничениями."
+                    ),
+                },
+                student_answer={"indexes": [0, 1, 2]},
             ),
             GradedItem(
                 question_id="c30e8f2a-4b19-4d77-a810-6f3b9c2e5d04",
                 is_correct=False,
                 score=0.33,
                 feedback="Верно названа атомарность, но не раскрыто назначение транзакции как единой логической единицы работы.",
-                correct_answer="Транзакция объединяет операции в единую логическую единицу работы; атомарность гарантирует выполнение всех операций либо откат всех изменений.",
-                student_answer="Транзакция обеспечивает атомарность операций.",
+                correct_answer={
+                    "reference_answer": (
+                        "Транзакция объединяет операции в единую логическую единицу "
+                        "работы; атомарность гарантирует выполнение всех операций "
+                        "либо откат всех изменений."
+                    ),
+                    "explanation": (
+                        "Ответ должен называть единицу работы и гарантию "
+                        "all-or-nothing."
+                    ),
+                },
+                student_answer={"text": "Транзакция обеспечивает атомарность операций."},
             ),
         ],
     )

@@ -16,6 +16,8 @@ import com.examassistant.messaging.enums.StatusTask;
 import com.examassistant.security.model.CustomUserDetails;
 import com.examassistant.tests.DTO.CreateTestRequest;
 import com.examassistant.tests.QuestionDTO;
+import com.examassistant.tests.entity.Question;
+import com.examassistant.tests.entity.StudentAttempt;
 import com.examassistant.tests.entity.Test;
 import com.examassistant.tests.enums.QuestionType;
 import com.examassistant.tests.enums.TestStatus;
@@ -36,6 +38,8 @@ public final class TestFixtures {
     public static final UUID TEST_ID = UUID.fromString("66666666-6666-6666-6666-666666666666");
     public static final UUID TASK_ID = UUID.fromString("77777777-7777-7777-7777-777777777777");
     public static final UUID SOURCE_CHUNK_ID = UUID.fromString("88888888-8888-8888-8888-888888888888");
+    public static final UUID QUESTION_ID = UUID.fromString("99999999-9999-9999-9999-999999999999");
+    public static final UUID ATTEMPT_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     public static final String EMAIL = "student@example.com";
     public static final String OTHER_EMAIL = "other@example.com";
@@ -114,10 +118,36 @@ public final class TestFixtures {
                 .testId(TEST_ID)
                 .courseId(COURSE_ID)
                 .title("Math test")
-                .amountQuestions(TestAmountQuestions.MEDIUM)
+                // В tests.amount_questions лежит фактическое число вопросов
+                // (его пишет CreateTestResultService по ответу ML).
+                .amountQuestions("2")
                 .statusTest(TestStatus.CREATED)
                 .difficulty(TestDifficulty.MEDIUM)
                 .createdAt(CREATED_AT)
+                .build();
+    }
+
+    public static Question question() {
+        return Question.builder()
+                .questionId(QUESTION_ID)
+                .testId(TEST_ID)
+                .typeQuestion(QuestionType.SINGLE_CHOICE)
+                .textQuestion("What is 2+2?")
+                .options(List.of("3", "4"))
+                .answerKey(Map.of("correct_index", 1))
+                .keyPoints(List.of())
+                .questionOrder(1)
+                .sourceChunkId(SOURCE_CHUNK_ID)
+                .createdAt(CREATED_AT)
+                .build();
+    }
+
+    public static StudentAttempt attempt() {
+        return StudentAttempt.builder()
+                .attemptId(ATTEMPT_ID)
+                .testId(TEST_ID)
+                .userId(USER_ID)
+                .startedAt(CREATED_AT)
                 .build();
     }
 
@@ -126,7 +156,6 @@ public final class TestFixtures {
                 .courseId(COURSE_ID)
                 .title("Math test")
                 .difficulty(TestDifficulty.MEDIUM)
-                .amountQuestions(TestAmountQuestions.MEDIUM)
                 .materialIds(List.of(MATERIAL_ID))
                 .build();
     }
@@ -137,7 +166,7 @@ public final class TestFixtures {
                 QuestionType.SINGLE_CHOICE,
                 "What is 2+2?",
                 List.of("3", "4"),
-                Map.of("correct", List.of("4")),
+                List.of("4"),
                 SOURCE_CHUNK_ID
         );
     }
@@ -174,7 +203,6 @@ public final class TestFixtures {
                 TEST_ID,
                 List.of(MATERIAL_ID, OTHER_MATERIAL_ID),
                 "Math test",
-                TestAmountQuestions.MEDIUM,
                 "medium",
                 COURSE_ID
         );

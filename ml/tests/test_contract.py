@@ -12,8 +12,9 @@
   - в payload'ах НЕТ полей, которых нет в контракте заказчика
     (`input_msg_id`, `course_id`, `user_id`, `chunks_indexed`);
   - служебная метка блока (`source_chunk_ref`) наружу не публикуется;
-  - контракт v4.1: числа вопросов (`amountQuestions`) в задаче нет, а эталон
-    (`answer_key`) в ответе на создание теста — есть.
+  - поля размера (`amount_questions`/`amountQuestions`) в задаче нет вообще:
+    размер выбирает ML-планировщик, а лишние ключи в payload'е игнорируются;
+    эталон (`answer_key`) в ответе на создание теста — есть.
 
 Полная спека: `ml/docs/superpowers/specs/2026-11-17-ml-backend-contract-v4.md`.
 """
@@ -133,8 +134,8 @@ class TestTaskPayloads:
         }
 
     def test_create_test_task_matches_backend_payload(self):
-        """Ключи create_test (контракт v4.1): task_id, test_id, material_ids,
-        title, difficulty. Числа вопросов в payload'е нет."""
+        """Ключи create_test: task_id, test_id, material_ids, title, difficulty.
+        Никакого поля размера в payload'е нет — размер выбирает ML."""
         task = CreateTestTask(
             task_id="t1",
             test_id="test-1",
@@ -150,16 +151,24 @@ class TestTaskPayloads:
             "difficulty": "medium",
         }
 
-    def test_create_test_task_has_no_amount_questions(self):
-        """Контракт v4.1: числа вопросов в payload'е нет — размер выбирает ML.
+    def test_create_test_task_payload_has_no_amount_questions(self):
+        """Поля размера в контракте нет — в payload'е оно тоже не может быть."""
+        task = CreateTestTask(
+            task_id="t1", test_id="test-1", material_ids=["m1"], title="Quiz",
+        )
+        payload = payload_of(task)
+        assert "amount_questions" not in payload
+        assert "amountQuestions" not in payload
 
-        Даже если внутреннее поле `num_questions` задано (внутренние вызовы и
+    def test_create_test_task_without_amount_questions(self):
+        """Даже если внутреннее поле `num_questions` задано (внутренние вызовы и
         тесты пользуются им), наружу оно не выходит."""
         task = CreateTestTask(
             task_id="t1", test_id="test-1", material_ids=["m1"], title="Quiz",
             num_questions=10,
         )
         payload = payload_of(task)
+        assert "amount_questions" not in payload
         assert "amountQuestions" not in payload
         assert "num_questions" not in payload
 
@@ -252,10 +261,11 @@ class TestTaskParsing:
         assert task.difficulty == "hard"
 
     def test_create_test_ignores_legacy_amount_questions(self):
-        """Контракт v4.1: `amountQuestions` из payload'а ИГНОРИРУЕТСЯ.
+        """Legacy-camelCase `amountQuestions` из payload'а ИГНОРИРУЕТСЯ.
 
-        Старые сообщения в Redis Streams остались лежать — их нельзя ронять.
-        Разбор проходит, число вопросов остаётся None (размер выбирает ML)."""
+        Поля размера в контракте больше нет: размер выбирает ML-планировщик.
+        Старые сообщения в Redis Streams остались лежать — их нельзя ронять:
+        разбор проходит, лишний ключ просто игнорируется."""
         raw = {
             "task_id": "t1",
             "test_id": "test-1",
@@ -268,6 +278,48 @@ class TestTaskParsing:
         assert isinstance(task, CreateTestTask)
         assert task.num_questions is None
         assert task.difficulty == "hard"
+
+    def test_create_test_ignores_amount_questions(self):
+        """Контрактное имя `amount_questions` — такой же неизвестный ключ,
+        как и любой другой лишний: разбор проходит, поле не применяется."""
+        raw = {
+            "task_id": "t1",
+            "test_id": "test-1",
+            "material_ids": ["m1"],
+            "title": "Quiz",
+            "amount_questions": "min",
+            "difficulty": "hard",
+        }
+        task = parse_task(raw, "create_test")
+        assert isinstance(task, CreateTestTask)
+        assert task.num_questions is None
+        assert task.difficulty == "hard"
+
+    def test_create_test_without_amount_questions_has_no_cap(self):
+        """Старое сообщение без потолка разбирается как раньше."""
+        raw = {
+            "task_id": "t1",
+            "test_id": "test-1",
+            "material_ids": ["m1"],
+            "title": "Quiz",
+            "difficulty": "hard",
+        }
+        task = parse_task(raw, "create_test")
+        assert isinstance(task, CreateTestTask)
+        assert task.num_questions is None
+
+    def test_create_test_rejects_invalid_amount_questions(self):
+        """Мусор в лишнем поле не роняет разбор — поле просто игнорируется."""
+        raw = {
+            "task_id": "t1",
+            "test_id": "test-1",
+            "material_ids": ["m1"],
+            "title": "Quiz",
+            "amount_questions": "huge",
+        }
+        task = parse_task(raw, "create_test")
+        assert isinstance(task, CreateTestTask)
+        assert task.num_questions is None
 
     def test_create_test_ignores_legacy_num_questions(self):
         """Legacy-имя `num_questions` (ещё более старый формат) — тоже мимо."""
@@ -284,7 +336,7 @@ class TestTaskParsing:
         assert task.num_questions is None
 
     def test_create_test_ignores_amount_questions_min(self):
-        """`amountQuestions: "min"` — тоже не часть контракта, просто мимо."""
+        """`amountQuestions: "min"` — legacy-camelCase, тоже просто мимо."""
         raw = {
             "task_id": "t1",
             "test_id": "test-1",
@@ -429,7 +481,9 @@ class TestResultPayloads:
             score_pct=60.0, grade=3,
             items=[GradedItem(
                 question_id="q1", is_correct=True, score=1.0,
-                feedback="Верно", correct_answer="A", student_answer="A",
+                feedback="Верно",
+                correct_answer={"correct_index": 0, "explanation": "Потому что"},
+                student_answer={"index": 0},
             )],
         )
         payload = payload_of(result)
@@ -441,8 +495,8 @@ class TestResultPayloads:
             "is_correct": True,
             "score": 1.0,
             "feedback": "Верно",
-            "correct_answer": "A",
-            "student_answer": "A",
+            "correct_answer": {"correct_index": 0, "explanation": "Потому что"},
+            "student_answer": {"index": 0},
         }]
 
     def test_grade_attempt_error_payload_keeps_ids(self):

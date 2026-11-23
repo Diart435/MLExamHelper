@@ -6,7 +6,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.connection.RedisStreamCommands.XDelOptions;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StreamOperations;
@@ -16,7 +15,6 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -53,8 +51,8 @@ class MlResultAckSupportTest {
 
         support.ack(message);
 
-        verify(streams).acknowledgeAndDelete(eq("grade-test:ml-to-be"), eq("ml-backend"),
-                any(XDelOptions.class), eq(RecordId.of("1-0")));
+        verify(streams).acknowledge(eq("grade-test:ml-to-be"), eq("ml-backend"), eq(RecordId.of("1-0")));
+        verify(streams).delete(eq("grade-test:ml-to-be"), eq(RecordId.of("1-0")));
     }
 
     @SuppressWarnings("unchecked")

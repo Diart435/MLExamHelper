@@ -203,10 +203,12 @@ class CreateTestTask:
     контекст из всех, отдаёт в LLM с JSON-output, парсит, валидирует, возвращает
     структурированный Test.
 
-    ⚠️ Контракт v4.1: числа вопросов в payload'е НЕТ. Размер теста ML выбирает
-    сам — отдельным вызовом планировщика (`services/test_planner.py`), который
-    смотрит на материал и решает, сколько фактов в нём разбирается (1..30).
-    Backend после получения теста сам пишет `tests.amount_questions =
+    Размер теста: его выбирает ML — отдельным вызовом планировщика
+    (`services/test_planner.py`), который смотрит на материал и считает, сколько
+    проверяемых фактов в нём разбирается. Границы жёсткие: 1..30
+    (`MIN_QUESTIONS`/`MAX_QUESTIONS`). Backend в выборе размера не участвует —
+    он присылает только `task_id`, `test_id`, `material_ids`, `title`,
+    `difficulty`. Backend после получения теста сам пишет `tests.amount_questions =
     len(questions)`.
 
     Внутреннее поле `num_questions` осталось: им пользуются внутренние вызовы
@@ -241,7 +243,6 @@ class CreateTestTask:
         return json.dumps(self._as_dict(), ensure_ascii=False)
 
     def _as_dict(self) -> dict[str, Any]:
-        # Контракт v4.1: числа вопросов в payload'е нет — размер выбирает ML.
         return {
             "task_id": self.task_id,
             "test_id": self.test_id,
@@ -255,11 +256,12 @@ class CreateTestTask:
         mids = d.get("material_ids") or []
         if not isinstance(mids, list) or not mids:
             raise ValueError("material_ids must be a non-empty list")
-        # ⚠️ Контракт v4.1: `amountQuestions` (и legacy `num_questions`) из
-        # payload'а ИГНОРИРУЮТСЯ — числа вопросов в контракте больше нет,
-        # размер выбирает ML (планировщик). Старые сообщения в Redis Streams
-        # остались лежать — их нельзя ронять, поэтому просто читаем мимо.
-        # Лимиты difficulty проверяет __post_init__.
+        # Legacy `num_questions`, legacy `amount_questions`/`amountQuestions`
+        # из payload'а ИГНОРИРУЮТСЯ: поля размера в контракте больше нет —
+        # размер выбирает ML-планировщик. Старые сообщения в Redis Streams
+        # остались лежать — их нельзя ронять, поэтому просто читаем мимо
+        # (лишние ключи игнорируются, как и любые другие).
+        # Лимит difficulty проверяет __post_init__.
         return cls(
             task_id=str(d["task_id"]),
             test_id=str(d["test_id"]),
@@ -689,16 +691,27 @@ class GradeAttemptTask:
 class GradedItem:
     """Per-question результат проверки.
 
-    В контракте ответы плоские, строками: `correct_answer` — текст правильного
-    варианта (для открытого вопроса — эталон), `student_answer` — что ответил
-    студент (текст отмеченных вариантов или его собственный ответ).
+    `correct_answer` — **эталон-объект** того же вида, что `answer_key`
+    вопроса в БД: `{"correct_index": N}` | `{"correct_indexes": [N, M]}` |
+    `{"reference_answer": "…"}`, плюс необязательный `explanation`.
+
+    `student_answer` — ответ студента объектом: `{"index": N}` |
+    `{"indexes": [N, M]}` | `{"text": "…"}`.
+
+    ⚠️ Именно объектом, а не строкой: backend читает `correct_answer` в
+    `Map<String, Object>`, и JSON-строка в этом поле роняет разбор всего
+    вердикта — попытка остаётся неоценённой. Человекочитаемый текст
+    правильного ответа при этом не теряется — он есть в `feedback`.
+
+    None — эталона/ответа нет: backend тогда подставляет `question.answer_key`
+    сам.
     """
     question_id: str
     is_correct: bool
     score: float                           # 0.0..1.0 — доля баллов за вопрос
     feedback: str = ""
-    correct_answer: str = ""
-    student_answer: str = ""
+    correct_answer: dict[str, Any] | None = None
+    student_answer: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {

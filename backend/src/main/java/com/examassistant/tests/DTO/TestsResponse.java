@@ -1,6 +1,5 @@
 package com.examassistant.tests.DTO;
 
-import com.examassistant.common.enums.TestAmountQuestions;
 import com.examassistant.common.enums.TestDifficulty;
 import com.examassistant.tests.enums.TestStatus;
 import lombok.AllArgsConstructor;
@@ -19,5 +18,7 @@ public class TestsResponse {
     private String title;
     private TestStatus statusTest;
     private TestDifficulty difficulty;
-    private TestAmountQuestions amountQuestions;
+    // Фактическое число вопросов в тесте (пишет CreateTestResultService
+    // по ответу ML). Размер теста выбирает ML-планировщик.
+    private String amountQuestions;
 }

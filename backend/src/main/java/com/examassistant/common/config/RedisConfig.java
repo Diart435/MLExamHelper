@@ -23,15 +23,21 @@ public class RedisConfig {
 
         return redisTemplate;
     }
+
     @Bean
-    public StreamMessageListenerContainer<String, MapRecord<String, String, String>> listenerContainer(
-            RedisConnectionFactory connectionFactory) {
+    StreamMessageListenerContainer<String, MapRecord<String, String, String>> listenerContainer(
+            RedisConnectionFactory connectionFactory, MlStreamsProperties properties) {
 
         var options = StreamMessageListenerContainer
                 .StreamMessageListenerContainerOptions.builder()
                 .pollTimeout(Duration.ofMillis(100))
+                // Контейнер стартует не сам: сначала RedisConsumer создаёт
+                // consumer-группы на каналах, и только потом подписывается.
+                .autoStartup(false)
                 .build();
 
+        // Имя consumer'а задаётся при подписке (Consumer.from в RedisConsumer):
+        // в этой версии Spring Data Redis у билдера опций такого метода нет.
         return StreamMessageListenerContainer.create(connectionFactory, options);
     }
 }

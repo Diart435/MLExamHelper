@@ -22,7 +22,8 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from app.services.llm import MAX_TOKENS_SMALL_JSON, LLMClient
+from app.core.config import get_settings
+from app.services.llm import MAX_TOKENS_SMALL_JSON, LLMClient, payloads_enabled
 
 
 SYSTEM_PROMPT = """\
@@ -111,7 +112,10 @@ class OpenAnswerJudge:
     __test__ = False  # не pytest-класс
 
     def __init__(self, llm: LLMClient | None = None) -> None:
-        self.llm = llm or LLMClient()
+        # Судья ходит на отдельную модель (judge_model): у неё свой бюджет
+        # max_tokens и своё качество вердикта. Пустая настройка → общая
+        # LLM_MODEL, как раньше.
+        self.llm = llm or LLMClient(model=get_settings().judge_model or None)
 
     async def judge(
         self,
@@ -147,14 +151,30 @@ class OpenAnswerJudge:
         try:
             return await self.llm.chat_json(
                 user_message,
-                validator=parse_verdict,
+                validator=self._logging_validator,
                 system_prompt=SYSTEM_PROMPT,
                 max_retries=2,
                 schema=VERDICT_SCHEMA,
                 # Ответ судьи — 100–200 токенов: большой max_tokens упирается
-                # в кредитный лимит OpenRouter (HTTP 402) на free-моделях.
+                # в кредитный лимит провайдера (RouterAI, HTTP 402) на free-моделях.
                 max_tokens=MAX_TOKENS_SMALL_JSON,
             )
         except Exception as e:
             logger.warning(f"OpenAnswerJudge: LLM failed ({type(e).__name__}: {e}) → score=0.0")
             return Verdict(score=0.0, feedback=FALLBACK_FEEDBACK)
+
+    def _logging_validator(self, data: dict) -> Verdict:
+        """Валидатор вердикта + лог сырого ответа модели.
+
+        Сырым считаем то, что модель вернула в JSON (до преобразования в
+        `Verdict`): score и feedback как есть. В лог идут как АРГУМЕНТЫ —
+        иначе фигурные скобки в тексте фидбэка сломали бы форматирование.
+        """
+        verdict = parse_verdict(data)
+        if payloads_enabled():
+            logger.info(
+                "[Judge] raw verdict: score={} feedback={}",
+                verdict.score,
+                verdict.feedback,
+            )
+        return verdict

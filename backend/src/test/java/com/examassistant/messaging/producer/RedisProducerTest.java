@@ -2,7 +2,9 @@ package com.examassistant.messaging.producer;
 
 import com.examassistant.common.enums.TestAmountQuestions;
 import com.examassistant.messaging.CreateTestRedisRequest;
+import com.examassistant.messaging.GradeTestRedisRequest;
 import com.examassistant.messaging.ProcessMaterialRedisRequest;
+import com.examassistant.messaging.StudentAnswerPayload;
 import com.examassistant.messaging.TaskDTO;
 import com.examassistant.messaging.enums.StatusTask;
 import com.examassistant.messaging.service.TasksService;
@@ -11,13 +13,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,48 +41,69 @@ class RedisProducerTest {
     @Mock
     private TasksService taskService;
 
-    @InjectMocks
     private RedisProducer redisProducer;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         when(redisTemplate.<Object, Object>opsForStream()).thenReturn(streamOperations);
+        redisProducer = new RedisProducer(redisTemplate, taskService, objectMapper);
     }
 
     @Test
-    void publishCreateTest_writesAllFieldsToStream() {
+    void publishCreateTest_writesContractEnvelopeToChannel() {
         CreateTestRedisRequest request = TestFixtures.createTestRedisRequest();
         RecordId recordId = RecordId.of("1-0");
-        when(streamOperations.add(eq("tests:create-test-request"), anyMap()))
-                .thenReturn(recordId);
+        when(streamOperations.add(eq("create-test:be-to-ml"), anyMap())).thenReturn(recordId);
 
         RecordId result = redisProducer.publishCreateTest(request);
 
         assertThat(result).isSameAs(recordId);
 
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
-        verify(streamOperations).add(eq("tests:create-test-request"), captor.capture());
-        @SuppressWarnings("unchecked")
-        Map<String, String> fields = (Map<String, String>) captor.getValue();
-
-        assertThat(fields)
+        Map<String, Object> payload = capturedPayload("create-test:be-to-ml");
+        assertThat(payload)
                 .containsEntry("task_id", TestFixtures.TASK_ID.toString())
                 .containsEntry("test_id", TestFixtures.TEST_ID.toString())
-                .containsEntry("material_ids",
-                        TestFixtures.MATERIAL_ID + "," + TestFixtures.OTHER_MATERIAL_ID)
                 .containsEntry("title", "Math test")
-                .containsEntry("amount_questions", "medium")
-                .containsEntry("difficulty", "medium")
-                .containsEntry("course_id", TestFixtures.COURSE_ID.toString());
+                .containsEntry("difficulty", "medium");
+    }
+
+    @Test
+    void publishCreateTest_payloadHasExactlyFiveContractKeys() {
+        when(streamOperations.add(anyString(), anyMap())).thenReturn(RecordId.of("1-0"));
+
+        redisProducer.publishCreateTest(TestFixtures.createTestRedisRequest());
+
+        Map<String, Object> payload = capturedPayload("create-test:be-to-ml");
+        // Контракт v4.2: ровно пять полей, amount_questions больше нет —
+        // размер теста целиком выбирает ML-планировщик.
+        assertThat(payload)
+                .containsOnlyKeys("task_id", "test_id", "material_ids", "title", "difficulty")
+                .hasSize(5)
+                .doesNotContainKey("amount_questions")
+                .doesNotContainKey("amountQuestions")
+                .doesNotContainKey("course_id")
+                .doesNotContainKey("type");
+    }
+
+    @Test
+    void publishCreateTest_materialIdsIsJsonArray() {
+        when(streamOperations.add(anyString(), anyMap())).thenReturn(RecordId.of("1-0"));
+
+        redisProducer.publishCreateTest(TestFixtures.createTestRedisRequest());
+
+        Map<String, Object> payload = capturedPayload("create-test:be-to-ml");
+        assertThat(payload.get("material_ids")).isInstanceOf(List.class);
+        assertThat((List<String>) payload.get("material_ids"))
+                .containsExactly(TestFixtures.MATERIAL_ID.toString(), TestFixtures.OTHER_MATERIAL_ID.toString());
     }
 
     @Test
     void publishCreateTest_createsProcessingTask() {
-        CreateTestRedisRequest request = TestFixtures.createTestRedisRequest();
         when(streamOperations.add(anyString(), anyMap())).thenReturn(RecordId.of("1-0"));
 
-        redisProducer.publishCreateTest(request);
+        redisProducer.publishCreateTest(TestFixtures.createTestRedisRequest());
 
         ArgumentCaptor<TaskDTO> captor = ArgumentCaptor.forClass(TaskDTO.class);
         verify(taskService).create(eq(TestFixtures.TASK_ID), captor.capture());
@@ -96,35 +120,80 @@ class RedisProducerTest {
     }
 
     @Test
-    void publishMaterialProcess_writesAllFieldsToStream() {
+    void publishMaterialProcess_writesContractEnvelopeToChannel() {
         ProcessMaterialRedisRequest request = TestFixtures.processMaterialRedisRequest();
         RecordId recordId = RecordId.of("2-0");
-        when(streamOperations.add(eq("materials:process-response"), anyMap()))
-                .thenReturn(recordId);
+        when(streamOperations.add(eq("ingest:be-to-ml"), anyMap())).thenReturn(recordId);
 
         RecordId result = redisProducer.publishMaterialProcess(request);
 
         assertThat(result).isSameAs(recordId);
 
-        @SuppressWarnings("rawtypes")
-        ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
-        verify(streamOperations).add(eq("materials:process-response"), captor.capture());
-        @SuppressWarnings("unchecked")
-        Map<String, String> fields = (Map<String, String>) captor.getValue();
-
-        assertThat(fields)
-                .containsEntry("task_id", TestFixtures.TASK_ID.toString())
+        Map<String, Object> payload = capturedPayload("ingest:be-to-ml");
+        assertThat(payload)
                 .containsEntry("material_id", TestFixtures.MATERIAL_ID.toString())
-                .containsEntry("storage_key", "materials/key.pdf");
+                .containsEntry("storage_key", "materials/key.pdf")
+                // У ingest в контракте ровно два поля.
+                .doesNotContainKey("task_id")
+                .doesNotContainKey("type")
+                .hasSize(2);
     }
 
     @Test
     void publishMaterialProcess_doesNotCreateTask() {
-        ProcessMaterialRedisRequest request = TestFixtures.processMaterialRedisRequest();
         when(streamOperations.add(anyString(), anyMap())).thenReturn(RecordId.of("3-0"));
 
-        redisProducer.publishMaterialProcess(request);
+        redisProducer.publishMaterialProcess(TestFixtures.processMaterialRedisRequest());
 
         verifyNoInteractions(taskService);
+    }
+
+    @Test
+    void publishGradeTest_writesAnswersWithTypedStudentAnswer() {
+        when(streamOperations.add(anyString(), anyMap())).thenReturn(RecordId.of("4-0"));
+
+        redisProducer.publishGradeTest(new GradeTestRedisRequest(
+                TestFixtures.TASK_ID,
+                TestFixtures.ATTEMPT_ID,
+                TestFixtures.TEST_ID,
+                List.of(
+                        new GradeTestRedisRequest.Answer(TestFixtures.QUESTION_ID, StudentAnswerPayload.single(1)),
+                        new GradeTestRedisRequest.Answer(TestFixtures.OTHER_MATERIAL_ID, StudentAnswerPayload.open("four"))
+                )
+        ));
+
+        Map<String, Object> payload = capturedPayload("grade-test:be-to-ml");
+        assertThat(payload)
+                .containsEntry("task_id", TestFixtures.TASK_ID.toString())
+                .containsEntry("attempt_id", TestFixtures.ATTEMPT_ID.toString())
+                .containsEntry("test_id", TestFixtures.TEST_ID.toString());
+
+        List<?> answers = (List<?>) payload.get("answers");
+        assertThat(answers).hasSize(2);
+
+        Map<String, Object> first = toMap(answers.get(0));
+        assertThat(first).containsEntry("question_id", TestFixtures.QUESTION_ID.toString());
+        assertThat(toMap(first.get("student_answer"))).containsExactly(Map.entry("index", 1));
+
+        Map<String, Object> second = toMap(answers.get(1));
+        assertThat(toMap(second.get("student_answer"))).containsExactly(Map.entry("text", "four"));
+    }
+
+    /**
+     * Достаёт payload из конверта {@code XADD <канал> * payload '<JSON>'}:
+     * в стриме ровно одно поле — payload, внутри JSON-объект задачи.
+     */
+    @SuppressWarnings("rawtypes")
+    private Map<String, Object> capturedPayload(String channel) {
+        ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
+        verify(streamOperations).add(eq(channel), captor.capture());
+        Map<String, String> envelope = (Map<String, String>) captor.getValue();
+        assertThat(envelope).hasSize(1).containsKey("payload");
+        return objectMapper.readValue(envelope.get("payload"), Map.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> toMap(Object value) {
+        return (Map<String, Object>) value;
     }
 }

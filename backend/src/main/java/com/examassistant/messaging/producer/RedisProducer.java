@@ -1,6 +1,9 @@
 package com.examassistant.messaging.producer;
 
+import com.examassistant.common.enums.TestAmountQuestions;
+import com.examassistant.common.redis.MlChannels;
 import com.examassistant.messaging.CreateTestRedisRequest;
+import com.examassistant.messaging.GradeTestRedisRequest;
 import com.examassistant.messaging.ProcessMaterialRedisRequest;
 import com.examassistant.messaging.Producer;
 import com.examassistant.messaging.TaskDTO;
@@ -10,45 +13,80 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.OffsetDateTime;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
+/**
+ * Публикация задач в Redis Streams по контракту v4.1.
+ *
+ * Конверт один: {@code XADD <канал> * payload '<JSON>'} — ровно одно поле
+ * {@code payload}, внутри JSON-объект задачи. Поля {@code type} нет: тип задачи
+ * задаёт имя канала.
+ */
 @Service
 @RequiredArgsConstructor
 public class RedisProducer implements Producer {
 
     private final StringRedisTemplate redisTemplate;
-    private static final String STREAM_KEY_TESTS = "tests:create-test-request";
-    private static final String STREAM_KEY_MATERIALS = "materials:process-response";
     private final TasksService taskService;
+    private final ObjectMapper objectMapper;
 
+    @Override
     public RecordId publishCreateTest(CreateTestRedisRequest test) {
-        Map<String, String> fields = new HashMap<>();
-        fields.put("task_id", test.getTaskId().toString());
-        fields.put("test_id", test.getTestId().toString());
-        fields.put("material_ids", test.getMaterialIds().stream()
-                .map(UUID::toString)
-                .collect(Collectors.joining(",")));
-        fields.put("title", test.getTitle());
-        fields.put("amount_questions", test.getAmountQuestions().getValue());
-        fields.put("difficulty", test.getDifficulty());
-        fields.put("course_id", test.getCourseId().toString());
-        TaskDTO taskDTO = new TaskDTO(test.getTestId(), test.getCourseId(), test.getTitle(), OffsetDateTime.now(), null, StatusTask.PROCESSING, test.getAmountQuestions(), test.getDifficulty());
+        // legacy-таблица query_tasks ждёт enum bucket — размер теста выбирает ML,
+        // поэтому в записи задачи лежит константа MEDIUM.
+        TaskDTO taskDTO = new TaskDTO(test.getTestId(), test.getCourseId(), test.getTitle(), OffsetDateTime.now(),
+                null, StatusTask.PROCESSING, TestAmountQuestions.MEDIUM, test.getDifficulty());
         taskService.create(test.getTaskId(), taskDTO);
 
-        return redisTemplate.opsForStream().add(STREAM_KEY_TESTS, fields);
+        // Контракт v4.2: ровно пять полей. course_id нет — корреляция идёт по
+        // task_id/test_id. amount_questions нет — размер теста целиком выбирает ML.
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("task_id", test.getTaskId().toString());
+        payload.put("test_id", test.getTestId().toString());
+        payload.put("material_ids", test.getMaterialIds().stream().map(UUID -> UUID.toString()).toList());
+        payload.put("title", test.getTitle());
+        payload.put("difficulty", test.getDifficulty());
+
+        return add(MlChannels.taskChannel(MlChannels.CREATE_TEST), payload);
     }
 
+    @Override
     public RecordId publishMaterialProcess(ProcessMaterialRedisRequest material) {
-        Map<String, String> fields = new HashMap<>();
-        fields.put("task_id", material.getTaskId().toString());
-        fields.put("material_id", material.getMaterialId().toString());
-        fields.put("storage_key", material.getStorageKey());
+        // У ingest в контракте ровно два поля — корреляция идёт по material_id.
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("material_id", material.getMaterialId().toString());
+        payload.put("storage_key", material.getStorageKey());
 
-        return redisTemplate.opsForStream().add(STREAM_KEY_MATERIALS, fields);
+        return add(MlChannels.taskChannel(MlChannels.INGEST), payload);
+    }
+
+    @Override
+    public RecordId publishGradeTest(GradeTestRedisRequest request) {
+        List<Map<String, Object>> answers = new ArrayList<>();
+        for (GradeTestRedisRequest.Answer answer : request.getAnswers() == null ? List.<GradeTestRedisRequest.Answer>of() : request.getAnswers()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("question_id", answer.getQuestionId().toString());
+            item.put("student_answer", answer.getStudentAnswer().toMap());
+            answers.add(item);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("task_id", request.getTaskId().toString());
+        payload.put("attempt_id", request.getAttemptId().toString());
+        payload.put("test_id", request.getTestId().toString());
+        payload.put("answers", answers);
+
+        return add(MlChannels.taskChannel(MlChannels.GRADE_TEST), payload);
+    }
+
+    private RecordId add(String channel, Map<String, Object> payload) {
+        String json = objectMapper.writeValueAsString(payload);
+        return redisTemplate.opsForStream().add(channel, Map.of("payload", json));
     }
 }

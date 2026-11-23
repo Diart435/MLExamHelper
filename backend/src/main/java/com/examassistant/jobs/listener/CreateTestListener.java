@@ -1,53 +1,66 @@
 package com.examassistant.jobs.listener;
 
-import com.examassistant.jobs.DTO.TestResultResponse;
-import com.examassistant.messaging.TaskService;
-import com.examassistant.tests.QuestionService;
-import com.examassistant.common.enums.TestAmountQuestions;
+import com.examassistant.jobs.DTO.CreateTestResultMessage;
+import com.examassistant.jobs.service.CreateTestResultService;
+import com.examassistant.jobs.service.MlResultAckSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
-import java.util.UUID;
-
+/**
+ * Результат генерации теста с канала {@code create-test:ml-to-be}.
+ *
+ * XACK делается только после успешного применения результата: при исключении
+ * сообщение остаётся в pending, его заберёт reclaim. Битый JSON — poison,
+ * его подтверждаем и удаляем, чтобы он не крутился по кругу.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class CreateTestListener implements StreamListener<String, MapRecord<String, String, String>> {
-    private final StringRedisTemplate redisTemplate;
-    private static final String STREAM_KEY = "tests:create-test-response";
-    private static final String GROUP_NAME = "test-handlers";
-    private final TaskService taskService;
-    private final QuestionService questionService;
+    private final CreateTestResultService resultService;
     private final ObjectMapper objectMapper;
+    private final MlResultAckSupport ackSupport;
 
-    //TODO: сделать создание теста
     @Override
     public void onMessage(MapRecord<String, String, String> message) {
-        log.info("Обработка теста: {}", message.getValue());
-        Map<String, String> fields = message.getValue();
+        CreateTestResultMessage result;
+        try {
+            result = objectMapper.readValue(ackSupport.payload(message), CreateTestResultMessage.class);
+        } catch (RuntimeException e) {
+            ackSupport.ackPoison(message, e);
+            return;
+        }
 
-        String taskIdStr = fields.get("task_id");
-        UUID taskId = UUID.fromString(taskIdStr);
-        taskService.changeStatus(taskId);
+        if (isError(result)) {
+            log.error("ML create-test failed task_id={} test_id={}: {}",
+                    result.getTaskId(), result.getTestId(), result.getError());
+            try {
+                resultService.applyError(result);
+            } catch (RuntimeException e) {
+                log.error("Failed to apply create-test error channel={} msg_id={} task_id={}",
+                        message.getStream(), message.getId(), result.getTaskId(), e);
+                return;
+            }
+            ackSupport.ack(message);
+            return;
+        }
 
-        String amountQuestionsStr = fields.get("amount_questions");
-        TestAmountQuestions amountQuestionsQuestions = TestAmountQuestions.fromValue(amountQuestionsStr);
+        try {
+            resultService.apply(result);
+        } catch (RuntimeException e) {
+            log.error("Failed to apply create-test result channel={} msg_id={} task_id={}",
+                    message.getStream(), message.getId(), result.getTaskId(), e);
+            return;
+        }
+        ackSupport.ack(message);
+    }
 
-        String statusStr = fields.get("status");
-
-        String testIdStr = fields.get("test_id");
-        UUID testId = UUID.fromString(testIdStr);
-
-        String testStr = fields.get("test");
-        TestResultResponse response = objectMapper.readValue(testStr, TestResultResponse.class);
-
-        // TODO: определиться с посылкой Redis response.getTestData().getQuestions().stream().map(x -> new QuestionDTO(testId, x.getQuestionType(), x.getText(), x.getOptions(), x.));
-        redisTemplate.opsForStream().acknowledge(STREAM_KEY, GROUP_NAME, message.getId());
+    // Признак ошибки — status == "error" либо непустое поле error.
+    private boolean isError(CreateTestResultMessage result) {
+        return "error".equals(result.getStatus()) || (result.getError() != null && !result.getError().isBlank());
     }
 }

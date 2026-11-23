@@ -1,0 +1,215 @@
+{
+  "answers": [
+    {
+      "questionId": "7e4dab7a-4646-5c6d-9b9a-1237a8f4f597",
+      "student_answer": {
+        "index": 1
+      }
+    },
+    {
+      "questionId": "e6af1924-e33f-5560-8ded-296a8c2df1e4",
+      "student_answer": {
+        "indexes": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "questionId": "5d7a4f26-4e96-531e-b087-6d3b6a7710c8",
+      "student_answer": {
+        "text": "Уровень фактора — это одно из нескольких значений, которое фактор может принимать в эксперименте."
+      }
+    },
+    {
+      "questionId": "7eb4fecb-22b1-5459-9ad8-eea01f84d44a",
+      "student_answer": {
+        "index": 0
+      }
+    },
+    {
+      "questionId": "798ef63d-8ad7-5fa5-a927-33a2a7768139",
+      "student_answer": {
+        "indexes": [
+          0,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "questionId": "b4219362-b70a-5f95-8640-95bb02bdf332",
+      "student_answer": {
+        "text": "Функции φ представляют в виде степенных полиномов первого или второго порядка."
+      }
+    },
+    {
+      "questionId": "8b6fc42b-97e7-56f0-a1cf-67aa34deee15",
+      "student_answer": {
+        "index": 0
+      }
+    },
+    {
+      "questionId": "96e531fa-da33-5a4a-b7eb-27bc8acae92b",
+      "student_answer": {
+        "index": 1
+      }
+    },
+    {
+      "questionId": "0b8a19cd-7f92-5c8b-96a2-c002375754fa",
+      "student_answer": {
+        "indexes": [
+          0,
+          2
+        ]
+      }
+    },
+    {
+      "questionId": "5a7d0de0-84ca-5757-9a37-40f1240f8c46",
+      "student_answer": {
+        "text": "Затрудняюсь ответить на этот вопрос, единого ответа не вижу."
+      }
+    },
+    {
+      "questionId": "2ee018a0-56db-5801-be2a-5d25a5ad4fe5",
+      "student_answer": {
+        "index": 1
+      }
+    },
+    {
+      "questionId": "aa77dd0d-d001-5227-a6b0-e374b4cbdc6a",
+      "student_answer": {
+        "indexes": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "questionId": "85ac4a70-334b-5608-9c1f-8ab1a6ff2414",
+      "student_answer": {
+        "text": "Фактор должен непосредственно воздействовать на объект: он не должен являться функцией других факторов."
+      }
+    },
+    {
+      "questionId": "2b89aa48-ae7b-5f0d-801d-3e4a325e78cc",
+      "student_answer": {
+        "index": 1
+      }
+    },
+    {
+      "questionId": "def47ac6-fe24-5a08-8216-07f24e3282f5",
+      "student_answer": {
+        "indexes": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "questionId": "1e8161d6-3733-5029-aee4-faebba22a166",
+      "student_answer": {
+        "text": "Сначала выбирают наиболее существенные факторы и отклики системы в соответствии с целью эксперимента, затем описывают функциональную зависимость между ними и устанавливают диапазон изменения каждого фактора от xi min до xi max."
+      }
+    },
+    {
+      "questionId": "e21b2b93-6154-5e50-aab2-ecb0aef3e491",
+      "student_answer": {
+        "index": 3
+      }
+    },
+    {
+      "questionId": "d84ca524-418f-58b1-9f8a-550e2c7cd25e",
+      "student_answer": {
+        "index": 2
+      }
+    },
+    {
+      "questionId": "3ad21497-0060-52c2-bd33-a608fccbf7e1",
+      "student_answer": {
+        "indexes": [
+          0,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "questionId": "279cde4e-eea9-57bb-9a64-fb120b3fe873",
+      "student_answer": {
+        "text": "Свободный член и факторы в первой степени объединяют, а также объединяют факторы во второй степени и произведения факторов."
+      }
+    },
+    {
+      "questionId": "a3806a56-a8cc-5793-aaee-f1dfaf9feafe",
+      "student_answer": {
+        "index": 0
+      }
+    },
+    {
+      "questionId": "b9e93b63-14c4-55e0-8c22-4eef6a7efe93",
+      "student_answer": {
+        "indexes": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "questionId": "76bc7569-5df6-584f-8912-f58a57a0648c",
+      "student_answer": {
+        "text": "План эксперимента D должен содержать N ≥ C(k+d, d) различных экспериментальных точек."
+      }
+    },
+    {
+      "questionId": "c8c8183c-7b88-5e3f-9de3-73f1f0649c36",
+      "student_answer": {
+        "index": 1
+      }
+    },
+    {
+      "questionId": "96f1fba7-ff58-5083-9f9e-4655d7ca61ed",
+      "student_answer": {
+        "indexes": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "questionId": "d72032a9-281b-5662-8db4-54bb4ffe193d",
+      "student_answer": {
+        "text": "Затрудняюсь ответить на этот вопрос, единого ответа не вижу."
+      }
+    },
+    {
+      "questionId": "e0d30a85-1a7f-5fe1-a628-fc9c1e183253",
+      "student_answer": {
+        "index": 1
+      }
+    },
+    {
+      "questionId": "44d6e1a5-6029-5372-a11a-563c777c34d7",
+      "student_answer": {
+        "index": 2
+      }
+    },
+    {
+      "questionId": "012a3155-02da-546e-ac13-9817067bd4d8",
+      "student_answer": {
+        "indexes": [
+          0,
+          1,
+          3
+        ]
+      }
+    },
+    {
+      "questionId": "14787641-6d92-542f-9de8-3a96ded6f428",
+      "student_answer": {
+        "text": "Затрудняюсь ответить на этот вопрос, единого ответа не вижу."
+      }
+    }
+  ]
+}

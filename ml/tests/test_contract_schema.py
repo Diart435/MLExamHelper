@@ -142,7 +142,8 @@ def expected_task_payload(channel: str, example: dict[str, Any]) -> dict[str, An
         )
 
     if task_type == "create_test":
-        # Контракт v4.1: числа вопросов в задаче нет — размер выбирает ML.
+        # Размера в задаче нет: его выбирает ML-планировщик. Поля `amount_questions`
+        # в контракте не существует (v4.2).
         return json.loads(
             CreateTestTask(
                 task_id=example["task_id"],
@@ -530,19 +531,30 @@ class TestContractFileSet:
 
 
 # ---------------------------------------------------------------------------
-#  i. Контракт v4.1: числа вопросов нет, эталон answer_key — есть
+#  i. Контракт: потолок размера amount_questions, эталон answer_key — есть
 # ---------------------------------------------------------------------------
 
 class TestContractV41:
-    """Контракт v4.1: `amountQuestions` убран из задачи, `answer_key` вернулся
-    в ответ на создание теста."""
+    """Контракт: поля размера в задаче нет (размер выбирает ML),
+    `answer_key` в ответе на создание теста — есть."""
 
     def test_create_test_task_schema_has_no_amount_questions(self):
+        """Поля размера в схеме задачи нет: размер выбирает ML-планировщик."""
+        schema = load_json(schema_path("create-test:be-to-ml"))
+        assert "amount_questions" not in schema.get("properties", {})
+        assert "amount_questions" not in schema.get("required", [])
+
+    def test_create_test_task_example_has_no_amount_questions(self):
+        example = load_json(example_path("create-test:be-to-ml"))
+        assert "amount_questions" not in example
+
+    def test_create_test_task_schema_has_no_legacy_amount_questions(self):
+        """Legacy-camelCase `amountQuestions` в контракт не входит."""
         schema = load_json(schema_path("create-test:be-to-ml"))
         assert "amountQuestions" not in schema.get("properties", {})
         assert "amountQuestions" not in schema.get("required", [])
 
-    def test_create_test_task_example_has_no_amount_questions(self):
+    def test_create_test_task_example_has_no_legacy_amount_questions(self):
         example = load_json(example_path("create-test:be-to-ml"))
         assert "amountQuestions" not in example
 
@@ -556,6 +568,13 @@ class TestContractV41:
         example = load_json(example_path("create-test:be-to-ml"))
         legacy = {**example, "amountQuestions": 7}
         Draft202012Validator(schema).validate(legacy)
+
+    def test_create_test_task_schema_accepts_payload_without_bucket(self):
+        """Задача без поля размера валидна — размер выбирает ML."""
+        schema = load_json(schema_path("create-test:be-to-ml"))
+        example = load_json(example_path("create-test:be-to-ml"))
+        without = {k: v for k, v in example.items() if k != "amount_questions"}
+        Draft202012Validator(schema).validate(without)
 
     def test_create_test_result_schema_requires_answer_key(self):
         """Эталон правильного ответа обязателен у каждого вопроса."""

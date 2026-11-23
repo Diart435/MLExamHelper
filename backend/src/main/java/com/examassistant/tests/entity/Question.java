@@ -20,7 +20,6 @@ import java.util.UUID;
 @Table(name = "test_questions")
 public class Question {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "question_id")
     private UUID questionId;
 
@@ -44,7 +43,10 @@ public class Question {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", name = "key_points")
-    private Map<String, Object> keyPoints;
+    private List<String> keyPoints;
+
+    @Column(name = "question_order")
+    private Integer questionOrder;
 
     @Column(name = "source_chunk_id")
     private UUID sourceChunkId;

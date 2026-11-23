@@ -63,10 +63,13 @@ class CreateTestResultServiceTest {
         QuestionDataMessage multi = question(2);
         multi.setType("multi_choice");
         multi.setAnswerKey(Map.of("correct_indexes", List.of(0, 1)));
+        // open_answer по контракту v4.1: answer_key = эталон, key_points — отдельное поле.
         QuestionDataMessage open = question(3);
         open.setType("open_answer");
         open.setOptions(null);
-        open.setAnswerKey(Map.of("key_points", List.of("definition", "example")));
+        open.setAnswerKey(Map.of("reference_answer", "A transaction is a unit of work",
+                "explanation", "Name the unit of work"));
+        open.setKeyPoints(List.of("definition", "example"));
 
         service.apply(successMessage(question(1), multi, open));
 
@@ -75,8 +78,22 @@ class CreateTestResultServiceTest {
                 QuestionType.SINGLE_CHOICE, QuestionType.MULTI_CHOICE, QuestionType.OPEN_ANSWER);
         assertThat(saved.get(1).getAnswerKey()).isEqualTo(Map.of("correct_indexes", List.of(0, 1)));
         assertThat(saved.get(2).getOptions()).isNull();
-        assertThat(saved.get(2).getAnswerKey())
-                .isEqualTo(Map.of("key_points", List.of("definition", "example")));
+        assertThat(saved.get(2).getAnswerKey()).isEqualTo(Map.of(
+                "reference_answer", "A transaction is a unit of work",
+                "explanation", "Name the unit of work"));
+        // Опорные пункты ML присылает отдельным полем key_points.
+        assertThat(saved.get(2).getKeyPoints()).containsExactly("definition", "example");
+    }
+
+    @Test
+    void apply_writesActualQuestionCountIntoAmountQuestions() {
+        var test = creatingTest();
+        when(testRepository.findByIdForUpdate(TestFixtures.TEST_ID)).thenReturn(Optional.of(test));
+
+        service.apply(successMessage(question(1), question(2)));
+
+        // Размер теста выбирает ML — backend пишет фактическое число вопросов.
+        assertThat(test.getAmountQuestions()).isEqualTo("2");
     }
 
     @Test
@@ -146,6 +163,9 @@ class CreateTestResultServiceTest {
     private com.examassistant.tests.entity.Test creatingTest() {
         var test = TestFixtures.test();
         test.setStatusTest(TestStatus.CREATING);
+        // Пока тест готовит ML, в колонке 0 — фактическое число пишется
+        // по ответу ML.
+        test.setAmountQuestions("0");
         return test;
     }
 

@@ -1,0 +1,25 @@
+$kind: http-request
+description: "difficulty: easy | medium | hard. Количество вопросов не задаётся: его выбирает ML-планировщик по числу проверяемых фактов в материале (1..30). Фактическое число придёт в ответе как amountQuestions = N."
+url: "{{baseUrl}}/api/tests"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "courseId": "{{courseId}}",
+      "title": "Стенд-тест {{email}}",
+      "difficulty": "medium",
+      "materialIds": ["{{materialId}}"]
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('201 Created', () => pm.response.to.have.status(201));
+      const body = pm.response.json();
+      pm.collectionVariables.set('testId', body.testId);
+      console.log('testId =', body.testId, '| statusTest =', body.statusTest);
+    language: text/javascript
+order: 6000

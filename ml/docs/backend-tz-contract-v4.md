@@ -1,4 +1,4 @@
-# ТЗ для backend-разработчика: приём ML-задач и результатов (контракт v4.1)
+# ТЗ для backend-разработчика: приём ML-задач и результатов (контракт v4.2)
 
 **Зачем документ.** ML-сторона готова: воркер читает Redis Streams, генерирует тесты, проверяет попытки и отвечает на **каждое** сообщение. Backend должен публиковать задачи в каналы и раскладывать результаты в БД. Ниже — требования к backend'у, сформулированные как контракт, а не как готовый код: имена классов, слои и DTO — на ваше усмотрение.
 
@@ -6,7 +6,26 @@
 
 **Машино-читаемые схемы.** Все шесть контрактов (3 типа задач × 2 направления) описаны JSON Schema draft 2020-12 в `ml/docs/contracts/` — по файлу на канал, плюс канонические примеры payload'ов в `ml/docs/contracts/examples/`. Примеры сгенерированы из `ml/app/contracts.py`, тест `ml/tests/test_contract_schema.py` следит, чтобы они не разъехались с кодом. Свои сообщения можно валидировать по схемам на своей стороне.
 
-**Состояние схемы БД** в этом документе — по миграциям `backend/src/main/resources/db/changelog/changes/001…005-materials-test.sql` (то, что реально применено сейчас). Расхождения с ERD заказчика (`ml/docs/erd.png`) выписаны явно в §4.
+**Состояние схемы БД** в этом документе — по миграциям `backend/src/main/resources/db/changelog/changes/001…005-materials-test.sql` плюс `006-redis-contract-v4.1.sql` (эталон и порядок вопросов). Расхождения с ERD заказчика (`ml/docs/erd.png`) выписаны явно в §4.
+
+### Состояние реализации (на 2026-11-23)
+
+Контракт v4.2 **реализован на обеих сторонах** в ветке `ml/redis-jobs` (слита ветка `backend/redis-jobs`, merge `c9af608`; правка v4.2 — 2026-11-23):
+
+| Что | Где | Состояние |
+|---|---|---|
+| Транспорт: каналы, `XADD … payload`, группы, reclaim/poison | `backend/common/redis/MlChannels.java`, `backend/common/config/MlStreamsProperties.java`, `backend/messaging/producer/RedisProducer.java`, `backend/jobs/service/RedisConsumer.java` | ✅ |
+| Три listener'а + применение результатов к БД | `backend/jobs/listener/*`, `backend/jobs/service/{CreateTestResultService,GradeTestResultService}.java` | ✅ |
+| DTO результатов ML | `backend/jobs/DTO/*` | ✅ |
+| Миграция `answer_key` / `question_order`, снятие NOT NULL | `backend/db/changelog/changes/006-redis-contract-v4.1.sql` | ✅ |
+| Эталон в ответе ML — **объект** (`correct_index` / `correct_indexes` / `reference_answer`) | `ml/app/contracts.py` (`GradedItem.correct_answer`), `ml/app/services/grader.py` | ✅ |
+| `key_points` в ответе `create-test` — плоский список строк | `ml/app/contracts.py`, `backend/jobs/DTO/QuestionDataMessage.java` | ✅ |
+| **Payload создания теста — ровно 5 ключей**, без `amountQuestions` | `backend/messaging/producer/RedisProducer.java`, `backend/messaging/CreateTestRedisRequest.java`, `backend/tests/DTO/CreateTestRequest.java` | ✅ |
+| **`tests.amount_questions` = число**: `"0"` при создании теста, `len(questions)` — после ответа ML | `backend/tests/service/TestsService.java`, `backend/jobs/service/CreateTestResultService.java` | ✅ |
+
+Что **осталось**: живая приёмка на docker-стенде по чек-листу §6 (реальные сообщения через Redis, проверка записей в БД) — тесты на обеих сторонах зелёные, но стенд ещё не поднимался. Плюс в backend остались мёртвые legacy-DTO (`jobs/DTO/TestResultResponse.java`, `TestData.java`, `QuestionData.java`, `jobs/ProcessMaterialResponse.java`, `jobs/Consumer.java`) — на контракт не влияют, но чистить надо.
+
+Проверка контракта двусторонняя и постоянная: `backend/src/test/java/com/examassistant/jobs/MlContractExamplesTest.java` разбирает канонические примеры из `ml/docs/contracts/examples/` DTO'ами backend'а (пропускается, если каталога `ml/` нет), а `ml/tests/test_contract_schema.py` следит, чтобы примеры совпадали с `ml/app/contracts.py`.
 
 ---
 
@@ -24,7 +43,11 @@
 
 Три первых пункта — правка **v4.1** (2026-11-17), обоснование — в спеке `ml/docs/superpowers/specs/2026-11-17-ml-backend-contract-v4.md` §0.3. Главное для backend'а: `answer_key` теперь приходит в ответе и его надо сохранить — без эталона frontend не может показать студенту правильный ответ.
 
+**Правка v4.2 (2026-11-23) — только в канале `create-test`, состав payload'а не изменился.** Backend присылает **ровно 5 ключей**: `task_id`, `test_id`, `material_ids`, `title`, `difficulty`. Ни поля размера, ни поля `course_id` в payload'е нет. Число вопросов (1..30) выбирает ML-планировщик по материалу; backend узнаёт фактический размер из ответа и пишет `tests.amount_questions = len(questions)`. В `tests.amount_questions` лежит **число**, а не бакет: при создании теста backend пишет `"0"` (тест пока без вопросов), после ответа ML — фактическое число. Бакеты `min`/`med`/`max` остались только в legacy-таблице `query_tasks`. Обоснование — в спеке, §0.4.
+
 В переписке заказчик местами писал «injest» и «rate-test» — это опечатки. Канонические имена каналов — как в таблице §1.1.
+
+⚠️ **План `ml/docs/redis-contract-v4.1-plan.md` этому документу противоречит.** Он написан для другого репозитория и под контракт v4.0: там вопрос плоский (`correct_index` на верхнем уровне), а размер теста фиксированный (`DEFAULT_NUM_QUESTIONS = 10`). **Правда — этот документ и `ml/app/contracts.py`.** Расхождения разобраны в `ml/docs/backend-redis-requirements.md` §0.1.
 
 ---
 
@@ -106,7 +129,9 @@ Backend обязан обрабатывать ошибку без падения
 ```
 
 - `task_id`, `test_id`, `material_ids` (непустой список UUID-строк), `title` — обязательны;
-- **`amountQuestions` в задаче нет** (v4.1). Размер теста определяет ML: отдельный LLM-вызов планировщика (`app/services/test_planner.py`, `plan_test(llm, digest, difficulty)`) смотрит на материал и возвращает `num_questions` (1..30) + список тем. Backend присылает только `task_id`, `test_id`, `material_ids`, `title`, `difficulty`;
+- **payload — ровно 5 ключей**: `task_id`, `test_id`, `material_ids`, `title`, `difficulty`. Ни поля размера, ни `course_id` в нём нет;
+- **`amountQuestions` в задаче нет** (v4.1). Размер теста определяет ML: отдельный LLM-вызов планировщика (`app/services/test_planner.py`, `plan_test(llm, digest)`) смотрит на материал и возвращает `num_questions` (1..30) + список тем. Размер = **число проверяемых фактов, найденных в материале**: границы 1..30 — рамка, а не цель (фактов 3 → тест из 3 вопросов, фактов 40 → 30 самых важных). Добивать размер выдуманными фактами нельзя;
+- **`difficulty` на количество вопросов не влияет** (v4.2) — ни в какую сторону. Он задаёт только **микс типов** вопросов и глубину формулировки;
 - `difficulty` — `easy` | `medium` | `hard`, по умолчанию `medium`. **Микс типов вопросов считает ML** — backend своей логики микса не реализует;
 - `course_id` в payload'е **нет** — связь теста с курсом backend хранит у себя.
 
@@ -149,6 +174,15 @@ Backend обязан обрабатывать ошибку без падения
 
 Плюс в `tests`: `status_test` → «готов» (или «ошибка»), `difficulty` → из задачи, `amount_questions` → **NOT NULL**, заполняется **фактическим числом вопросов из ответа**: `len(questions)`. Поля `amountQuestions` в задаче больше нет, писать «`"min"`» не нужно.
 
+**Про `tests.amount_questions` (v4.2).** Колонка объявлена как `VARCHAR(50) NOT NULL`, но **значение в ней теперь всегда число, а не бакет**:
+
+| Момент | Что писать |
+|---|---|
+| При создании теста (задача ушла в ML, вопросов ещё нет) | `"0"` — строка-число |
+| После прихода ответа ML | фактическое число: `len(questions)` |
+
+Бакеты `"min"` / `"med"` / `"max"` в этой колонке не бывают — enum `TestAmountQuestions` остался только для legacy-таблицы `query_tasks`.
+
 **`source_chunk_id`:** ML присылает **UUID чанка** (метки `C1`, `C2` живут только в промпте, ML разворачивает их в UUID). Если чанка нет в `material_chunks` — писать `NULL`, **не ронять вставку по FK**: сначала найти чанк (`SELECT chunk_id FROM material_chunks WHERE chunk_id = :id`), и если его нет — `NULL`.
 
 ### 2.3. `grade-test` — проверить попытку
@@ -182,7 +216,9 @@ Backend обязан обрабатывать ошибку без падения
 {"task_id": "3b17…", "attempt_id": "dc12…", "test_id": "5780…",
  "score_pct": 60.0, "grade": 3,
  "items": [{"question_id": "05a8…", "is_correct": true, "score": 1.0,
-            "feedback": "Верно", "correct_answer": "Текст варианта", "student_answer": "Текст ответа"}]}
+            "feedback": "Верно",
+            "correct_answer": {"correct_index": 0, "explanation": "Потому что"},
+            "student_answer": {"index": 0}}]}
 ```
 
 **Поля `status` в ответе нет.** Ошибка: `{"task_id": "…", "error": "…"}` — обязателен только `error`; `attempt_id` и `test_id` могут отсутствовать, если payload не удалось разобрать.
@@ -207,7 +243,21 @@ Backend обязан обрабатывать ошибку без падения
 
 **3.2. `is_correct` = `score ≥ 0.5`.** Значение приходит от ML в `items[].is_correct` — backend пишет его как есть (в `attempt_answers` эта колонка есть и NOT NULL, см. §4.4). Backend не пересчитывает его сам.
 
-**3.3. `correct_answer` — это текст**, а не индекс: для закрытых вопросов — текст правильного варианта, для `open_answer` — эталонный ответ. В `items[]` он приходит строкой. Колонка `attempt_answers.correct_answer` — JSONB; форма хранения (JSON-строка `"Read committed"` или объект `{"text": "…"}`) — на ваше усмотрение, но её надо зафиксировать в одном месте и отдать фронту в том же виде.
+**3.3. `correct_answer` — это объект-эталон**, а не строка: та же форма, что `answer_key` вопроса. В `items[]` он приходит объектом:
+
+| Тип вопроса | `correct_answer` |
+|---|---|
+| `single_choice` | `{"correct_index": N}` (+ необязательный `explanation`) |
+| `multi_choice` | `{"correct_indexes": [N, M]}` (+ необязательный `explanation`) |
+| `open_answer` | `{"reference_answer": "<эталон>"}` (+ необязательный `explanation`) |
+
+Так backend и разбирает это поле: у него `Map<String, Object>`, и **JSON-строка в `correct_answer` роняет разбор всего вердикта** — попытка остаётся неоценённой. Объект совпадает с `test_questions.answer_key`, который backend и так хранит, — так что `attempt_answers.correct_answer` (JSONB) пишется as-is, без пересборки.
+
+Если поля `correct_answer` в `items[]` нет (эталона не нашлось) — backend подставляет `question.answer_key` сам.
+
+`student_answer` в `items[]` — тоже объект: `{"index": N}` | `{"indexes": [N, M]}` | `{"text": "…"}` (та же форма, что в задаче `grade-test:be-to-ml`).
+
+Человекочитаемый текст правильного ответа при этом не теряется — он есть в `feedback` («Неверно. Правильный ответ: «B».»).
 
 ---
 
@@ -229,6 +279,11 @@ attempt_answers(answer_id PK, attempt_id NOT NULL, question_id NOT NULL,
 student_attempts(attempt_id PK, test_id NOT NULL, user_id NOT NULL,
                  started_at NOT NULL, finished_at, score_pct NUMERIC(5,2), grade INT)
 ```
+
+`tests.amount_questions` — колонка `VARCHAR(50) NOT NULL`, но значение в ней всегда
+**число**, а не бакет: `"0"` при создании теста (вопросов ещё нет) → фактическое число
+`len(questions)` после ответа ML (см. §2.2). Бакеты `"min"`/`"med"`/`"max"` остались
+только в legacy-таблице `query_tasks`.
 
 **4.1. Добавить колонки `test_questions.answer_key JSONB` и `test_questions.question_order INT`.** Обе добавляются backend'ом своей миграцией.
 
@@ -252,10 +307,12 @@ student_attempts(attempt_id PK, test_id NOT NULL, user_id NOT NULL,
 
 Backend на этот порядок не влияет — он отвечает только за то, чтобы эталон оказался в БД (п. 1).
 
-**4.4. `attempt_answers.is_correct` и `attempt_answers.correct_answer` — NOT NULL.** В ERD заказчика этих колонок нет, а в миграции `001` они есть и **NOT NULL**. ML присылает обе величины в `items[]`, поэтому backend может их заполнить — но при создании строки ответа (до прихода вердикта) значений ещё нет. Выберите одно из двух и держитесь этого варианта:
+**4.4. `attempt_answers.is_correct` и `attempt_answers.correct_answer` — NOT NULL.** В ERD заказчика этих колонок нет, а в миграции `001` они есть и **NOT NULL**. ML присылает обе величины в `items[]` (`correct_answer` — объект-эталон, §3.3), поэтому backend может их заполнить — но при создании строки ответа (до прихода вердикта) значений ещё нет. Выберите одно из двух и держитесь этого варианта:
 
-- **(а) рекомендуемое** — снять NOT NOT NULL своей миграцией (`ALTER TABLE attempt_answers ALTER COLUMN is_correct DROP NOT NULL; ALTER COLUMN correct_answer DROP NOT NULL;`) и писать значения из вердикта; до вердикта — `NULL`;
+- **(а) рекомендуемое** — снять NOT NULL своей миграцией (`ALTER TABLE attempt_answers ALTER COLUMN is_correct DROP NOT NULL; ALTER COLUMN correct_answer DROP NOT NULL;`) и писать значения из вердикта; до вердикта — `NULL`;
 - **(б) без миграции** — писать заглушку (`false` / `'{}'::jsonb`) при создании строки ответа и обновлять из `items[]` при применении вердикта. Тогда между сдачей и вердиктом в строке лежит заглушка — это надо учитывать при чтении попытки.
+
+Значение `correct_answer` пишется в JSONB **как объект** (как пришло в `items[]`), а не как JSON-строка: иначе форма в колонке разойдётся с формой в `test_questions.answer_key` (там объект) и с тем, что ожидает фронт.
 
 **4.5. Права ML в БД:** `INSERT` в `material_chunks` и `SELECT` в `test_questions` (в т. ч. `answer_key` — эталон) — больше ML в БД не пишет. Всё остальное (тесты, вопросы, попытки, ответы) пишет backend.
 
@@ -266,12 +323,16 @@ Backend на этот порядок не влияет — он отвечает
 - пересобирать, «приводить к своему виду» и заново валидировать `options` / `key_points` / `answer_key` — ML уже проверил;
 - ждать от ML поля `status` в `grade-test:ml-to-be` — его там нет;
 - присылать `amountQuestions` в задаче `create-test` — поля больше нет, размер всегда выбирает ML;
+- присылать в задаче `create-test` поле размера в **любом** виде — ни числа, ни `"min"`, ни бакета; payload создания теста — ровно 5 ключей;
+- подбирать размер теста под `difficulty` (например, «для `hard` сделаем 30 вопросов») — количество вопросов от сложности не зависит;
+- писать в `tests.amount_questions` бакет (`"min"` / `"med"` / `"max"`) — там всегда число;
 - считать микс типов вопросов — это зона ML;
 - публиковать сообщения без поля `payload` или с полем `type`;
 - писать в `material_chunks` — это делает ML;
 - определять тип задачи по `task_id` — только по имени канала;
 - отправлять `grade-test` раньше, чем записаны `student_attempts` и `attempt_answers`;
 - использовать старые имена каналов `ml-tasks:<type>` / `ml-results:<type>` — они больше не существуют, ML их не слушает;
+- **понижать уже успешный статус ошибкой** — доставка «хотя бы один раз», успешный результат может прийти после неуспешного. Если материал/тест уже в успешном состоянии (`ready`/«готов»), поздняя ошибка его не переводит в «ошибка», а только логируется;
 - делать синхронный HTTP-запрос в ML — транспорт только Redis Streams, HTTP-эндпоинты клиента возвращают **202 Accepted** и статус проверяется опросом `GET`.
 
 ---
@@ -291,8 +352,8 @@ Backend на этот порядок не влияет — он отвечает
 | 9 | Вопрос с несуществующим чанком сохранился, `source_chunk_id` = NULL | вставить вопрос с чужой меткой → строка есть, FK не упал |
 | 10 | Повторный результат не удвоил вопросы | обработать один и тот же результат дважды → `count(*)` не изменился |
 | 11 | **Эталон сохранён в `test_questions.answer_key`** | `SELECT answer_key FROM test_questions WHERE test_id=…` → у каждого вопроса есть `correct_index` / `correct_indexes` / `reference_answer` по его типу |
-| 12 | **`tests.amount_questions` = фактическое число вопросов** | `SELECT amount_questions, (SELECT count(*) FROM test_questions WHERE test_id=…) FROM tests WHERE test_id=…` → значения равны |
-| 13 | **В задаче `create-test` нет поля `amountQuestions`** | `redis-cli XRANGE create-test:be-to-ml - + COUNT 1` → в payload'е только `task_id`, `test_id`, `material_ids`, `title`, `difficulty` |
+| 12 | **`tests.amount_questions` = фактическое число вопросов** | `SELECT amount_questions, (SELECT count(*) FROM test_questions WHERE test_id=…) FROM tests WHERE test_id=…` → значения равны; значение — **число**, не бакет |
+| 13 | **В задаче `create-test` нет поля `amountQuestions`** | `redis-cli XRANGE create-test:be-to-ml - + COUNT 1` → в payload'е **ровно 5** ключей: `task_id`, `test_id`, `material_ids`, `title`, `difficulty` |
 | 14 | Попытка создаётся до публикации задачи | после сдачи: строки в `student_attempts` и `attempt_answers` есть, `score` = NULL, попытка в статусе «обрабатывается» |
 | 15 | Вердикт применился | после ответа ML: `finished_at` заполнен, `score_pct` и `grade` совпадают с ответом, `is_correct`/`correct_answer` записаны, `GET` попытки отдаёт «проверена» |
 | 16 | `multi_choice` с частичными отметками | ответ `{indexes:[0,2]}` → дробный `score`; `{index}` на `open_answer` → ошибка ML |

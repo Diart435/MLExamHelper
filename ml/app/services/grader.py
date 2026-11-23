@@ -36,9 +36,19 @@ Feedback per question:
   - multi_choice, неверно:  "Неверно. Правильные варианты: ... <explanation>"
   - open_answer:            разбор от LLM-судьи (что верно, чего не хватает)
   - Пусто/неизвестный тип:  "Ответ не распознан."
+
+Что уходит в payload вердикта:
+  `correct_answer` — эталон-объект той же формы, что `answer_key` вопроса
+  (`{"correct_index": N}` | `{"correct_indexes": [N, M]}` |
+  `{"reference_answer": "…"}` + необязательный `explanation`);
+  `student_answer` — ответ студента объектом (`{"index": N}` |
+  `{"indexes": [N, M]}` | `{"text": "…"}`). Backend читает `correct_answer` в
+  `Map<String, Object>`, поэтому строка там роняет разбор всего вердикта.
+  Человекочитаемый текст правильного ответа не теряется — он в `feedback`.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -49,6 +59,7 @@ from app.contracts import GradeAttemptTask, GradedItem, StudentAnswer
 from app.models import AnswerKey, QuestionRow
 from app.services.answer_store import AnswerStore
 from app.services.choice_judge import ChoiceJudge
+from app.services.llm import payloads_enabled
 from app.services.open_answer_judge import OpenAnswerJudge
 from app.services.test_store import TestStore
 
@@ -130,6 +141,7 @@ class Grader:
             items.append(await self._grade_one(q, ans, task.test_id))
 
         score_pct, grade = _aggregate(items, total_questions=len(questions))
+        self._log_summary(items, len(questions), score_pct, grade)
         return GradingOutcome(
             score_pct=score_pct, grade=grade, items=items,
             total_questions=len(questions),
@@ -215,11 +227,63 @@ class Grader:
         if q.type_question != "single_choice":
             # Текущая итерация таких вопросов не генерит, но если backend пришлёт —
             # явно отказываемся, а не угадываем.
-            return GradedItem(
+            item = GradedItem(
                 question_id=q.question_id, is_correct=False, score=0.0,
                 feedback=f"Автопроверка для типа «{q.type_question}» пока не реализована.",
             )
+            self._log_graded(q, ans, None, item)
+            return item
         return await self._grade_single_choice(q, ans, test_id)
+
+    # ------------------------------------------------------------------
+    #  Подробные логи проверки
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _log_graded(
+        q: QuestionRow,
+        ans: StudentAnswer,
+        ref: dict[str, Any] | None,
+        item: GradedItem,
+    ) -> None:
+        """Разбор проверки одного вопроса: ответ, эталон, вердикт, фидбэк.
+
+        Фидбэк логируется вместе с вердиктом: это ровно тот текст, который
+        уходит студенту в `items[].feedback`.
+        """
+        if not payloads_enabled():
+            return
+        logger.info(
+            "[Grader] question_id={} type={} student_answer={} answer_key={} "
+            "→ is_correct={} score={}",
+            q.question_id,
+            q.type_question,
+            json.dumps(_student_answer_view(ans), ensure_ascii=False),
+            json.dumps(_answer_key_payload(_answer_key(ref)) or {}, ensure_ascii=False),
+            item.is_correct,
+            item.score,
+        )
+        logger.info(
+            "[Grader] question_id={} feedback: {}",
+            q.question_id,
+            item.feedback or "",
+        )
+
+    @staticmethod
+    def _log_summary(items: list[GradedItem], total_questions: int,
+                     score_pct: float, grade: int) -> None:
+        """Итог проверки: сколько вопросов полный балл, сколько верных."""
+        if not payloads_enabled():
+            return
+        full = sum(1 for i in items if i.score >= 1.0)
+        correct = sum(1 for i in items if i.is_correct)
+        answered = len(items)
+        logger.info(
+            "[Grader] summary: score_pct={} grade={} correct={}/{} "
+            "full_score={}/{} answered={}/{}",
+            score_pct, grade, correct, total_questions,
+            full, total_questions, answered, total_questions,
+        )
 
     async def _grade_single_choice(
         self, q: QuestionRow, ans: StudentAnswer, test_id: str
@@ -228,19 +292,23 @@ class Grader:
         ref = await self._reference(q, test_id)
         correct = _correct_index(ref)
         if correct is None:
-            return GradedItem(
+            item = GradedItem(
                 question_id=q.question_id, is_correct=False, score=0.0,
                 feedback=FALLBACK_FEEDBACK,
             )
+            self._log_graded(q, ans, ref, item)
+            return item
 
         correct_text = q.options[correct] if 0 <= correct < len(q.options) else ""
         student_idx = ans.student_answer_index
         if student_idx is None or not (0 <= student_idx < len(q.options)):
-            return GradedItem(
+            item = GradedItem(
                 question_id=q.question_id, is_correct=False, score=0.0,
-                correct_answer=correct_text,
+                correct_answer=_answer_key_payload(_answer_key(ref)),
                 feedback="Ответ не выбран.",
             )
+            self._log_graded(q, ans, ref, item)
+            return item
 
         is_correct = (student_idx == correct)
         explanation = _explanation(ref)
@@ -252,14 +320,16 @@ class Grader:
                 + (f" {explanation}" if explanation else "")
             )
 
-        return GradedItem(
+        item = GradedItem(
             question_id=q.question_id,
             is_correct=is_correct,
             score=1.0 if is_correct else 0.0,
-            correct_answer=correct_text,
-            student_answer=q.options[student_idx],
+            correct_answer=_answer_key_payload(_answer_key(ref)),
+            student_answer={"index": student_idx},
             feedback=feedback,
         )
+        self._log_graded(q, ans, ref, item)
+        return item
 
     async def _grade_open_answer(
         self, q: QuestionRow, ans: StudentAnswer, test_id: str
@@ -278,11 +348,13 @@ class Grader:
 
         if not reference and not criteria:
             # Ни эталона, ни критериев — оценивать нечем, LLM не тратим.
-            return GradedItem(
+            item = GradedItem(
                 question_id=q.question_id, is_correct=False, score=0.0,
-                student_answer=student_text,
+                student_answer={"text": student_text},
                 feedback=FALLBACK_FEEDBACK,
             )
+            self._log_graded(q, ans, ref, item)
+            return item
 
         verdict = await self.judge.judge(
             question=q.text_question,
@@ -291,14 +363,16 @@ class Grader:
             student_answer=student_text,
         )
 
-        return GradedItem(
+        item = GradedItem(
             question_id=q.question_id,
             is_correct=verdict.score >= PARTIAL_CORRECT_THRESHOLD,
             score=verdict.score,
-            student_answer=student_text,
-            correct_answer=reference,
+            student_answer={"text": student_text},
+            correct_answer=_answer_key_payload(_answer_key(ref)),
             feedback=verdict.feedback,
         )
+        self._log_graded(q, ans, ref, item)
+        return item
 
     async def _grade_multi_choice(
         self, q: QuestionRow, ans: StudentAnswer, test_id: str
@@ -314,18 +388,22 @@ class Grader:
         ref = await self._reference(q, test_id)
         correct = set(_correct_indexes(ref))
         if not correct:
-            return GradedItem(
+            item = GradedItem(
                 question_id=q.question_id, is_correct=False, score=0.0,
                 feedback=FALLBACK_FEEDBACK,
             )
+            self._log_graded(q, ans, ref, item)
+            return item
 
         student = set(ans.student_answer_indexes or [])
         if not student:
-            return GradedItem(
+            item = GradedItem(
                 question_id=q.question_id, is_correct=False, score=0.0,
-                correct_answer=_options_text(q, sorted(correct)),
+                correct_answer=_answer_key_payload(_answer_key(ref)),
                 feedback="Ответ не выбран.",
             )
+            self._log_graded(q, ans, ref, item)
+            return item
 
         hits = len(correct & student)
         # Отметки вне диапазона вариантов тоже считаются неверными: мусорный
@@ -349,14 +427,28 @@ class Grader:
                 + (f" {explanation}" if explanation else "")
             )
 
-        return GradedItem(
+        item = GradedItem(
             question_id=q.question_id,
             is_correct=score >= PARTIAL_CORRECT_THRESHOLD,
             score=score,
-            student_answer=_options_text(q, sorted(student)),
-            correct_answer=correct_text,
+            student_answer={"indexes": sorted(student)},
+            correct_answer=_answer_key_payload(_answer_key(ref)),
             feedback=feedback,
         )
+        self._log_graded(q, ans, ref, item)
+        return item
+
+
+def _student_answer_view(ans: StudentAnswer) -> dict[str, Any]:
+    """Ответ студента в том же виде, что уходит в payload (`items[].student_answer`).
+
+    Ровно одно из трёх: `index` | `indexes` | `text` — как в контракте.
+    """
+    if ans.student_answer_indexes is not None:
+        return {"indexes": list(ans.student_answer_indexes)}
+    if ans.student_answer_index is not None:
+        return {"index": ans.student_answer_index}
+    return {"text": ans.student_answer_text or ""}
 
 
 def _answer_key(ref: dict[str, Any] | None) -> AnswerKey:
@@ -365,6 +457,23 @@ def _answer_key(ref: dict[str, Any] | None) -> AnswerKey:
         return AnswerKey()
     ak = ref.get("answer_key")
     return ak if isinstance(ak, AnswerKey) else AnswerKey()
+
+
+def _answer_key_payload(ak: AnswerKey) -> dict[str, Any] | None:
+    """Эталон правильного ответа объектом — та же форма, что `answer_key` в БД.
+
+    None, если эталона нет: backend тогда подставит `question.answer_key` сам.
+    """
+    payload: dict[str, Any] = {}
+    if ak.correct_index is not None:
+        payload["correct_index"] = ak.correct_index
+    if ak.correct_indexes:
+        payload["correct_indexes"] = list(ak.correct_indexes)
+    if (ak.reference_answer or "").strip():
+        payload["reference_answer"] = ak.reference_answer
+    if (ak.explanation or "").strip():
+        payload["explanation"] = ak.explanation
+    return payload or None
 
 
 def _answer_key_from_ref(ref: dict[str, Any]) -> AnswerKey | None:

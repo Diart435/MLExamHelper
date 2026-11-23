@@ -48,6 +48,9 @@ public class CreateTestResultService {
         try {
             List<Question> questions = mapQuestions(test.getTestId(), message);
             questionRepository.saveAll(questions);
+            // Контракт v4.1: размер теста выбирает ML — backend пишет фактическое
+            // число вопросов вместо запрошенного bucket'а.
+            test.setAmountQuestions(String.valueOf(questions.size()));
             test.setStatusTest(TestStatus.CREATED);
             changeTaskStatus(message.getTaskId(), StatusTask.FINISHED);
         } catch (InvalidResultException e) {
@@ -91,6 +94,8 @@ public class CreateTestResultService {
                     .typeQuestion(type)
                     .textQuestion(item.getText())
                     .options(item.getOptions() == null ? null : List.copyOf(item.getOptions()))
+                    // key_points — плоский список строк: критерии для open_answer.
+                    .keyPoints(item.getKeyPoints() == null ? null : List.copyOf(item.getKeyPoints()))
                     .answerKey(new LinkedHashMap<>(item.getAnswerKey()))
                     .sourceChunkId(sourceChunkId)
                     .questionOrder(item.getId())

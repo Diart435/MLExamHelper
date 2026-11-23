@@ -40,7 +40,7 @@ from typing import Any
 from loguru import logger
 
 from app.contracts import CreateTestTask, Test, TestQuestion
-from app.services.llm import LLMClient
+from app.services.llm import LLMClient, payloads_enabled
 from app.services.rag import ChunkRef, RAGService
 from app.services.test_planner import plan_test
 
@@ -477,11 +477,13 @@ class TestGenerator:
         chunk_refs = [c.ref for _mid, chunks in context for c in chunks]
         ref_to_chunk = {c.ref: c.chunk_id for _mid, chunks in context for c in chunks}
 
-        # Размер теста: задан backend'ом — уважаем; не задан — решает планировщик
-        # по тому же контексту, по которому потом пишутся вопросы.
+        # Размер теста: задан явно (внутренний вызов) — уважаем; не задан —
+        # решает планировщик по тому же контексту, по которому потом пишутся
+        # вопросы. Размер = число проверяемых фактов в материале (1..30);
+        # backend в этом не участвует, сложность на размер не влияет.
         topics: list[str] | None = None
         if task.num_questions is None:
-            plan = await plan_test(self.llm, digest, task.difficulty)
+            plan = await plan_test(self.llm, digest)
             num_questions = plan.num_questions
             topics = plan.topics
         else:
@@ -531,8 +533,31 @@ class TestGenerator:
                 # чем привязка к чужому чанку.
                 q.source_chunk_id = ref_to_chunk.get(q.source_chunk_ref or "")
 
+            # Разобранный JSON вопросов — целиком, на каждой попытке: так видно
+            # сами вопросы и то, почему пошла вторая попытка (неверный микс).
+            # Логируем ПОСЛЕ подстановки source_chunk_id — в логе должен быть
+            # тот же тест, который уйдёт наружу.
+            if payloads_enabled():
+                logger.info(
+                    "[TestGenerator] attempt {}/{} — test JSON:",
+                    attempt, _MAX_GENERATION_ATTEMPTS,
+                )
+                logger.info(
+                    "[TestGenerator] attempt {}/{} — questions: {}",
+                    attempt, _MAX_GENERATION_ATTEMPTS,
+                    json.dumps(test.to_dict(), ensure_ascii=False, indent=2),
+                )
+
             got = _count_types(test.questions)
             if len(test.questions) == num_questions and got == counts:
+                # Перенумеровываем вопросы в 1..N по порядку списка. JSON Schema
+                # ограничивает `id` диапазоном 1..N, но не гарантирует ни
+                # уникальность, ни порядок: модель может вернуть [1,1,3] или
+                # [3,2,1]. Backend выводит `question_id = uuid5(test_id, "q:"+N)`
+                # из порядкового номера, поэтому ids должны быть ровно 1..N и по
+                # порядку — иначе вопросы в БД разъедутся по порядку.
+                for i, q in enumerate(test.questions, start=1):
+                    q.id = i
                 return test
 
             logger.warning(

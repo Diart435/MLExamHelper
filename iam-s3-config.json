@@ -1,6 +1,6 @@
 {
   "sts": {
     "tokenDuration": "1h",
-    "signingKey": "${S3_SIGNING_KEY}"
+    "signingKey": "@@S3_SIGNING_KEY@@"
   }
 }

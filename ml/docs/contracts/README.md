@@ -27,11 +27,20 @@ XADD <канал> * payload '<JSON>'
 
 Ошибка — нормальный ответ. ML обязан ответить на каждое принятое сообщение, в том числе когда обработка завершилась ошибкой; backend не должен считать задачу «зависшей» из-за отсутствия успешного результата.
 
+## Что изменилось в v4.2 (2026-11-23)
+
+Правка касается только канала `create-test` — **состав payload'ов не изменился**, изменился смысл размера теста (полное обоснование — в спеке `ml/docs/superpowers/specs/2026-11-17-ml-backend-contract-v4.md` §0.4):
+
+1. **В задаче `create-test:be-to-ml` поля размера нет вообще** — ни числа, ни `"min"`, ни бакета `min`/`med`/`max`. Payload — **ровно 5 ключей**: `task_id`, `test_id`, `material_ids`, `title`, `difficulty`.
+2. **Размер теста (1..30) определяет ML-планировщик по числу проверяемых фактов в материале.** `app/services/test_planner.py`, `plan_test(llm, digest)` — ни параметра `difficulty`, ни параметра размера. Границы 1..30 — рамка, а не цель: фактов 3 → 3 вопроса, фактов 40 → 30 самых важных. Добивать выдуманными фактами нельзя.
+3. **`difficulty` на количество вопросов не влияет** — только на микс типов вопросов и глубину формулировки.
+4. **`tests.amount_questions` — всегда число, не бакет:** `"0"` при создании теста (вопросов ещё нет) → фактическое число `len(questions)` после ответа ML. Бакеты остались только в legacy-таблице `query_tasks`.
+
 ## Что изменилось в v4.1 (2026-11-17)
 
 Три изменения в канале `create-test` (полное обоснование — в спеке `ml/docs/superpowers/specs/2026-11-17-ml-backend-contract-v4.md` §0.3):
 
-1. **Из задачи `create-test:be-to-ml` убрано поле `amountQuestions`.** Backend присылает только `task_id`, `test_id`, `material_ids`, `title`, `difficulty`. Число вопросов (1..30) определяет сам ML — отдельным LLM-вызовом планировщика (`app/services/test_planner.py`, `plan_test(llm, digest, difficulty)`), который смотрит на материал и возвращает `num_questions` + список тем. Backend после получения теста пишет `tests.amount_questions = len(questions)`.
+1. **Из задачи `create-test:be-to-ml` убрано поле `amountQuestions`.** Backend присылает только `task_id`, `test_id`, `material_ids`, `title`, `difficulty`. Число вопросов (1..30) определяет сам ML — отдельным LLM-вызовом планировщика (`app/services/test_planner.py`, `plan_test(llm, digest)`), который смотрит на материал и возвращает `num_questions` + список тем. Backend после получения теста пишет `tests.amount_questions = len(questions)`.
 2. **В ответе `create-test:ml-to-be` поле `answer_key` есть** — по объекту на вопрос: `{"correct_index": N}` (single_choice), `{"correct_indexes": [N, M]}` (multi_choice), `{"reference_answer": "<эталон>"}` (open_answer), плюс необязательный `explanation`. Backend пишет его в колонку `test_questions.answer_key` (есть в ERD заказчика).
 3. **Приоритет эталона при проверке: БД → Redis → LLM-судья.** Раньше было Redis → LLM-судья. Redis (`ml:answers:{test_id}`, TTL 30 дней) остаётся резервной копией, но больше не единственный источник.
 
@@ -41,7 +50,7 @@ XADD <канал> * payload '<JSON>'
 
 Отдельно: в ответе `grade-test:ml-to-be` **нет поля `status`**. Признак ошибки — наличие поля `error`.
 
-Поля `amountQuestions` нет **ни** в задаче `create-test:be-to-ml` (v4.1), **ни** в ответе `create-test:ml-to-be`.
+Поля `amountQuestions` нет **ни** в задаче `create-test:be-to-ml` (v4.1; в v4.2 — нет и никакого другого поля размера), **ни** в ответе `create-test:ml-to-be`.
 
 `answer_key` (эталон правильного ответа) — **есть** в ответе `create-test:ml-to-be`, по объекту на каждый вопрос (v4.1). Backend пишет его в `test_questions.answer_key`. При проверке ML берёт эталон из первого доступного источника: `test_questions.answer_key` в БД → `ml:answers:{test_id}` в Redis → LLM-судья.
 
@@ -62,8 +71,8 @@ XADD <канал> * payload '<JSON>'
 ### `create-test:be-to-ml`
 
 - Обязательны `task_id`, `test_id`, `material_ids` (непустой массив строк), `title`.
-- Поля `amountQuestions` **нет** (v4.1): размер теста определяет ML планировщиком — `num_questions` (1..30) + список тем.
-- `difficulty` необязателен, допустимы `easy`, `medium`, `hard`; значение по умолчанию — `medium`.
+- Поля `amountQuestions` **нет** (v4.1), и никакого другого поля размера нет (v4.2): размер теста определяет ML планировщиком — `num_questions` (1..30) + список тем. Размер = число проверяемых фактов в материале; если фактов 30 или больше — ровно 30, если 3 — 3. Выдумывать факты, чтобы добить число, нельзя.
+- `difficulty` необязателен, допустимы `easy`, `medium`, `hard`; значение по умолчанию — `medium`. На **количество** вопросов не влияет (v4.2) — только на микс типов.
 
 ### `create-test:ml-to-be`
 

@@ -20,9 +20,9 @@ SYSTEM_PROMPT = (
 )
 
 # Жёсткий лимит на размер ответа.
-# Free-модели на OpenRouter имеют per-request кредит — дефолтные 131 072 токена
-# (полный max модели) превышают этот лимит. 1024 — заведомо достаточно для
-# grounded RAG-ответа (≈ 4 КБ текста по-русски).
+# Free-модели у провайдера (RouterAI) имеют per-request кредит — дефолтные
+# 131 072 токена (полный max модели) превышают этот лимит. 1024 — заведомо
+# достаточно для grounded RAG-ответа (≈ 4 КБ текста по-русски).
 MAX_TOKENS = 1024
 
 # Лимит побольше для генерации тестов. Замерено на deepseek/deepseek-v4.1-flash:
@@ -32,15 +32,15 @@ MAX_TOKENS = 1024
 MAX_TOKENS_JSON = 16384
 
 # Бюджет для маленьких JSON-ответов (судьи: {score, feedback}, {correct_indexes, explanation}).
-# Отдельный от MAX_TOKENS_JSON по измерению: OpenRouter для free-моделей сверяет
-# запрошенный max_tokens с остатком кредита на запрос — при max_tokens=16384
+# Отдельный от MAX_TOKENS_JSON по измерению: провайдер (RouterAI) для free-моделей
+# сверяет запрошенный max_tokens с остатком кредита на запрос — при max_tokens=16384
 # приходил HTTP 402 («can only afford 4415»), а 1024 проходит. Генератору тестов
 # нужен большой бюджет, судье — маленький.
 MAX_TOKENS_SMALL_JSON = 1024
 
-# Ретрай. Free-модели OpenRouter периодически отвечают пустым content или
-# choices=None (rate-limit, перегрев провайдера и т.п.) — это транзиентно,
-# поэтому пробуем ещё пару раз перед тем как сдаваться.
+# Ретрай. Free-модели у провайдера (RouterAI) периодически отвечают пустым
+# content или choices=None (rate-limit, перегрев провайдера и т.п.) — это
+# транзиентно, поэтому пробуем ещё пару раз перед тем как сдаваться.
 _MAX_RETRIES = 3
 _RETRY_BACKOFF_SEC = (1.0, 2.0, 4.0)
 
@@ -50,11 +50,39 @@ _FORMAT_DEGRADE = {"json_schema": "json_object", "json_object": "plain"}
 
 
 def _summarize_error(raw: str, limit: int = 200) -> str:
-    """OpenRouter при ошибке отдаёт портянку JSON. Сокращаем до сути."""
+    """Провайдер (RouterAI) при ошибке отдаёт портянку JSON. Сокращаем до сути."""
     s = raw.strip()
     if len(s) <= limit:
         return s
     return s[:limit] + f"... [+{len(s) - limit} chars]"
+
+
+def payloads_enabled() -> bool:
+    """Включены ли подробные логи payload'ов LLM (flag log_llm_payloads).
+
+    Общий помощник для всех модулей ML: генератор, проверка, судья и воркер
+    спрашивают его перед тем, как писать в лог большие тела JSON/текстов.
+
+    Настройку читаем на каждый вызов, а не один раз при импорте: кэш
+    настроек общий для процесса, а флаг может поменяться между запусками.
+    """
+    try:
+        return bool(get_settings().log_llm_payloads)
+    except Exception:
+        # Настройки не прочитались (нет .env, нет ключа) — логи лишними не
+        # сделаем, но и логирование не уроним.
+        return False
+
+
+def _dump_json(obj: Any) -> str:
+    """Красивый JSON для логов (ensure_ascii=False, indent=2).
+
+    Фолбэк на str(obj): сериализация не должна ронять логирование.
+    """
+    try:
+        return json.dumps(obj, ensure_ascii=False, indent=2)
+    except Exception:
+        return str(obj)
 
 
 class _TransientLLMError(RuntimeError):
@@ -81,10 +109,12 @@ class _LLMCreditError(RuntimeError):
 
 
 class LLMClient:
-    def __init__(self) -> None:
+    def __init__(self, model: str | None = None) -> None:
         s = get_settings()
         self._client = AsyncOpenAI(api_key=s.openrouter_api_key, base_url=s.base_url)
-        self._model = s.llm_model
+        # Явная модель важнее настройки: судьи ходят на отдельную (judge_model),
+        # а генератор/планировщик/RAG — на общую LLM_MODEL.
+        self._model = model or s.llm_model
 
     async def chat(self, user_message: str, system_prompt: str | None = None) -> str:
         """Один вызов LLM с ретраями на транзиентные ошибки.
@@ -100,7 +130,10 @@ class LLMClient:
         last_err: Exception | None = None
         for attempt in range(1, _MAX_RETRIES + 1):
             try:
-                return await self._chat_once(user_message, system_prompt)
+                return await self._chat_once(
+                    user_message, system_prompt,
+                    attempt=f"{attempt}/{_MAX_RETRIES}",
+                )
             except _TransientLLMError as e:
                 last_err = e
                 if attempt >= _MAX_RETRIES:
@@ -142,9 +175,9 @@ class LLMClient:
           - Возвращает результат `validator(data)`.
 
         `max_tokens` — бюджет ответа. None → дефолт по формату (MAX_TOKENS_JSON
-        для json). Маленькие ответы (судьи) стоит просить явно: OpenRouter
-        сверяет запрошенный max_tokens с остатком кредита, и большой бюджет
-        упирается в HTTP 402.
+        для json). Маленькие ответы (судьи) стоит просить явно: провайдер
+        (RouterAI) сверяет запрошенный max_tokens с остатком кредита, и большой
+        бюджет упирается в HTTP 402.
 
         Raises:
             RuntimeError: после исчерпания попыток (parse/validate/transient).
@@ -163,7 +196,8 @@ class LLMClient:
 
             try:
                 content = await self._chat_once_raw(
-                    sys_prompt, user_message, fmt=fmt, schema=schema, max_tokens=max_tokens
+                    sys_prompt, user_message, fmt=fmt, schema=schema, max_tokens=max_tokens,
+                    attempt=f"{attempt}/{max_retries}",
                 )
             except _UnsupportedResponseFormat as e:
                 logger.info(f"chat_json: формат {fmt} не поддержан ({e}), ослабляем требования")
@@ -200,9 +234,15 @@ class LLMClient:
             f"chat_json failed after {max_retries} attempts (model={self._model}): {last_err}"
         )
 
-    async def _chat_once(self, user_message: str, system_prompt: str | None = None) -> str:
+    async def _chat_once(
+        self,
+        user_message: str,
+        system_prompt: str | None = None,
+        attempt: str = "",
+    ) -> str:
         content = await self._chat_once_raw(
-            system_prompt or SYSTEM_PROMPT, user_message, fmt="plain"
+            system_prompt or SYSTEM_PROMPT, user_message, fmt="plain",
+            attempt=attempt,
         )
         return content
 
@@ -214,6 +254,7 @@ class LLMClient:
         fmt: str = "plain",
         schema: dict[str, Any] | None = None,
         max_tokens: int | None = None,
+        attempt: str = "",
     ) -> str:
         """Один сырой вызов.
 
@@ -222,8 +263,11 @@ class LLMClient:
 
         max_tokens: None → дефолт по формату (MAX_TOKENS для plain,
         MAX_TOKENS_JSON для json). Явно заданное значение важно для судьей:
-        OpenRouter сверяет max_tokens с остатком кредита и на большом бюджете
-        отдаёт 402.
+        провайдер (RouterAI) сверяет max_tokens с остатком кредита и на большом
+        бюджете отдаёт 402.
+
+        attempt — метка попытки ("2/3") для логов: видно, что запрос ушёл
+        повторно и с каким system prompt.
 
         Бросает _UnsupportedResponseFormat, если провайдер отверг формат ответа,
         _LLMCreditError на 402 и _TransientLLMError на остальных сбоях.
@@ -247,6 +291,21 @@ class LLMClient:
         elif fmt == "json_object":
             kwargs["response_format"] = {"type": "json_object"}
 
+        # Подробные логи: владелец хочет видеть в docker logs всё, что уходит
+        # в LLM. Тексты логируются как АРГУМЕНТ ("{}", значение), а не как
+        # шаблон: loguru подставляет {} только по переданным аргументам, и
+        # JSON с фигурными скобками в шаблоне уронил бы форматирование.
+        verbose = payloads_enabled()
+        if verbose:
+            attempt_part = f" attempt={attempt}" if attempt else ""
+            logger.info(
+                f"[LLM] → model={self._model} fmt={fmt} max_tokens={max_tokens}{attempt_part}"
+            )
+            logger.info("[LLM] system: {}", system_prompt)
+            logger.info("[LLM] user: {}", user_message)
+            if fmt == "json_schema" and schema is not None:
+                logger.info("[LLM] schema: {}", _dump_json(schema))
+
         try:
             resp = await self._client.chat.completions.create(**kwargs)
         except BadRequestError as e:
@@ -254,30 +313,78 @@ class LLMClient:
             # формат ответа, а не «неверный ключ»: разбираемся пониже уровнем.
             # Важно: BadRequestError — подкласс APIStatusError, поэтому эта
             # ветка должна стоять ПЕРЕД общей веткой APIStatusError.
+            self._log_error(verbose, "unsupported_response_format", e)
             raise _UnsupportedResponseFormat(f"{type(e).__name__}: {e}") from e
         except APIStatusError as e:
             # 402 — не хватило кредита (в openai SDK нет PaymentRequiredError,
             # поэтому сверяем status_code). Это не сетевой сбой: повторять
             # тот же запрос бессмысленно, ретрай-цикл его не ловит.
             if getattr(e, "status_code", None) == 402:
+                self._log_error(verbose, "credit", e)
                 raise _LLMCreditError(f"{type(e).__name__}: {e}") from e
+            self._log_error(verbose, "api_status", e)
             raise _TransientLLMError(f"{type(e).__name__}: {e}") from e
         except Exception as e:
+            self._log_error(verbose, "transient", e)
             raise _TransientLLMError(f"{type(e).__name__}: {e}") from e
 
         if not resp.choices:
+            dump = _safe_dump(resp)
+            self._log_error(verbose, "empty_choices", dump)
             raise _TransientLLMError(
                 f"choices пуст (model={self._model}): "
-                f"{_summarize_error(_safe_dump(resp))}"
+                f"{_summarize_error(dump)}"
             )
 
         content = (resp.choices[0].message.content or "").strip()
         if not content:
+            dump = _safe_dump(resp)
+            self._log_error(verbose, "empty_content", dump)
             raise _TransientLLMError(
                 f"пустой content (model={self._model}): "
-                f"{_summarize_error(_safe_dump(resp))}"
+                f"{_summarize_error(dump)}"
             )
+
+        if verbose:
+            self._log_response(resp, content)
         return content
+
+    # ------------------------------------------------------------------
+    #  Подробные логи вызова LLM
+    # ------------------------------------------------------------------
+
+    def _log_error(self, verbose: bool, kind: str, detail: Any) -> None:
+        """Ошибка вызова LLM: полный текст (не обрезанный до 200 символов).
+
+        В исключение уходит сокращённый вариант (`_summarize_error`), но в
+        лог — полный: по нему видно, что именно ответил провайдер.
+        """
+        if not verbose:
+            return
+        logger.error("[LLM] ✗ {}: {}", kind, detail)
+
+    def _log_response(self, resp: Any, content: str) -> None:
+        """Ответ LLM: finish_reason, usage, длина и сырой текст целиком."""
+        finish_reason = None
+        try:
+            finish_reason = getattr(resp.choices[0], "finish_reason", None)
+        except Exception:
+            pass
+
+        prompt_tokens = completion_tokens = None
+        usage = getattr(resp, "usage", None)
+        if usage is not None:
+            prompt_tokens = getattr(usage, "prompt_tokens", None)
+            completion_tokens = getattr(usage, "completion_tokens", None)
+
+        logger.info(
+            "[LLM] ← finish_reason={} prompt_tokens={} completion_tokens={} chars={}",
+            finish_reason,
+            prompt_tokens,
+            completion_tokens,
+            len(content),
+        )
+        logger.info("[LLM] response: {}", content)
 
 
 def _extract_json_block(s: str) -> str:

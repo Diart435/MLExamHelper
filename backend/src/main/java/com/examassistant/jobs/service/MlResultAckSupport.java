@@ -4,7 +4,6 @@ import com.examassistant.common.config.MlStreamsProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.RedisStreamCommands.XDelOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -25,10 +24,16 @@ public class MlResultAckSupport {
 
     public void ack(MapRecord<String, String, String> message) {
         try {
-            redisTemplate.opsForStream().acknowledgeAndDelete(
+            // XACKDEL есть только в Redis 8.2+, а у нас Redis 7.4 — команда не поддерживается.
+            // Поэтому подтверждаем и удаляем двумя обычными вызовами: сначала XACK,
+            // затем XDEL (удаление обязательно после подтверждения).
+            redisTemplate.opsForStream().acknowledge(
                     message.getStream(),
                     properties.getConsumerGroup(),
-                    XDelOptions.defaults(),
+                    message.getId()
+            );
+            redisTemplate.opsForStream().delete(
+                    message.getStream(),
                     message.getId()
             );
         } catch (RuntimeException e) {

@@ -1,6 +1,6 @@
 """Тесты для генерации тестов: TestGenerator, process_create_test, LLMClient.chat_json.
 
-Без реального OpenRouter — мокаем LLMClient. Цель — убедиться, что:
+Без реального провайдера LLM — мокаем LLMClient. Цель — убедиться, что:
   - TestGenerator правильно собирает контекст и парсит ответ LLM
   - микс типов вопросов соответствует сложности (70/30/0, 40/30/30, 10/30/60)
   - количество вопросов укладывается в лимиты заказчика (1..30), а если не
@@ -693,6 +693,98 @@ class TestTestGenerator:
 
 
 # ============================================================================
+# Перенумерация вопросов готового теста (ids 1..N по порядку)
+# ============================================================================
+
+class TestQuestionRenumbering:
+    """Backend выводит `question_id = uuid5(test_id, "q:" + порядковый номер)`.
+
+    Значит, `id` у вопроса — это его ординал в тесте, и backend берёт его из
+    поля `id` ответа ML. JSON Schema ограничивает `id` диапазоном 1..N, но не
+    гарантирует ни уникальность, ни порядок: модель может вернуть [1,1,3] или
+    [3,2,1]. Поэтому генератор перенумеровывает вопросы в 1..N по порядку
+    списка."""
+
+    @staticmethod
+    def _payload_with_ids(ids: list[int], texts: list[str]) -> str:
+        """Ответ LLM: типы как в миксе easy для N вопросов, но id — заданные.
+
+        Типы чередуются по миксу `easy` (70 % single_choice / 30 % multi_choice),
+        чтобы микс сошёлся и тест был принят с первой попытки.
+        """
+        counts = question_mix(len(ids), "easy")
+        types = spread_types(counts)
+        questions: list[dict] = []
+        for qid, qtype, text in zip(ids, types, texts):
+            if qtype == "single_choice":
+                questions.append({
+                    "id": qid, "type_question": "single_choice",
+                    "options": ["A", "B", "C", "D"], "text": text,
+                    "answer_key": {"correct_index": 0, "explanation": "A"},
+                    "key_points": [], "source_chunk_ref": "C1",
+                })
+            else:
+                questions.append({
+                    "id": qid, "type_question": "multi_choice",
+                    "options": ["A", "B", "C", "D", "E", "F"], "text": text,
+                    "answer_key": {"correct_indexes": [0, 2], "explanation": "A и C"},
+                    "key_points": [], "source_chunk_ref": "C1",
+                })
+        return json.dumps(
+            {"title": "Тест по лекции", "questions": questions}, ensure_ascii=False,
+        )
+
+    @pytest.mark.asyncio
+    async def test_ids_are_renumbered_to_1_n(self):
+        """LLM вернула дубли и не по порядку — ids всё равно 1..N."""
+        rag = _make_rag_with_chunks([101])
+        payload = self._payload_with_ids([3, 1, 1], ["Первый?", "Второй?", "Третий?"])
+        llm = _make_fake_llm([payload])
+        gen = TestGenerator(rag=rag, llm=llm)
+
+        task = CreateTestTask(
+            task_id="t1", test_id="T1", material_ids=[101], title="Quiz",
+            num_questions=3, difficulty="easy",
+        )
+        test = await gen.generate(task)
+        assert [q.id for q in test.questions] == [1, 2, 3]
+
+    @pytest.mark.asyncio
+    async def test_renumbering_keeps_question_order(self):
+        """Перенумерация не переставляет сами вопросы — только их id."""
+        rag = _make_rag_with_chunks([101])
+        payload = self._payload_with_ids([7, 2], ["Первый?", "Второй?"])
+        llm = _make_fake_llm([payload])
+        gen = TestGenerator(rag=rag, llm=llm)
+
+        task = CreateTestTask(
+            task_id="t1", test_id="T1", material_ids=[101], title="Quiz",
+            num_questions=2, difficulty="easy",
+        )
+        test = await gen.generate(task)
+        assert [q.text for q in test.questions] == ["Первый?", "Второй?"]
+        assert [q.id for q in test.questions] == [1, 2]
+
+    @pytest.mark.asyncio
+    async def test_renumbered_ids_are_published(self):
+        """В ответе на backend уходят уже перенумерованные id."""
+        rag = _make_rag_with_chunks([101])
+        llm = _make_fake_llm([planner_response(6), llm_response(2, 2, 2)])
+        gen = TestGenerator(rag=rag, llm=llm)
+
+        result = await process_create_test(
+            {
+                "task_id": "t1", "test_id": "T1",
+                "material_ids": [101], "title": "Quiz",
+            },
+            rag, generator=gen,
+        )
+        assert result["status"] == "ok"
+        ids = [q["id"] for q in result["test"]["questions"]]
+        assert ids == [1, 2, 3, 4, 5, 6]
+
+
+# ============================================================================
 # Привязка вопроса к источнику (source_chunk_id)
 # ============================================================================
 
@@ -813,7 +905,7 @@ class TestProcessCreateTest:
     @pytest.mark.asyncio
     async def test_legacy_amount_questions_is_ignored(self):
         """Старый payload с `amountQuestions: 31` не должен ронять задачу:
-        числа вопросов в контракте больше нет (v4.1), размер выбирает ML."""
+        поля размера в контракте больше нет — лишний ключ просто игнорируется."""
         rag = _make_rag_with_chunks([101])
         task_dict = {
             "task_id": "t1", "test_id": "T1",
@@ -824,6 +916,67 @@ class TestProcessCreateTest:
         result = await process_create_test(task_dict, rag, generator=gen)
         assert result["status"] == "ok"
         assert len(result["test"]["questions"]) == 4
+
+    @pytest.mark.asyncio
+    async def test_planner_decides_size_without_backend_cap(self):
+        """Размер целиком определяет планировщик: 15 фактов → 15 вопросов."""
+        rag = _make_rag_with_chunks([101])
+        llm = _make_fake_llm([planner_response(15), llm_response(6, 4, 5)])
+        gen = TestGenerator(rag=rag, llm=llm)
+        task_dict = {
+            "task_id": "t1", "test_id": "T1",
+            "material_ids": [101], "title": "Quiz", "difficulty": "medium",
+        }
+        result = await process_create_test(task_dict, rag, generator=gen)
+        assert result["status"] == "ok"
+        assert len(result["test"]["questions"]) == 15
+
+    @pytest.mark.asyncio
+    async def test_planner_schema_has_hard_bounds(self):
+        """Планировщик получает жёсткие границы 1..30 — потолка от backend нет."""
+        rag = _make_rag_with_chunks([101])
+        llm = _make_fake_llm([planner_response(3), llm_response(2, 1, 0)])
+        gen = TestGenerator(rag=rag, llm=llm)
+        task_dict = {
+            "task_id": "t1", "test_id": "T1",
+            "material_ids": [101], "title": "Quiz", "difficulty": "medium",
+        }
+        await process_create_test(task_dict, rag, generator=gen)
+        planner_schema = llm.calls[0]["schema"]
+        assert planner_schema["properties"]["num_questions"]["maximum"] == 30
+        assert planner_schema["properties"]["num_questions"]["minimum"] == 1
+
+    @pytest.mark.asyncio
+    async def test_legacy_amount_questions_does_not_reach_planner(self):
+        """Поле `amount_questions` в payload'е не влияет на размер:
+        планировщик решает сам."""
+        rag = _make_rag_with_chunks([101])
+        llm = _make_fake_llm([planner_response(15), llm_response(6, 4, 5)])
+        gen = TestGenerator(rag=rag, llm=llm)
+        task_dict = {
+            "task_id": "t1", "test_id": "T1",
+            "material_ids": [101], "title": "Quiz",
+            "difficulty": "medium", "amount_questions": "min",
+        }
+        result = await process_create_test(task_dict, rag, generator=gen)
+        assert result["status"] == "ok"
+        assert len(result["test"]["questions"]) == 15
+        planner_schema = llm.calls[0]["schema"]
+        assert planner_schema["properties"]["num_questions"]["maximum"] == 30
+
+    @pytest.mark.asyncio
+    async def test_explicit_num_questions_skips_planner(self):
+        """Явное число вопросов (внутренний вызов) — планировщик не зовём."""
+        rag = _make_rag_with_chunks([101])
+        llm = _make_fake_llm([llm_response(3, 2)])
+        gen = TestGenerator(rag=rag, llm=llm)
+        task = CreateTestTask(
+            task_id="t1", test_id="T1", material_ids=[101], title="Quiz",
+            num_questions=5, difficulty="easy",
+        )
+        await gen.generate(task)
+        # Планировщик не вызывался — первый вызов LLM ушёл генератору.
+        assert len(llm.calls) == 1
 
     @pytest.mark.asyncio
     async def test_llm_failure_returns_error(self):
@@ -871,11 +1024,34 @@ class TestParseCreateTest:
         assert parsed.num_questions is None
 
     def test_amount_questions_is_ignored(self):
-        """Контракт v4.1: `amountQuestions` из payload'а НЕ читается — числа
-        вопросов в контракте больше нет, размер выбирает ML."""
+        """Legacy-camelCase `amountQuestions` из payload'а игнорируется:
+        поля размера в контракте больше нет."""
         parsed = CreateTestTask.from_dict({
             "task_id": "t1", "test_id": "T1", "title": "X", "material_ids": ["1"],
             "amountQuestions": 12,
+        })
+        assert parsed.num_questions is None
+
+    def test_amount_questions_field_is_ignored(self):
+        """Контрактное имя `amount_questions` — такой же неизвестный ключ,
+        как и любой другой лишний: разбор проходит, размер не применяется."""
+        parsed = CreateTestTask.from_dict({
+            "task_id": "t1", "test_id": "T1", "title": "X", "material_ids": ["1"],
+            "amount_questions": "medium",
+        })
+        assert parsed.num_questions is None
+
+    def test_amount_questions_absent_means_auto(self):
+        parsed = CreateTestTask.from_dict({
+            "task_id": "t1", "test_id": "T1", "title": "X", "material_ids": ["1"],
+        })
+        assert parsed.num_questions is None
+
+    def test_invalid_amount_questions_does_not_break_parsing(self):
+        """Мусор в лишнем поле не роняет разбор — поле просто игнорируется."""
+        parsed = CreateTestTask.from_dict({
+            "task_id": "t1", "test_id": "T1", "title": "X", "material_ids": ["1"],
+            "amount_questions": "huge",
         })
         assert parsed.num_questions is None
 

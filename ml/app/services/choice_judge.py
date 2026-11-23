@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 from loguru import logger
 
+from app.core.config import get_settings
 from app.services.llm import MAX_TOKENS_SMALL_JSON, LLMClient
 
 
@@ -129,7 +130,9 @@ class ChoiceJudge:
     __test__ = False  # не pytest-класс
 
     def __init__(self, llm: LLMClient | None = None) -> None:
-        self.llm = llm or LLMClient()
+        # Тот же отдельный путь для модели судьи, что и в open_answer_judge:
+        # оба судьи решают задачу «одна оценка — один запрос».
+        self.llm = llm or LLMClient(model=get_settings().judge_model or None)
 
     async def judge(
         self,
@@ -161,7 +164,7 @@ class ChoiceJudge:
                 max_retries=2,
                 schema=VERDICT_SCHEMA,
                 # Ответ судьи — 100–200 токенов: большой max_tokens упирается
-                # в кредитный лимит OpenRouter (HTTP 402) на free-моделях.
+                # в кредитный лимит провайдера (RouterAI, HTTP 402) на free-моделях.
                 max_tokens=MAX_TOKENS_SMALL_JSON,
             )
         except Exception as e:

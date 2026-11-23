@@ -1,13 +1,14 @@
 """Тесты проверки ответов: LLM-судья open_answer и Grader.
 
-Без реального OpenRouter и без реального Redis — мокаем LLMClient и
+Без реального провайдера LLM и без реального Redis — мокаем LLMClient и
 AnswerStore. Цель — убедиться, что:
   - single_choice проверяется детерминированно (0.0 / 1.0) по эталону из Redis;
   - open_answer оценивается судьёй: дробный score и feedback;
   - если эталона нет (Redis пуст) — включается LLM-страховка;
   - упавший LLM не роняет попытку: score=0.0, остальные вопросы не пострадали;
   - score_pct считается от ВСЕХ вопросов теста: пропущенный вопрос даёт 0;
-  - `correct_answer` — это ТЕКСТ правильного варианта, а не индекс.
+  - `correct_answer` — эталон-объект (та же форма, что `answer_key` вопроса),
+    а `student_answer` — ответ студента объектом (`index` | `indexes` | `text`).
 """
 
 from __future__ import annotations
@@ -284,8 +285,8 @@ class TestGrader:
         assert out.grade == 5
         assert out.items[0].score == 1.0
         assert out.items[0].is_correct is True
-        assert out.items[0].student_answer == "B"
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].student_answer == {"index": 1}
+        assert out.items[0].correct_answer == {"correct_index": 1, "explanation": "потому что A"}
 
     @pytest.mark.asyncio
     async def test_single_choice_wrong(self):
@@ -296,19 +297,31 @@ class TestGrader:
         assert out.score_pct == 0.0
         assert out.grade == 2
         assert "Неверно" in out.items[0].feedback
-        assert out.items[0].student_answer == "A"
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].student_answer == {"index": 0}
+        assert out.items[0].correct_answer == {"correct_index": 1, "explanation": "потому что A"}
 
     @pytest.mark.asyncio
-    async def test_correct_answer_is_text_not_index(self):
-        """`correct_answer` в контракте — строка: текст правильного варианта,
-        а не его индекс."""
+    async def test_correct_answer_is_reference_object_not_text(self):
+        """`correct_answer` в контракте — объект-эталон (как `answer_key`
+        вопроса), а не строка и не «индекс варианта» числом.
+
+        Строкой backend его не разобрать: у него `Map<String, Object>`, и
+        JSON-строка роняет разбор всего вердикта."""
         q = single_choice_q("q1", correct=2)
         store = store_with({"1": ref_single(q.text_question, 2, q.options)})
         gr = Grader(store=FakeStore([q]), answer_store=store)
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=2)]))
-        assert out.items[0].correct_answer == "C"
-        assert out.items[0].correct_answer != "2"
+        assert out.items[0].correct_answer == {
+            "correct_index": 2,
+            "explanation": "потому что A",
+        }
+        assert isinstance(out.items[0].correct_answer, dict)
+
+        # Человекочитаемый текст правильного ответа не потерялся — он в feedback.
+        wrong = await gr.grade(attempt([
+            StudentAnswer(question_id="q1", student_answer_index=0),
+        ]))
+        assert "«C»" in wrong.items[0].feedback
 
     @pytest.mark.asyncio
     async def test_unanswered_question_counts_as_zero(self):
@@ -339,8 +352,11 @@ class TestGrader:
         ]))
         assert out.items[0].score == 0.5
         assert out.items[0].feedback == "Частично верно"
-        assert out.items[0].student_answer == "мой ответ"
-        assert out.items[0].correct_answer == "Эталонный ответ"
+        assert out.items[0].student_answer == {"text": "мой ответ"}
+        assert out.items[0].correct_answer == {
+            "reference_answer": "Эталонный ответ",
+            "explanation": "пояснение",
+        }
         assert out.score_pct == 50.0
 
     @pytest.mark.asyncio
@@ -502,8 +518,11 @@ class TestMultiChoiceGrading:
         out = await gr.grade(attempt([
             StudentAnswer(question_id="q1", student_answer_indexes=[1, 3]),
         ]))
-        assert out.items[0].student_answer == "«Б», «Г»"
-        assert out.items[0].correct_answer == "«A», «В»"
+        assert out.items[0].student_answer == {"indexes": [1, 3]}
+        assert out.items[0].correct_answer == {
+            "correct_indexes": [0, 2],
+            "explanation": "потому что A и В",
+        }
 
     @pytest.mark.asyncio
     async def test_broken_answer_key_gives_zero(self):
@@ -541,7 +560,7 @@ class TestJudgeFallbackWithoutReference:
         assert len(choice_judge.calls) == 1
         assert out.items[0].score == 1.0
         assert out.items[0].is_correct is True
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {"correct_index": 1, "explanation": "судья решил"}
         assert out.score_pct == 100.0
 
     @pytest.mark.asyncio
@@ -558,7 +577,10 @@ class TestJudgeFallbackWithoutReference:
         ]))
         assert len(choice_judge.calls) == 1
         assert out.items[0].score == 1.0
-        assert out.items[0].correct_answer == "«A», «В»"
+        assert out.items[0].correct_answer == {
+            "correct_indexes": [0, 2],
+            "explanation": "судья решил",
+        }
 
     @pytest.mark.asyncio
     async def test_open_answer_judged_by_key_points_only(self):
@@ -662,7 +684,7 @@ class TestReferencePriority:
         gr = Grader(store=FakeStore([q]), answer_store=store)
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=2)]))
         assert out.items[0].is_correct is True
-        assert out.items[0].correct_answer == "C"
+        assert out.items[0].correct_answer == {"correct_index": 2}
         assert out.score_pct == 100.0
 
     @pytest.mark.asyncio
@@ -681,7 +703,7 @@ class TestReferencePriority:
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=1)]))
         assert out.items[0].is_correct is True
         assert out.items[0].score == 1.0
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {"correct_index": 1}
 
     @pytest.mark.asyncio
     async def test_db_multi_choice_reference_is_deterministic(self):
@@ -699,7 +721,7 @@ class TestReferencePriority:
         assert out.items[0].score == pytest.approx(2 / 3)
         assert out.items[0].is_correct is True
         # correct_answer — все правильные варианты эталона, а не отмеченные.
-        assert out.items[0].correct_answer == "«A», «Б», «В»"
+        assert out.items[0].correct_answer == {"correct_indexes": [0, 1, 2]}
 
     @pytest.mark.asyncio
     async def test_db_open_answer_reference_fills_correct_answer(self):
@@ -722,7 +744,7 @@ class TestReferencePriority:
             StudentAnswer(question_id="q1", student_answer_text="мой ответ"),
         ]))
         assert judge.seen["reference_answer"] == "Эталон из БД"
-        assert out.items[0].correct_answer == "Эталон из БД"
+        assert out.items[0].correct_answer == {"reference_answer": "Эталон из БД"}
         assert out.items[0].score == 1.0
 
     @pytest.mark.asyncio
@@ -733,7 +755,10 @@ class TestReferencePriority:
         gr = Grader(store=FakeStore([q]), answer_store=store)
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=1)]))
         assert out.items[0].is_correct is True
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {
+            "correct_index": 1,
+            "explanation": "потому что A",
+        }
 
     @pytest.mark.asyncio
     async def test_empty_db_answer_key_falls_through_to_redis(self):
@@ -745,7 +770,10 @@ class TestReferencePriority:
         gr = Grader(store=FakeStore([q]), answer_store=store)
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=1)]))
         assert out.items[0].is_correct is True
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {
+            "correct_index": 1,
+            "explanation": "потому что A",
+        }
 
     @pytest.mark.asyncio
     async def test_incomplete_db_answer_key_falls_through_to_redis(self):
@@ -759,7 +787,10 @@ class TestReferencePriority:
             StudentAnswer(question_id="q1", student_answer_indexes=[0, 2]),
         ]))
         assert out.items[0].score == 1.0
-        assert out.items[0].correct_answer == "«A», «В»"
+        assert out.items[0].correct_answer == {
+            "correct_indexes": [0, 2],
+            "explanation": "потому что A и В",
+        }
 
     @pytest.mark.asyncio
     async def test_llm_judge_used_when_neither_db_nor_redis(self):
@@ -776,7 +807,10 @@ class TestReferencePriority:
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=1)]))
         assert len(choice_judge.calls) == 1
         assert out.items[0].is_correct is True
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {
+            "correct_index": 1,
+            "explanation": "судья решил",
+        }
 
     @pytest.mark.asyncio
     async def test_malformed_redis_reference_falls_through_to_llm_judge(self):
@@ -797,7 +831,10 @@ class TestReferencePriority:
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=1)]))
         assert len(choice_judge.calls) == 1
         assert out.items[0].is_correct is True
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {
+            "correct_index": 1,
+            "explanation": "судья решил",
+        }
 
     @pytest.mark.asyncio
     async def test_redis_reference_of_wrong_type_falls_through_to_llm_judge(self):
@@ -814,7 +851,10 @@ class TestReferencePriority:
         gr = Grader(store=FakeStore([q]), answer_store=store, choice_judge=choice_judge)
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=2)]))
         assert len(choice_judge.calls) == 1
-        assert out.items[0].correct_answer == "C"
+        assert out.items[0].correct_answer == {
+            "correct_index": 2,
+            "explanation": "судья решил",
+        }
 
 
 # ============================================================================
@@ -914,7 +954,10 @@ class TestAnswerStoreIntegration:
         out = await gr.grade(task)
         assert out.items[0].score == 1.0
         assert out.items[0].is_correct is True
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {
+            "correct_index": 1,
+            "explanation": "потому что B",
+        }
 
     @pytest.mark.asyncio
     async def test_missing_reference_returns_none(self):
@@ -941,4 +984,7 @@ class TestAnswerStoreIntegration:
         gr = Grader(store=FakeStore([row]), answer_store=store)
         out = await gr.grade(attempt([StudentAnswer(question_id="q1", student_answer_index=1)]))
         assert out.items[0].score == 1.0
-        assert out.items[0].correct_answer == "B"
+        assert out.items[0].correct_answer == {
+            "correct_index": 1,
+            "explanation": "потому что B",
+        }

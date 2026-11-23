@@ -1,0 +1,18 @@
+$kind: http-request
+name: 7. Тест готов?
+description: "Жми ПОВТОРНО, пока statusTest = created (значения: creating → created | error)."
+url: "{{baseUrl}}/api/tests/{{testId}}"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200 OK', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      console.log('statusTest =', body.statusTest, '| amountQuestions =', body.amountQuestions);
+      if (String(body.statusTest).toLowerCase() !== 'created') {
+        console.warn('ML ещё готовит тест — жми Send ещё раз через ~15 с');
+      }
+    language: text/javascript
+order: 7000

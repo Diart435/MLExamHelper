@@ -1,4 +1,4 @@
-# Redis в backend: требования для корректного обмена с ML (контракт v4.1)
+# Redis в backend: требования для корректного обмена с ML (контракт v4.2)
 
 **Кому.** Backend-разработчику.
 
@@ -6,7 +6,7 @@
 
 **Связанные документы.** Форма сообщений — `ml/docs/backend-tz-contract-v4.md`; машино-читаемые схемы — `ml/docs/contracts/`; полная спека с обоснованием — `ml/docs/superpowers/specs/2026-11-17-ml-backend-contract-v4.md`.
 
-**Статус кода backend'а на момент написания.** Реализация Redis в backend'е сейчас не соответствует контракту: имена каналов другие, форма сообщения другая, подписки нет. Разбор — §5. Это не претензия к разработчику: контракт v4.1 менялся после того, как появился текущий код.
+**Статус кода backend'а (на 2026-11-23).** Реализация Redis в backend'е приведена к контракту v4.2: имена каналов, форма сообщения, подписка, listener'ы — всё как описано ниже. Разбор того, что было и что стало, — §5.
 
 ---
 
@@ -24,6 +24,18 @@
 | Ошибка | ML отвечает **всегда**; в `grade-test:ml-to-be` поля `status` нет — ошибка это наличие ключа `error` |
 | Доставка | «хотя бы один раз» → запись в БД обязана быть идемпотентной |
 
+### 0.1 План `ml/docs/redis-contract-v4.1-plan.md` — три расхождения с контрактом v4.2
+
+План написан для **другого репозитория** (`C:\MLExamHelper`) и под состояние ML, где контракт был ещё v4.0. Если backend-разработчик пойдёт по нему буквально, ML и backend не сойдутся. Расходятся три пункта:
+
+| Пункт плана | Что в плане | Что в контракте v4.2 (наша правда) |
+|---|---|---|
+| §1.3 / D3 — форма вопроса | плоская: `{"id":1,"text":"…","options":[…],"correct_index":0,"source_chunk_id":"…"}` | у вопроса есть **`type`** (`single_choice` \| `multi_choice` \| `open_answer`) и **вложенный** `answer_key`: `{"correct_index": N}` \| `{"correct_indexes": [N,M]}` \| `{"reference_answer":"…"}` + необязательный `explanation`. Плоского `correct_index` в ответе **нет** |
+| D5 — размер теста | фиксированные 10 вопросов (`DEFAULT_NUM_QUESTIONS = 10`), `difficulty` влияет только на содержание | размер выбирает **ML-планировщик** по материалу (1..30) — по числу проверяемых фактов, `difficulty` задаёт **микс типов** (70/30/0, 40/30/30, 10/30/60) и на количество вопросов **не влияет**. Backend узнаёт фактический размер из ответа: `len(questions)` |
+| §1.3 — `items[]` вердикта | `{"question_id":"…","score":1.0}` — минимальный вариант | ML шлёт полный набор: `is_correct`, `feedback` тоже приходят, а `correct_answer` — **объект-эталон** (та же форма, что `answer_key`: `{"correct_index": N}` \| `{"correct_indexes": [N,M]}` \| `{"reference_answer":"…"}`), `student_answer` — объект (`{"index"}` \| `{"indexes"}` \| `{"text"}`). Backend берёт их, если есть (D4 плана совпадает) |
+
+Источник правды — `ml/app/contracts.py` и `ml/docs/contracts/*.schema.json`, а не план. План полезен как **карта работы** (что и в каком порядке делать в backend'е), но не как описание формата.
+
 ---
 
 ## 1. Источник правды — что смотреть в `ml/`
@@ -31,9 +43,9 @@
 | Файл | Что там истина |
 |---|---|
 | `ml/app/contracts.py` | имена каналов (`TASK_CHANNEL_SLUGS`, `task_channel()`, `result_channel()`), dataclass'ы задач и результатов, `parse_task()` |
-| `ml/app/workers/rag.py` | цикл чтения: `XREADGROUP` по трём каналам, роутинг по имени канала, `XADD` результата, `XACK` в исходный канал, `XAUTOCLAIM` зависших |
+| `ml/app/workers/rag.py` | цикл чтения: `XREADGROUP` по трём каналам, роутинг по имени канала, `XADD` результата → `XACK` в исходный канал → `XDEL` обработанного сообщения, `XAUTOCLAIM` зависших |
 | `ml/app/handlers/rag.py` | сборка результата (`IngestResult`, `CreateTestResult`, `GradeAttemptResult`) |
-| `ml/app/core/config.py` | env ML: `REDIS_URL`, `CONSUMER_GROUP`, `CONSUMER_NAME`, `reclaim_idle_ms`, `reclaim_max_attempts` |
+| `ml/app/core/config.py` | env ML: `REDIS_URL`, `CONSUMER_GROUP`, `CONSUMER_NAME` (дефолт — hostname), `WORKER_CLAIM_IDLE_MS`, `WORKER_CLAIM_INTERVAL_MS`, `WORKER_CLAIM_MAX_ATTEMPTS` |
 | `ml/app/services/answer_store.py` | ключи ML в Redis: `ml:answers:{test_id}`, TTL 30 суток |
 | `ml/docs/contracts/*.schema.json` | шесть JSON Schema (draft 2020-12) — по файлу на канал, с примерами в `examples/` |
 | `ml/tools/stub_backend.py` | стенд: целиком эмулирует backend на Redis + Postgres. Готовый образец «как правильно» |
@@ -152,10 +164,12 @@ JSON — **одной строкой, без переносов**. Jackson по 
 | Канал | Поля payload |
 |---|---|
 | `ingest:be-to-ml` | `material_id`, `storage_key`. **`task_id` здесь нет** — корреляция идёт по `material_id` (одна индексация — один материал) |
-| `create-test:be-to-ml` | `task_id`, `test_id`, `material_ids` (**массив** UUID-строк), `title`, `difficulty` (`easy`/`medium`/`hard`). Числа вопросов **нет** — размер выбирает ML |
+| `create-test:be-to-ml` | **ровно 5 ключей**: `task_id`, `test_id`, `material_ids` (**массив** UUID-строк), `title`, `difficulty` (`easy`/`medium`/`hard`). Числа вопросов **нет** — размер выбирает ML |
 | `grade-test:be-to-ml` | `task_id`, `attempt_id`, `test_id`, `answers[]`. Ответ студента — `{question_id, student_answer}`, где `student_answer` = `{index}` \| `{indexes:[…]}` \| `{text}` по типу вопроса. `user_id` в контракте нет |
 
 Чего в payload быть **не должно** (backend пришлёт — ML это проигнорирует, но лишние поля в ТЗ и схемах запрещены): `amountQuestions`/`amount_questions`, `course_id`, `user_id` (в grade), `chunks_indexed`, `input_msg_id`, `type`.
+
+**Про размер теста (v4.2).** В payload создания теста нет **никакого** поля размера — ни числа, ни `"min"`, ни бакета `min`/`med`/`max`. Число вопросов (1..30) выбирает ML-планировщик по материалу: сколько в нём проверяемых фактов. `difficulty` на количество вопросов не влияет — только на микс типов. Backend узнаёт фактический размер из ответа и пишет `tests.amount_questions = len(questions)`: при создании теста — `"0"` (вопросов ещё нет), после ответа ML — фактическое число. Бакеты остались только в legacy-таблице `query_tasks`.
 
 > `material_ids` — массив, а не строка через запятую: ML разбирает список и падает с `material_ids must be a non-empty list`.
 
@@ -294,37 +308,58 @@ stringRedisTemplate.opsForStream()
 
 `minIdleTime` для backend'а — порядка минуты (обработка короткая), `count` — десятки. Как только сообщение переиграно, оно снова попадёт в обработку и снова требует `XACK` — то есть цикл reclaim'а безопасный, если запись в БД идемпотентна.
 
-Страховка от «ядовитого» сообщения: если после N попыток обработка падает всё так же — сообщение надо снять с обработки руками (`XACK` без записи + запись в лог), иначе оно будет крутиться бесконечно. У ML для этого есть `reclaim_max_attempts`; у backend'а аналог стоит завести.
+Страховка от «ядовитого» сообщения: если после N попыток обработка падает всё так же — сообщение надо снять с обработки руками (`XACK` без записи + запись в лог), иначе оно будет крутиться бесконечно. У ML для этого есть `WORKER_CLAIM_MAX_ATTEMPTS`; у backend'а аналог стоит завести.
+
+### 4.6 Ядовитое сообщение: ML отвечает ошибкой, а не молчит
+
+Раньше ML ронял ядовитое сообщение из pending **без результата** — backend висел в ожидании вердикта, которого не будет никогда (материал навсегда «в обработке», тест — «создаётся»).
+
+Теперь поведение такое: сообщение, которое не удалось обработать `WORKER_CLAIM_MAX_ATTEMPTS` (5) раз, ML **публикует в канал результата ошибочный результат** — `{"status":"error","error":"…"}`, а в `grade-test:ml-to-be` — `{"task_id":"…","error":"…"}` (без `status`, как и все grade-ответы) — затем подтверждает сообщение и удаляет его из стрима. Backend получает явную ошибку и переводит сущность в «ошибка».
+
+⚠️ **Требование к backend'у: поздняя ошибка не должна понижать уже успешный статус.** Доставка — «хотя бы один раз», поэтому успешный результат может прийти после неуспешного (или наоборот). Правило: если материал/тест уже в успешном терминальном состоянии (`ready` / «готов»), пришедшая ошибка его **не** переводит в «ошибка» — только логируется. Иначе гонка «сначала успех, потом поздняя ошибка» испортит результат.
+
+### 4.7 Порядок работы воркера ML (для сверки с логами)
+
+1. `XREADGROUP` по трём каналам задач (блокировка 5 с, по одному сообщению за раз).
+2. Роутинг по **имени канала** → handler → результат.
+3. `XADD` в зеркальный канал результата (`payload` — JSON одной строкой).
+4. `XACK` в **исходный** канал.
+5. `XDEL` обработанного сообщения из исходного канала — чтобы стрим задач не рос.
+
+Пункты 3–5 идут именно в таком порядке. Если `XADD` не прошёл — `XACK` **не делается**: сообщение вернётся в работу через reclaim (шаг 6), и backend получит результат ровно один раз. Если `XACK` не прошёл при успешном `XADD` — результат у backend'а уже есть, задача выполнится ещё раз, поэтому запись в БД идемпотентна.
+
+6. Reclaim: не чаще одного раза в `WORKER_CLAIM_INTERVAL_MS` (60 с) ML проверяет pending-список и забирает сообщения, провисевшие дольше `WORKER_CLAIM_IDLE_MS` (30 с).
 
 ---
 
-## 5. Расхождения текущего кода backend'а с контрактом v4.1
+## 5. Что было и что стало (разбор прежнего кода backend'а)
 
-Разбор взят из рабочей копии ветки `ml/redis-jobs` (`backend/src/main/java/...`). Это карта работы, а не список претензий.
+Таблица показывает, как выглядел код backend'а до приведения к контракту v4.1/v4.2 и что в нём сейчас. Прежние расхождения закрыты; левая колонка осталась как история изменений.
 
-| Где | Что сейчас | Что нужно по контракту v4.1 |
+| Где | Что было | Что стало |
 |---|---|---|
-| `messaging/producer/RedisProducer.java:25-26` | `STREAM_KEY_TESTS = "tests:create-test-request"`, `STREAM_KEY_MATERIALS = "materials:process-response"` | `create-test:be-to-ml`, `ingest:be-to-ml` (+ `grade-test:be-to-ml`) |
-| `messaging/producer/RedisProducer.java` | поля задачи раскиданы по верхнему уровню: `task_id`, `test_id`, `material_ids`, `title`, `amount_questions`, `difficulty`, `course_id` | одно поле `payload` со строкой JSON; внутри — только поля контракта |
-| `messaging/producer/RedisProducer.java` | `material_ids` — строка через запятую (`Collectors.joining(",")`) | массив `["uuid","uuid"]` |
-| `messaging/producer/RedisProducer.java` | `amount_questions` и `course_id` в payload | обоих полей в контракте нет (v4.1) |
-| `messaging/producer/RedisProducer.java` | `publishMaterialProcess` кладёт `task_id` | у `ingest` `task_id` нет, корреляция по `material_id` |
-| `messaging/producer/RedisProducer.java` | нет продюсера для `grade-test` | нужен: `task_id`, `attempt_id`, `test_id`, `answers[]` |
-| `jobs/service/RedisConsumer.java` | пустой класс | подписка на три канала результатов |
-| `jobs/Consumer.java` | пустой интерфейс | — |
-| `common/config/RedisConfig.java` | контейнер и шаблон созданы, но `container.receive(...)` **не вызывается нигде**, группы **не создаются** | `createGroup` на каждом из трёх каналов + `receive(...)` на каждый |
-| `jobs/listener/ProcessingMaterialListener.java` | `STREAM_KEY = "materials:process-response"`, `GROUP_NAME = "material-status-handlers"` | канал `ingest:ml-to-be`, группа backend'а (`ml-backend`) |
-| `jobs/listener/CreateTestListener.java` | `STREAM_KEY = "tests:create-test-response"`, `GROUP_NAME = "test-handlers"` | канал `create-test:ml-to-be`, та же группа |
-| оба listener'а | ветки ошибки нет: `UUID.fromString(fields.get("material_id"))` → NPE, если ML прислал `error` без id | ветка ошибки обрабатывается отдельно; попытку не трогать |
-| оба listener'а | читают `fields.get("test")` как отдельное поле | весь payload — один JSON, разбирать целиком |
-| `jobs/listener/CreateTestListener.java` | читает `amount_questions` из ответа ML | ML размер не присылает (v4.1): размер = `len(questions)` |
-| оба listener'а | нет обработки «неизвестного канала» и защиты от NPE | контракт требует терпимости: неизвестные поля игнорировать, обязательные — проверять |
-| — | нет listener'а `grade-test` | нужен: `student_attempts` (finished_at, score_pct, grade) + `attempt_answers` (score, feedback, is_correct, correct_answer) |
-| — | нет reclaim'а pending | §4.5 |
-| — | нет `XTRIM`/`XDEL` | §6.1 |
-| `application-docker.properties` | только host/port | §2.1: таймауты, client-name, repositories.enabled |
+| `messaging/producer/RedisProducer.java` | `STREAM_KEY_TESTS = "tests:create-test-request"`, `STREAM_KEY_MATERIALS = "materials:process-response"` | ✅ каналы из `common/redis/MlChannels.java`: `create-test:be-to-ml`, `ingest:be-to-ml`, `grade-test:be-to-ml` |
+| `messaging/producer/RedisProducer.java` | поля задачи раскиданы по верхнему уровню: `task_id`, `test_id`, `material_ids`, `title`, `amount_questions`, `difficulty`, `course_id` | ✅ одно поле `payload` со строкой JSON; внутри — только поля контракта |
+| `messaging/producer/RedisProducer.java` | `material_ids` — строка через запятую (`Collectors.joining(",")`) | ✅ массив `["uuid","uuid"]` |
+| `messaging/producer/RedisProducer.java` | `amount_questions` и `course_id` в payload | ✅ обоих полей в контракте нет (v4.1). С v4.2 payload создания теста — **ровно 5 ключей**: `task_id`, `test_id`, `material_ids`, `title`, `difficulty` |
+| `messaging/producer/RedisProducer.java` | `publishMaterialProcess` кладёт `task_id` | ✅ у `ingest` `task_id` нет, корреляция по `material_id` |
+| `messaging/producer/RedisProducer.java` | нет продюсера для `grade-test` | ✅ `publishGradeTest`: `task_id`, `attempt_id`, `test_id`, `answers[]` |
+| `jobs/service/RedisConsumer.java` | пустой класс | ✅ подписка на три канала результатов, создание групп (`MKSTREAM`), reclaim pending + poison |
+| `common/config/RedisConfig.java` | контейнер и шаблон созданы, но `container.receive(...)` **не вызывается нигде**, группы **не создаются** | ✅ `container.receive(...)` на каждый канал в `RedisConsumer.start()`; группы создаются там же (контейнер с `autoStartup=false`, чтобы группы были до подписки) |
+| `jobs/listener/ProcessingMaterialListener.java` | `STREAM_KEY = "materials:process-response"`, `GROUP_NAME = "material-status-handlers"` | ✅ канал `ingest:ml-to-be`, группа backend'а (`ml-backend`) |
+| `jobs/listener/CreateTestListener.java` | `STREAM_KEY = "tests:create-test-response"`, `GROUP_NAME = "test-handlers"` | ✅ канал `create-test:ml-to-be`, та же группа |
+| оба listener'а | ветки ошибки нет: `UUID.fromString(fields.get("material_id"))` → NPE, если ML прислал `error` без id | ✅ ветка ошибки обрабатывается отдельно; попытку не трогать |
+| оба listener'а | читают `fields.get("test")` как отдельное поле | ✅ весь payload — один JSON, разбирать целиком |
+| `jobs/listener/CreateTestListener.java` | читает `amount_questions` из ответа ML | ✅ ML размер не присылает (v4.1): размер = `len(questions)`, пишется в `tests.amount_questions` (в v4.2 — всегда **число**, не бакет: `"0"` при создании теста → фактическое число после ответа) |
+| оба listener'а | нет обработки «неизвестного канала» и защиты от NPE | ✅ контрактные DTO'ы + `MlResultAckSupport`: битый payload → `ackPoison` (подтвердить и не разбирать дальше) |
+| — | нет listener'а `grade-test` | ✅ `jobs/listener/GradeTestListener.java` + `GradeTestResultService`: `student_attempts` (finished_at, score_pct, grade) + `attempt_answers` (score, feedback, is_correct, correct_answer) |
+| — | нет reclaim'а pending | ✅ `RedisConsumer.reclaimPending()` — `XPENDING` + `XCLAIM`, poison по счётчику доставок (§4.5) |
+| — | нет `XTRIM`/`XDEL` | ✅ `acknowledgeAndDelete` — подтвердить и удалить одним заходом (§6.1) |
+| `application-docker.properties` | только host/port | ✅ §2.1: таймауты, client-name, repositories.enabled |
+| `jobs/DTO/*` | `correct_answer` — строка, `key_points` — не списка | ✅ `correct_answer` — объект-эталон (та же форма, что `answer_key`), `key_points` — `List<String>` |
+| `jobs/Consumer.java` | пустой интерфейс | ⚠️ остался лежать (на контракт не влияет, но чистить надо) |
 
-Отдельно: в `CreateTestListener` есть `//TODO: сделать создание теста` — то есть запись вопросов в `test_questions` ещё не написана. Это часть общей задачи «развернуть ответ ML в БД», детали — в `ml/docs/backend-tz-contract-v4.md` §2.2 и §4.
+Отдельно: в `CreateTestListener` был `//TODO: сделать создание теста` — теперь запись вопросов в `test_questions` написана (`jobs/service/CreateTestResultService.java`), вместе с `answer_key` и `key_points`.
 
 ---
 
@@ -332,7 +367,7 @@ stringRedisTemplate.opsForStream()
 
 ### 6.1 Стримы растут бесконечно — их надо укорачивать
 
-Ни ML, ни backend сейчас не удаляют обработанные сообщения: `XACK` убирает запись из pending, но **не из самого стрима**. Стримы растут, память Redis растёт, `XLEN` растёт.
+`XACK` убирает запись из pending, но **не из самого стрима**. За ML эта часть закрыта: обработанное сообщение воркер удаляет сам (`XADD` → `XACK` → `XDEL`), поэтому каналы задач `*:be-to-ml` не растут. За backend'ом остаются каналы результатов `*:ml-to-be` — их чистит сам backend.
 
 Что делать:
 
@@ -388,7 +423,7 @@ ml_result_acked     channel=grade-test:ml-to-be    msg_id=1752...
 - [ ] Consumer name уникален на реплику (например, `${HOSTNAME}`)
 - [ ] Группы создаются с `createGroup(..., ReadOffset.lastConsumed(), ...)`; `BUSYGROUP` проглатывается, остальное — пробрасывается
 - [ ] Публикация задач — `XADD <канал> * payload '<JSON>'`, ровно одно поле `payload`
-- [ ] Payload'ы соответствуют §3.2: без `amountQuestions`, без `course_id`, без `task_id` в ingest, `material_ids` — массив
+- [ ] Payload'ы соответствуют §3.2: без `amountQuestions`, без `course_id`, без `task_id` в ingest, `material_ids` — массив; payload создания теста — **ровно 5 ключей**
 - [ ] Чтение через `container.receive(...)`, **не** `receiveAutoAck`
 - [ ] `XACK` — после успешной записи в БД, в канал, откуда пришло сообщение
 - [ ] Обработчик не бросает наружу исключение: ошибка → лог, без `XACK`
@@ -396,6 +431,9 @@ ml_result_acked     channel=grade-test:ml-to-be    msg_id=1752...
 - [ ] Запись в БД идемпотентна (детерминированные `question_id`/`answer_id`)
 - [ ] Реализован reclaim pending (`XPENDING` + `XCLAIM`) и счётчик попыток
 - [ ] Обработанные сообщения удаляются из стрима (`acknowledgeAndDelete` или `XDEL`)
+- [ ] Поздняя ошибка **не понижает** уже успешный статус (`ready`/«готов» остаётся «готов»)
+- [ ] Форма вопроса читается по `type` + вложенному `answer_key` — **не** по плоскому `correct_index` (§0.1)
+- [ ] Размер теста = `len(questions)` из ответа — не фиксированные 10, не поле из задачи и не бакет (§0.1)
 - [ ] В логах есть `channel`, `msg_id`, `task_id`
 - [ ] Backend не трогает ключи `ml:*` и не вызывает `FLUSHDB`
 - [ ] Проверено вживую: задача ушла в канал, ML ответил, backend разложил результат в БД, `XPENDING` пуст, `XLEN` не растёт

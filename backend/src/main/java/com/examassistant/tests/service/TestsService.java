@@ -50,8 +50,13 @@ public class TestsService implements TestService {
         Test test = Test.builder()
                 .courseId(request.getCourseId())
                 .title(request.getTitle())
-                .amountQuestions(request.getAmountQuestions())
-                .statusTest(TestStatus.CREATED)
+                // Размер теста целиком выбирает ML-планировщик. Пока тест
+                // готовится, в колонке 0; фактическое число вопросов записывает
+                // CreateTestResultService по ответу ML.
+                .amountQuestions("0")
+                // CREATING: тест ещё готовит ML. Статус CREATED выставит
+                // CreateTestResultService, когда придёт ответ с вопросами.
+                .statusTest(TestStatus.CREATING)
                 .difficulty(request.getDifficulty() == null ? TestDifficulty.MEDIUM : request.getDifficulty())
                 .createdAt(OffsetDateTime.now())
                 .build();
@@ -115,7 +120,6 @@ public class TestsService implements TestService {
                 test.getTestId(),
                 materialIds,
                 test.getTitle(),
-                test.getAmountQuestions(),
                 test.getDifficulty().getValue(),
                 test.getCourseId()
         );

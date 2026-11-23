@@ -26,14 +26,14 @@ from app.services.llm import (
 
 
 def _bad_request() -> BadRequestError:
-    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    request = httpx.Request("POST", "https://llm.test/api/v1/chat/completions")
     response = httpx.Response(400, request=request)
     return BadRequestError("response_format is not supported", response=response, body=None)
 
 
 def _payment_required() -> APIStatusError:
     """HTTP 402 от провайдера: не хватило кредита на запрос."""
-    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    request = httpx.Request("POST", "https://llm.test/api/v1/chat/completions")
     response = httpx.Response(402, request=request)
     return APIStatusError(
         "This request requires more credits, or fewer max_tokens.",
@@ -208,9 +208,9 @@ class TestBadRequestMapping:
 class TestMaxTokensBudget:
     """Бюджет ответа — по измерению, а не «всем одинаково».
 
-    OpenRouter для free-моделей сверяет запрошенный max_tokens с остатком
-    кредита: при 16384 приходил HTTP 402 («can only afford 4415»), а 1024
-    проходит. Поэтому судьи просят маленький бюджет явно."""
+    Провайдер (RouterAI) для free-моделей сверяет запрошенный max_tokens с
+    остатком кредита: при 16384 приходил HTTP 402 («can only afford 4415»),
+    а 1024 проходит. Поэтому судьи просят маленький бюджет явно."""
 
     @pytest.mark.asyncio
     async def test_explicit_max_tokens_is_passed_through(self):
@@ -331,7 +331,7 @@ class TestPaymentRequired:
         """Остальные APIStatusError (500 и т.п.) — по-прежнему транзиентные."""
         from app.services.llm import _TransientLLMError
 
-        request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+        request = httpx.Request("POST", "https://llm.test/api/v1/chat/completions")
         response = httpx.Response(500, request=request)
         err = APIStatusError("upstream boom", response=response, body=None)
 

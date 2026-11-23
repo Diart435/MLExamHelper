@@ -1,6 +1,5 @@
 package com.examassistant.tests.DTO;
 
-import com.examassistant.common.enums.TestAmountQuestions;
 import com.examassistant.common.enums.TestDifficulty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -29,9 +28,6 @@ public class CreateTestRequest {
 
     @NotNull(message = "Difficulty must not be null")
     private TestDifficulty difficulty;
-
-    @NotNull(message = "Amount must not be blank")
-    private TestAmountQuestions amountQuestions;
 
     @NotEmpty
     private List<UUID> materialIds;

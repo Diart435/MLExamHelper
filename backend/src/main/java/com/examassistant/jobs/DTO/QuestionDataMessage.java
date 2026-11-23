@@ -15,6 +15,11 @@ public class QuestionDataMessage {
     private String type;
     private String text;
     private List<String> options;
+    // Опорные пункты вопроса — плоский список строк (у open_answer критерии,
+    // у закрытых типов пустой список).
+    @JsonProperty("key_points")
+    private List<String> keyPoints;
+    // Эталон правильного ответа: {correct_index} | {correct_indexes} | {reference_answer}.
     @JsonProperty("answer_key")
     private Map<String, Object> answerKey;
     @JsonProperty("source_chunk_id")

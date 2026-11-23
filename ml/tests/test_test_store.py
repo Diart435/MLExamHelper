@@ -15,6 +15,8 @@
   - при `UndefinedColumnError` / `UndefinedTableError` повторить запрос без
     колонки и подставить пустой эталон, а НЕ упасть — иначе проверка любой
     попытки на старой схеме падала бы целиком;
+  - упорядочивать вопросы по `question_order` (миграция backend'а 006), а если
+    её нет — по `question_id` (иначе порядок случаен: question_id — UUID);
   - проверять форму данных: json/jsonb приходят с codec'ом как `dict`/`list`,
     а строка вместо объекта — ошибка формы (`ValidationError`), а не тихая
     подстановка (именно из-за неё `key_points` превращался в список символов).
@@ -46,15 +48,29 @@ class FakeConn:
 
     `raises` — исключение, которое нужно кинуть на ПЕРВОМ запросе (имитация
     отсутствующей колонки). Второй запрос (без колонки) отдаёт `rows`.
+
+    `raises_on` — словарь «кусок текста запроса → исключение»: позволяет
+    смоделировать БД, где есть `answer_key`, но нет `question_order` (или
+    наоборот) — то есть когда запрос падает не на первом, а на втором
+    кандидате.
     """
 
-    def __init__(self, rows: list[dict], raises: Exception | None = None) -> None:
+    def __init__(
+        self,
+        rows: list[dict],
+        raises: Exception | None = None,
+        raises_on: dict[str, Exception] | None = None,
+    ) -> None:
         self._rows = rows
         self._raises = raises
+        self._raises_on = raises_on or {}
         self.queries: list[str] = []
 
     async def fetch(self, query: str, *args: Any) -> list[FakeRow]:
         self.queries.append(" ".join(query.split()))
+        for needle, error in self._raises_on.items():
+            if needle in self.queries[-1]:
+                raise error
         if self._raises is not None:
             error, self._raises = self._raises, None
             raise error
@@ -196,16 +212,21 @@ class TestFetchQuestions:
                     "key_points": [],
                 },
             ],
-            raises=_undefined_column(),
+            raises_on={
+                "question_order": _undefined_column(),
+                "answer_key": _undefined_column(),
+            },
         )
         rows = await _store_with(conn).fetch_questions("T1")
         assert len(rows) == 1
         assert rows[0].answer_key == AnswerKey()
         assert rows[0].question_id == "q1"
-        # Два запроса: первый с колонкой, второй — без.
-        assert len(conn.queries) == 2
-        assert "answer_key" in conn.queries[0]
-        assert "answer_key" not in conn.queries[1]
+        # Три запроса: с question_order, с answer_key и совсем без них.
+        assert len(conn.queries) == 3
+        assert "question_order" in conn.queries[0]
+        assert "question_order" not in conn.queries[1]
+        assert "answer_key" in conn.queries[1]
+        assert "answer_key" not in conn.queries[2]
 
     @pytest.mark.asyncio
     async def test_fallback_when_table_missing(self):
@@ -226,6 +247,69 @@ class TestFetchQuestions:
         conn = FakeConn([], raises=RuntimeError("connection lost"))
         with pytest.raises(RuntimeError, match="connection lost"):
             await _store_with(conn).fetch_questions("T1")
+
+
+# ---------------------------------------------------------------------------
+# Порядок вопросов: question_order
+# ---------------------------------------------------------------------------
+
+class TestQuestionOrder:
+    """Колонка `question_order` (миграция backend'а 006) задаёт порядок.
+
+    Без неё сортировка идёт по `question_id` — случайному UUID, то есть
+    вопросы выдаются в произвольном порядке."""
+
+    @pytest.mark.asyncio
+    async def test_orders_by_question_order_when_column_exists(self):
+        conn = FakeConn([
+            {
+                "question_id": "q1", "type_question": "single_choice",
+                "text_question": "Первый?", "options": ["A"], "key_points": [],
+                "answer_key": {"correct_index": 0},
+            },
+            {
+                "question_id": "q2", "type_question": "single_choice",
+                "text_question": "Второй?", "options": ["A"], "key_points": [],
+                "answer_key": {"correct_index": 0},
+            },
+        ])
+        rows = await _store_with(conn).fetch_questions("T1")
+        assert [r.text_question for r in rows] == ["Первый?", "Второй?"]
+        # Первый запрос — самый полный: с question_order в ORDER BY.
+        assert len(conn.queries) == 1
+        assert "ORDER BY question_order, question_id" in conn.queries[0]
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_question_id_order(self):
+        """`question_order` нет — запрос повторяется с ORDER BY question_id,
+        строки всё равно приходят."""
+        conn = FakeConn(
+            [
+                {
+                    "question_id": "q1", "type_question": "single_choice",
+                    "text_question": "Вопрос?", "options": ["A"], "key_points": [],
+                    "answer_key": {"correct_index": 0},
+                },
+            ],
+            raises_on={"question_order": _undefined_column()},
+        )
+        rows = await _store_with(conn).fetch_questions("T1")
+        assert len(rows) == 1
+        assert rows[0].question_id == "q1"
+        assert rows[0].answer_key.correct_index == 0
+        assert len(conn.queries) == 2
+        assert "ORDER BY question_order, question_id" in conn.queries[0]
+        assert "ORDER BY question_id" in conn.queries[1]
+        assert "question_order" not in conn.queries[1]
+
+    @pytest.mark.asyncio
+    async def test_question_order_column_is_not_selected(self):
+        """`QuestionRow` о `question_order` не знает — колонку в SELECT
+        добавлять нельзя, форма строки от этого изменится."""
+        conn = FakeConn([])
+        await _store_with(conn).fetch_questions("T1")
+        select_part = conn.queries[0].split("ORDER BY")[0]
+        assert "question_order" not in select_part
 
     @pytest.mark.asyncio
     async def test_key_points_normalised(self):
