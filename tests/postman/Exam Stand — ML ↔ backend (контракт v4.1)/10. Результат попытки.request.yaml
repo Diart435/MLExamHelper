@@ -1,0 +1,19 @@
+$kind: http-request
+description: Жми ПОВТОРНО, пока status = finished. В ответе — по каждому вопросу correct, score и feedback от ML.
+url: "{{baseUrl}}/api/attempts/{{attemptId}}"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200 OK', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      console.log('status =', body.status, '| scorePct =', body.scorePct, '| grade =', body.grade);
+      console.log('ответов:', (body.answers || []).length);
+      (body.answers || []).forEach(a => console.log(' ', a.questionId, '| correct =', a.correct, '| score =', a.score, '| feedback =', String(a.feedback || '').slice(0, 80)));
+      if (body.status !== 'finished') {
+        console.warn('Ещё проверяется — жми Send ещё раз через ~15 с');
+      }
+    language: text/javascript
+order: 10000

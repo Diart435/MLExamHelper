@@ -44,13 +44,18 @@ services:
       - |
         cp /etc/seaweedfs/s3-config.json /tmp/s3-config.json
         
-        sed -e "s|\$${S3_ACCESS_KEY}|\${S3_ACCESS_KEY}|g" \
-            -e "s|\$${S3_SECRET_KEY}|\${S3_SECRET_KEY}|g" \
+        # Плейсхолдеры в шаблонах — вида @@VAR@@. Compose подставляет переменные
+        # в самом файле compose ДО запуска контейнера, поэтому литерал с
+        # dollar-скобками в паттерне sed доехал бы уже подставленным и sed
+        # перестал бы совпадать. @@VAR@@ compose не трогает, а значение в
+        # замену подставляет сам — из .env хоста (тот же, что уходит в env).
+        sed -e "s|@@S3_ACCESS_KEY@@|${S3_ACCESS_KEY}|g" \
+            -e "s|@@S3_SECRET_KEY@@|${S3_SECRET_KEY}|g" \
             /tmp/s3-config.json > /tmp/s3-config-final.json
-            
+
         cp /etc/seaweedfs/iam-s3-config.json /tmp/iam-s3-config.json
 
-        sed -e "s|\$${S3_SIGNING_KEY}|\${S3_SIGNING_KEY}|g" \
+        sed -e "s|@@S3_SIGNING_KEY@@|${S3_SIGNING_KEY}|g" \
             /tmp/iam-s3-config.json > /tmp/iam-s3-config-final.json
             
         mv /tmp/s3-config-final.json /tmp/s3-config.json
@@ -125,15 +130,22 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
 
-      # Три пары стримов. Тип задачи задаёт имя стрима — поля type в payload нет.
-      STREAM_TASKS_INGEST: ml:tasks:ingest
-      STREAM_TASKS_CREATE_TEST: ml:tasks:create-test
-      STREAM_TASKS_GRADE_ATTEMPT: ml:tasks:grade-attempt
-      STREAM_RESULTS_INGEST: ml:results:ingest
-      STREAM_RESULTS_CREATE_TEST: ml:results:create-test
-      STREAM_RESULTS_GRADE_ATTEMPT: ml:results:grade-attempt
+      # Адрес OpenAI-совместимого провайдера. По умолчанию — RouterAI:
+      # отвечает с российского IP напрямую, VPN и прокси не нужны.
+      # Другой провайдер подключается значением LLM_BASE_URL в .env хоста.
+      BASE_URL: ${LLM_BASE_URL:-https://routerai.ru/api/v1}
+
+      # Vector store: pgvector, а не in-memory. Чанки должны попадать в
+      # material_chunks — их читает backend, чтобы разрезолвить source_chunk_id
+      # вопроса в UUID чанка. С in-memory они теряются при рестарте ML.
+      VECTOR_STORE_BACKEND: pg
+
+      # Имена каналов заданы в app/contracts.py и не конфигурируются.
+      # Имя consumer'а по умолчанию — hostname контейнера, поэтому не фиксируется.
       CONSUMER_GROUP: ml-workers
-      CONSUMER_NAME: worker-1
+      WORKER_CLAIM_IDLE_MS: "30000"
+      WORKER_CLAIM_INTERVAL_MS: "60000"
+      WORKER_CLAIM_MAX_ATTEMPTS: "5"
 
       MINIO_ENDPOINT: seaweedfs:9000
       MINIO_ACCESS_KEY: ${S3_ACCESS_KEY}
@@ -143,8 +155,15 @@ services:
 
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-minimax/minimax-m3:free}
+      # Отдельная модель для LLM-судьи (оценка открытых ответов). У gemma
+      # нет reasoning-канала, поэтому её ответ всегда влезает в маленький
+      # бюджет max_tokens, который судье достаётся.
+      LLM_AS_A_JUDGE: ${LLM_AS_A_JUDGE:-}
       EMBED_MODEL: ${EMBED_MODEL:-openai/text-embedding-3-small}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # В образе нет ffmpeg/faster-whisper: аудио и видео должны падать явно.
+      WHISPER_ENABLED: "false"
     restart: unless-stopped
     networks:
       - helper-network

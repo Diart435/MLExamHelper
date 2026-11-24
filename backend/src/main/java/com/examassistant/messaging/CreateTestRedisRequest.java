@@ -1,6 +1,5 @@
 package com.examassistant.messaging;
 
-import com.examassistant.common.enums.TestAmountQuestions;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,7 +15,6 @@ public class CreateTestRedisRequest {
     private UUID testId;
     private List<UUID> materialIds;
     private String title;
-    private TestAmountQuestions amountQuestions;
     private String difficulty;
     private UUID courseId;
 }

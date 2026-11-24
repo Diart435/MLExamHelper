@@ -34,7 +34,12 @@ public class TasksService implements TaskService {
 
     @Transactional
     public void changeStatus(UUID taskId){
+        changeStatus(taskId, StatusTask.FINISHED);
+    }
+
+    @Transactional
+    public void changeStatus(UUID taskId, StatusTask status){
         QueryTask task = taskRepository.findById(taskId).orElseThrow(() -> new TaskNotFoundException("task not found"));
-        task.setStatusTask(StatusTask.FINISHED);
+        task.setStatusTask(status);
     }
 }

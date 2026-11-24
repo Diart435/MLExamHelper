@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-exam:contract:ingest:be-to-ml",
+  "title": "Задача индексации материала — канал ingest:be-to-ml",
+  "type": "object",
+  "required": [
+    "material_id",
+    "storage_key"
+  ],
+  "properties": {
+    "material_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "storage_key": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "examples": [
+    {
+      "material_id": "5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04",
+      "storage_key": "materials/5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04/lecture.pdf"
+    }
+  ]
+}

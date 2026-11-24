@@ -1,163 +1,275 @@
-"""Контракты сообщений между backend и ML-воркером.
+"""Контракт сообщений между backend и ML-воркером.
 
-Тип задачи задаёт ИМЯ СТРИМА, а не поле в payload. Поэтому в этих dataclass'ах
-нет поля `type` ни во входящих, ни в исходящих сообщениях — по трём парам стримов
-backend однозначно понимает, что прислал ML, и наоборот.
+=== ГДЕ ЖИВЁТ ===
+Один тип задачи — один канал в каждом направлении. Имя канала:
+`<слаг-типа-задачи>:<направление>`, где направление — `be-to-ml` (backend → ml)
+или `ml-to-be` (ml → backend).
 
-ВХОД (backend → ML), поле `payload` = JSON:
-    ml:tasks:ingest         → IngestTask
-    ml:tasks:create-test    → CreateTestTask
-    ml:tasks:grade-attempt  → GradeAttemptTask
+    ingest:be-to-ml          ingest:ml-to-be
+    create-test:be-to-ml     create-test:ml-to-be
+    grade-test:be-to-ml      grade-test:ml-to-be
 
-ВЫХОД (ML → backend), поле `payload` = JSON:
-    ml:results:ingest         → IngestResult
-    ml:results:create-test    → CreateTestResult
-    ml:results:grade-attempt  → GradeAttemptResult
+Внутренние типы задач (`ingest`, `create_test`, `grade_attempt`) не совпадают
+со слагами каналов. `rag_question` остаётся legacy-каналом `rag-question`.
 
-Полная спецификация: docs/superpowers/specs/2026-10-22-ml-backend-contract-design.md
+Тип задачи определяется ИМЕНЕМ КАНАЛА, а не полем в payload: payload не несёт
+`type`. Обработчик выбирается по каналу, поэтому сообщение нельзя прочитать не
+тем обработчиком.
 
-ML пишет в БД только material_chunks. Всё остальное — test_questions,
-student_attempts, attempt_answers, статусы — пишет backend, беря значения
-отсюда. Поэтому в исходящих сообщениях нет дублирующих полей вроде
-`is_correct` или `correct_index` в grade_attempt: backend их уже знает из своих
-же таблиц.
+=== КАК ПОЛЬЗОВАТЬСЯ ===
+Сборка:
+    task = IngestTask(material_id="uuid-material", storage_key="uploads/lec.pdf")
+    await redis.xadd(task_channel("ingest"), {"payload": task.to_json()})
+
+Парсинг входящего сообщения (тип известен из канала):
+    payload = fields["payload"]
+    task = parse_task(payload, "ingest")   # сам выберет нужный dataclass по типу
+    if isinstance(task, UnknownTask):
+        ...                            # отдать ошибку в ingest:ml-to-be
+
+Сборка ответа:
+    result = IngestResult.ok(material_id="uuid-material")
+    await redis.xadd(result_channel("ingest"), {"payload": result.to_json()})
+
+=== BEST PRACTICE ===
+- ML отдаёт ВАЛИДНЫЙ структурированный JSON, не сырой текст LLM. Если LLM вернул
+  кривой JSON — ML сам делает retry и только потом error. Backend никогда не
+  парсит LLM-output напрямую.
+- Поле `task_id` обязательно в каждом сообщении, кроме ingest: там корреляция
+  идёт по material_id (одна индексация — один материал). Backend использует
+  task_id, чтобы сопоставить результат с запросом. Канал задаёт ТИП задачи,
+  task_id — КАКУЮ именно: в одном канале может висеть несколько задач.
+- `status` в результатах: "ok" | "error", для ingest — "ready" | "error".
+  При error — поле `error` обязательно. В grade-ответе статуса нет: признак
+  ошибки — наличие поля `error`.
+- Контракт заказчика — источник правды: лишних полей в payload нет, а
+  недостающие читаются терпимо (`from_dict` игнорирует неизвестные ключи).
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
+
 
 TaskStatus = Literal["ok", "error"]
+IngestStatus = Literal["ready", "error"]
 Difficulty = Literal["easy", "medium", "hard"]
 
+# Ограничения заказчика на количество вопросов в тесте.
+# Минимум 1, а не 5: мы не знаем, какие материалы прилетят — на записке с тремя
+# тезисами разбирается один вопрос, и требовать пять — значит выдумывать.
+MIN_QUESTIONS = 1
+MAX_QUESTIONS = 30
 
-class ContractError(ValueError):
-    """Payload не соответствует контракту. Backend должен увидеть status=error."""
+# Типы вопросов, которые ML умеет генерировать и проверять.
+QUESTION_TYPES = ("single_choice", "multi_choice", "open_answer")
+DIFFICULTIES = ("easy", "medium", "hard")
+
+# Направления потока между backend и ML.
+BE_TO_ML = "be-to-ml"
+ML_TO_BE = "ml-to-be"
+
+# Слаг типа задачи в имени канала. Внутренние типы задач не меняются.
+TASK_CHANNEL_SLUGS: dict[str, str] = {
+    "ingest": "ingest",
+    "rag_question": "rag-question",
+    "create_test": "create-test",
+    "grade_attempt": "grade-test",
+}
+
+
+def stream_channel(task_type: str, direction: str) -> str:
+    """Имя канала для типа задачи и направления: '<slug>:<direction>'.
+
+    На неизвестный внутренний тип задачи выбрасывается KeyError: молчаливый
+    fallback мог бы отправить сообщение не в тот канал.
+    """
+    return f"{TASK_CHANNEL_SLUGS[task_type]}:{direction}"
+
+
+def task_channel(task_type: str) -> str:
+    """Канал задачи backend → ML."""
+    return stream_channel(task_type, BE_TO_ML)
+
+
+def result_channel(task_type: str) -> str:
+    """Канал результата ML → backend."""
+    return stream_channel(task_type, ML_TO_BE)
+
+
+def channel_task_type(channel: str) -> str:
+    """Обратное преобразование: 'create-test:be-to-ml' → 'create_test'."""
+    slug, sep, _direction = channel.partition(":")
+    if not sep:
+        return ""
+    for task_type, channel_slug in TASK_CHANNEL_SLUGS.items():
+        if channel_slug == slug:
+            return task_type
+    return ""
+
+
+def mirror_channel(channel: str) -> str:
+    """Зеркальный канал результата для неизвестного типа задачи.
+
+    Например, 'foo:be-to-ml' → 'foo:ml-to-be'. Если двоеточия нет, оно
+    добавляется: 'foo' → 'foo:ml-to-be'.
+    """
+    slug, sep, _direction = channel.partition(":")
+    if not sep:
+        slug = channel
+    return f"{slug}:{ML_TO_BE}"
 
 
 # ============================================================================
 #  ВХОДЯЩИЕ ЗАДАЧИ
 # ============================================================================
 
-
 @dataclass
 class IngestTask:
-    """Скачать файл из S3, нарезать и записать чанки в material_chunks."""
+    """Скачать файл из MinIO и проиндексировать в vector store.
 
-    task_id: str
-    material_id: str
-    storage_key: str
-
-    def to_json(self) -> str:
-        return json.dumps(self._as_dict(), ensure_ascii=False)
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "IngestTask":
-        _require(d, "task_id", "material_id", "storage_key")
-        return cls(
-            task_id=str(d["task_id"]),
-            material_id=str(d["material_id"]),
-            storage_key=str(d["storage_key"]),
-        )
-
-
-@dataclass
-class CreateTestTask:
-    """Сгенерировать вопросы по материалам, уже нарезанным в material_chunks."""
-
-    task_id: str
-    test_id: str
-    material_ids: list[str]
-    title: str
-    num_questions: int = 10
-    difficulty: Difficulty = "medium"
-    course_id: str | None = None
+    Backend заливает файл в MinIO (bucket=MINIO_BUCKET), затем шлёт эту задачу.
+    В контракте у задачи ровно два поля: `material_id` и `storage_key`.
+    Корреляция идёт по material_id — одна индексация соответствует одному
+    материалу, поэтому `task_id` в контракте нет.
+    """
+    material_id: str                       # UUID-строка от backend; int-иды больше не используются
+    storage_key: str                       # путь внутри MinIO bucket, например "uploads/lec.pdf"
+    TYPE: ClassVar[str] = "ingest"
 
     def to_json(self) -> str:
         return json.dumps(self._as_dict(), ensure_ascii=False)
 
     def _as_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {
-            "task_id": self.task_id,
-            "test_id": self.test_id,
-            "material_ids": list(self.material_ids),
-            "title": self.title,
-            "num_questions": self.num_questions,
-            "difficulty": self.difficulty,
+        return {
+            "material_id": self.material_id,
+            "storage_key": self.storage_key,
         }
-        if self.course_id is not None:
-            out["course_id"] = self.course_id
-        return out
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "CreateTestTask":
-        _require(d, "task_id", "test_id", "title")
-        material_ids = [str(x) for x in (d.get("material_ids") or [])]
-        if not material_ids:
-            raise ContractError("create_test: material_ids must be a non-empty list")
-        difficulty = d.get("difficulty", "medium")
-        if difficulty not in ("easy", "medium", "hard"):
-            raise ContractError(f"create_test: unknown difficulty {difficulty!r}")
+    def from_dict(cls, d: dict) -> "IngestTask":
+        # Терпимо к лишним полям (task_id/course_id от старого контракта) —
+        # просто игнорируем их.
         return cls(
-            task_id=str(d["task_id"]),
-            test_id=str(d["test_id"]),
-            material_ids=material_ids,
-            title=str(d["title"]),
-            num_questions=_positive_int(d.get("num_questions", 10), "num_questions"),
-            difficulty=difficulty,
-            course_id=None if d.get("course_id") is None else str(d["course_id"]),
+            material_id=str(d["material_id"]),         # было int() — бек шлёт UUID-строку
+            storage_key=str(d["storage_key"]),
         )
 
 
 @dataclass
-class StudentAnswer:
-    """Ответ студента на один вопрос. ML генерирует только single_choice,
-    поэтому ответ — это индекс выбранного варианта."""
-
-    question_id: str
-    student_answer_index: int | None = None
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "StudentAnswer":
-        if "question_id" not in d:
-            raise ContractError("answer: question_id is required")
-        idx = d.get("student_answer_index")
-        return cls(
-            question_id=str(d["question_id"]),
-            student_answer_index=None if idx is None else int(idx),
-        )
-
-
-@dataclass
-class GradeAttemptTask:
-    """Проверить попытку. Backend к этому моменту уже создал строку в
-    student_attempts и сохранил ответы через автосохранение.
-
-    ML читает test_questions, чтобы знать правильные индексы, и возвращает
-    score по каждому вопросу + один overall_feedback на всю попытку.
-    """
-
+class RAGQuestionTask:
+    """Ответить на вопрос по уже проиндексированному материалу."""
     task_id: str
-    attempt_id: str
-    test_id: str
-    answers: list[StudentAnswer] = field(default_factory=list)
+    material_id: int
+    question: str
+    top_k: int = 4
+    retrieve_n: int | None = None          # None → равен top_k
+    rerank: bool = False
+    TYPE: ClassVar[str] = "rag_question"
 
     def to_json(self) -> str:
         return json.dumps(self._as_dict(), ensure_ascii=False)
 
+    def _as_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "material_id": self.material_id,
+            "question": self.question,
+            "top_k": self.top_k,
+            **({"retrieve_n": self.retrieve_n} if self.retrieve_n is not None else {}),
+            "rerank": self.rerank,
+        }
+
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "GradeAttemptTask":
-        _require(d, "task_id", "attempt_id", "test_id")
-        raw = d.get("answers") or []
-        if not isinstance(raw, list):
-            raise ContractError("grade_attempt: answers must be a list")
+    def from_dict(cls, d: dict) -> "RAGQuestionTask":
+        rn = d.get("retrieve_n")
         return cls(
             task_id=str(d["task_id"]),
-            attempt_id=str(d["attempt_id"]),
+            material_id=int(d["material_id"]),
+            question=str(d["question"]),
+            top_k=int(d.get("top_k", 4)),
+            retrieve_n=int(rn) if rn is not None else None,
+            rerank=bool(d.get("rerank", False)),
+        )
+
+
+@dataclass
+class CreateTestTask:
+    """Сгенерировать тест (вопросы с вариантами) по нескольким материалам.
+
+    Backend присылает список уже проиндексированных material_ids; ML собирает
+    контекст из всех, отдаёт в LLM с JSON-output, парсит, валидирует, возвращает
+    структурированный Test.
+
+    Размер теста: его выбирает ML — отдельным вызовом планировщика
+    (`services/test_planner.py`), который смотрит на материал и считает, сколько
+    проверяемых фактов в нём разбирается. Границы жёсткие: 1..30
+    (`MIN_QUESTIONS`/`MAX_QUESTIONS`). Backend в выборе размера не участвует —
+    он присылает только `task_id`, `test_id`, `material_ids`, `title`,
+    `difficulty`. Backend после получения теста сам пишет `tests.amount_questions =
+    len(questions)`.
+
+    Внутреннее поле `num_questions` осталось: им пользуются внутренние вызовы
+    и тесты (прямой запуск генератора с заданным числом вопросов). В JSON оно
+    не сериализуется, а из входящего payload'а игнорируется — старые сообщения
+    в Redis Streams не должны ронять разбор.
+    """
+    task_id: str
+    test_id: str                           # uuid теста, который хранит backend
+    material_ids: list[str]                # uuid-строки от backend (раньше было int)
+    title: str
+    num_questions: int | None = None
+    difficulty: Difficulty = "medium"
+    course_id: str | None = None           # внутри кода только; в JSON не сериализуется
+    TYPE: ClassVar[str] = "create_test"
+
+    def __post_init__(self) -> None:
+        # Лимиты заказчика: 1..30. None = «определи сам», тогда проверять нечего.
+        if self.num_questions is not None and not (
+            MIN_QUESTIONS <= self.num_questions <= MAX_QUESTIONS
+        ):
+            raise ValueError(
+                f"num_questions must be in [{MIN_QUESTIONS}, {MAX_QUESTIONS}], "
+                f"got {self.num_questions}"
+            )
+        if self.difficulty not in DIFFICULTIES:
+            raise ValueError(
+                f"difficulty must be one of {DIFFICULTIES}, got {self.difficulty!r}"
+            )
+
+    def to_json(self) -> str:
+        return json.dumps(self._as_dict(), ensure_ascii=False)
+
+    def _as_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "test_id": self.test_id,
+            "material_ids": list(self.material_ids),
+            "title": self.title,
+            "difficulty": self.difficulty,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "CreateTestTask":
+        mids = d.get("material_ids") or []
+        if not isinstance(mids, list) or not mids:
+            raise ValueError("material_ids must be a non-empty list")
+        # Legacy `num_questions`, legacy `amount_questions`/`amountQuestions`
+        # из payload'а ИГНОРИРУЮТСЯ: поля размера в контракте больше нет —
+        # размер выбирает ML-планировщик. Старые сообщения в Redis Streams
+        # остались лежать — их нельзя ронять, поэтому просто читаем мимо
+        # (лишние ключи игнорируются, как и любые другие).
+        # Лимит difficulty проверяет __post_init__.
+        return cls(
+            task_id=str(d["task_id"]),
             test_id=str(d["test_id"]),
-            answers=[StudentAnswer.from_dict(a) for a in raw],
+            material_ids=[str(x) for x in mids],
+            title=str(d["title"]),
+            num_questions=None,
+            difficulty=str(d.get("difficulty", "medium")),  # type: ignore[arg-type]
+            course_id=d.get("course_id"),
         )
 
 
@@ -165,130 +277,476 @@ class GradeAttemptTask:
 #  РЕЗУЛЬТАТЫ
 # ============================================================================
 
-
 @dataclass
 class IngestResult:
-    """Backend сам знает material_id по своему же маппингу task_id → material_id,
-    поэтому в ответе его нет — только подтверждение."""
+    """Результат индексации материала.
 
-    task_id: str
-    status: TaskStatus = "ok"
+    В контракте статус успеха — "ready" (материал проиндексирован), а не "ok":
+    это тот же смысл, что у `materials.status_material` в БД. Ошибка — "error"
+    с обязательным полем `error`.
+
+    В контракте ровно два поля: `material_id` и `status` (+ `error` в ветке
+    ошибки). Ни `task_id`, ни `chunks_indexed` в JSON нет — корреляция идёт по
+    material_id, а число чанков backend'у не нужно.
+    """
+    status: IngestStatus
+    material_id: str | None = None         # UUID-строка от backend; в err-ветке включается,
+                                            # если известен — чтобы backend мог обновить status_material
     error: str | None = None
-
-    def _as_dict(self) -> dict[str, Any]:
-        if self.status == "ok":
-            return {"task_id": self.task_id, "status": "ok"}
-        return {
-            "task_id": self.task_id,
-            "status": "error",
-            "error": self.error or "unknown error",
-        }
 
     def to_json(self) -> str:
         return json.dumps(self._as_dict(), ensure_ascii=False)
 
-    @classmethod
-    def ok(cls, task_id: str) -> "IngestResult":
-        return cls(task_id=task_id, status="ok")
+    def _as_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        if self.material_id is not None:
+            out["material_id"] = self.material_id
+        out["status"] = self.status
+        if self.status != "ready":
+            out["error"] = self.error or "unknown error"
+        return out
 
     @classmethod
-    def err(cls, task_id: str, error: str) -> "IngestResult":
+    def ok(cls, material_id: str) -> "IngestResult":
+        return cls(status="ready", material_id=material_id)
+
+    @classmethod
+    def err(cls, error: str, material_id: str | None = None) -> "IngestResult":
+        return cls(status="error", error=error, material_id=material_id)
+
+
+@dataclass
+class RAGQuestionResult:
+    task_id: str
+    status: TaskStatus
+    answer: str | None = None
+    sources: list[str] = field(default_factory=list)
+    error: str | None = None
+
+    def to_json(self) -> str:
+        return json.dumps(self._as_dict(), ensure_ascii=False)
+
+    def _as_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {"task_id": self.task_id, "status": self.status}
+        if self.status == "ok":
+            out["answer"] = self.answer or ""
+            out["sources"] = list(self.sources)
+        else:
+            out["error"] = self.error or "unknown error"
+        return out
+
+    @classmethod
+    def ok(cls, task_id: str, answer: str, sources: list[str]) -> "RAGQuestionResult":
+        return cls(task_id=task_id, status="ok", answer=answer, sources=sources)
+
+    @classmethod
+    def err(cls, task_id: str, error: str) -> "RAGQuestionResult":
         return cls(task_id=task_id, status="error", error=error)
 
 
 @dataclass
 class TestQuestion:
-    """Вопрос в том виде, в каком его запишет backend в test_questions."""
+    """Один вопрос теста. Backend кладёт в свою таблицу test_questions.
 
-    __test__ = False  # pytest не должен пытаться собрать dataclass'ы как тесты
+    Три типа вопросов:
+      - `single_choice` — есть варианты, в `answer_key` лежит `{"correct_index": N}`;
+      - `multi_choice`  — есть варианты, в `answer_key` лежит
+        `{"correct_indexes": [N, M]}` (2 или 3 правильных);
+      - `open_answer`    — вариантов нет, в `answer_key` лежит
+        `{"reference_answer": "<эталон>"}`, а в `key_points` — опорные пункты.
 
+    `answer_key.explanation` — короткое объяснение правильного ответа (есть у всех
+    типов вопросов). `key_points` — список опорных пунктов; у закрытых вопросов
+    список пустой.
+
+    ⚠️ Контракт v4.1: `answer_key` ВЫХОДИТ наружу — по одному объекту на
+    вопрос. Это эталон правильного ответа: backend пишет его в колонку
+    `test_questions.answer_key` (она есть в ERD заказчика). Redis-эталон с TTL
+    30 дней — ненадёжное хранилище, а LLM-фолбэк при проверке уже давал
+    неверный вердикт (назвал 2 правильных варианта вместо 3). Поэтому эталон
+    лежит в БД, а Redis (`services/answer_store.py`) остаётся резервной
+    копией.
+
+    `source_chunk_id` — UUID чанка, из которого взят вопрос (nullable). LLM
+    возвращает короткий алиас в `source_chunk_ref`, генератор разворачивает его
+    в UUID — модель не выдумывает UUID'ы, а выбирает из списка реальных.
+
+    На входе принимаются и плоские legacy-поля (`correct_index`, `explanation`),
+    и старая форма `key_points` (объект с `criteria`) — в Redis Streams остались
+    payload'ы прежнего формата. На выходе — только канонический вид.
+    """
+    __test__ = False  # не pytest-класс
     id: int
     text: str
-    options: list[str]
-    correct_index: int
+    type_question: str = "single_choice"
+    options: list[str] = field(default_factory=list)
+    answer_key: dict[str, Any] = field(default_factory=dict)
+    key_points: list[str] = field(default_factory=list)
     source_chunk_id: str | None = None
+    source_chunk_ref: str | None = None      # внутренний алиас чанка от LLM
 
     def to_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {
+        # Имя поля типа в контракте — `type`. `answer_key` (контракт v4.1)
+        # уходит наружу: это эталон правильного ответа, backend пишет его в
+        # `test_questions.answer_key`.
+        return {
             "id": self.id,
+            "type": self.type_question,
             "text": self.text,
             "options": list(self.options),
-            "correct_index": self.correct_index,
+            "key_points": list(self.key_points),
+            "answer_key": dict(self.answer_key),
+            "source_chunk_id": self.source_chunk_id,
         }
-        if self.source_chunk_id is not None:
-            out["source_chunk_id"] = self.source_chunk_id
-        return out
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "TestQuestion":
+        qid = d.get("id")
+        # `type` — каноническое имя поля типа, type_question принимаем как legacy.
+        qtype = str(d.get("type") or d.get("type_question") or "single_choice")
+        if qtype not in QUESTION_TYPES:
+            raise ValueError(f"question {qid}: unknown type_question {qtype!r}")
+
+        opts = d.get("options") or []
+        if not isinstance(opts, list):
+            raise ValueError(f"question {qid}: options must be a list")
+        opts = [str(o) for o in opts]
+
+        answer_key = dict(d.get("answer_key") or {})
+        raw_kp = d.get("key_points")
+        key_points = _key_points_list(raw_kp)
+        if isinstance(raw_kp, dict) and raw_kp.get("explanation") and "explanation" not in answer_key:
+            answer_key["explanation"] = str(raw_kp["explanation"])
+
+        # legacy: плоские поля → вложенные
+        if "correct_index" in d and "correct_index" not in answer_key:
+            answer_key["correct_index"] = int(d["correct_index"])
+        if "correct_indexes" in d and "correct_indexes" not in answer_key:
+            answer_key["correct_indexes"] = list(d["correct_indexes"])
+        if "explanation" in d and "explanation" not in answer_key:
+            answer_key["explanation"] = str(d["explanation"])
+
+        if qtype == "single_choice":
+            if len(opts) < 2:
+                raise ValueError(f"question {qid}: single_choice needs >= 2 options")
+            if "correct_index" not in answer_key:
+                raise ValueError(f"question {qid}: single_choice needs answer_key.correct_index")
+            ci = int(answer_key["correct_index"])
+            if not (0 <= ci < len(opts)):
+                raise ValueError(f"question {qid}: correct_index {ci} out of range")
+            answer_key["correct_index"] = ci
+        elif qtype == "multi_choice":
+            if len(opts) < 2:
+                raise ValueError(f"question {qid}: multi_choice needs >= 2 options")
+            raw = answer_key.get("correct_indexes")
+            if raw is None:
+                raise ValueError(f"question {qid}: multi_choice needs answer_key.correct_indexes")
+            if not isinstance(raw, list) or not raw:
+                raise ValueError(f"question {qid}: correct_indexes must be a non-empty list")
+            indexes = [int(i) for i in raw]
+            if len(set(indexes)) != len(indexes):
+                raise ValueError(f"question {qid}: correct_indexes has duplicates")
+            if len(indexes) < 2:
+                raise ValueError(f"question {qid}: multi_choice needs >= 2 correct indexes")
+            if any(not (0 <= i < len(opts)) for i in indexes):
+                raise ValueError(f"question {qid}: correct_indexes out of range")
+            answer_key["correct_indexes"] = sorted(indexes)
+        else:
+            reference = str(answer_key.get("reference_answer") or "").strip()
+            if not reference:
+                raise ValueError(f"question {qid}: open_answer needs answer_key.reference_answer")
+            answer_key["reference_answer"] = reference
+            # LLM нередко кладёт `criteria` в answer_key, а не в key_points.
+            # Нормализуем на границе: дальше судья читает key_points, а в
+            # answer_key остаётся только эталон.
+            if "criteria" in answer_key and not key_points:
+                key_points = _key_points_list(answer_key.pop("criteria"))
+
+        chunk_id = d.get("source_chunk_id")
+        chunk_ref = d.get("source_chunk_ref")
+
+        return cls(
+            id=int(d["id"]),
+            text=str(d["text"]).strip(),
+            type_question=qtype,
+            options=opts,
+            answer_key=answer_key,
+            key_points=key_points,
+            source_chunk_id=str(chunk_id) if chunk_id else None,
+            source_chunk_ref=str(chunk_ref) if chunk_ref else None,
+        )
+
+    def reference_answer(self) -> str:
+        """Эталонный ответ для open_answer (пустая строка у single_choice)."""
+        return str(self.answer_key.get("reference_answer") or "").strip()
+
+    def explanation(self) -> str:
+        """Короткое объяснение правильного ответа (answer_key.explanation)."""
+        return str(self.answer_key.get("explanation") or "").strip()
+
+    def criteria(self) -> list[str]:
+        """Опорные пункты для open_answer."""
+        return list(self.key_points)
+
+    def correct_indexes(self) -> list[int]:
+        """Правильные индексы вариантов для multi_choice (пусто у других типов)."""
+        raw = self.answer_key.get("correct_indexes") or []
+        if not isinstance(raw, list):
+            return []
+        try:
+            return sorted({int(i) for i in raw})
+        except (TypeError, ValueError):
+            return []
+
+
+def _key_points_list(raw: Any) -> list[str]:
+    """key_points в канонической форме — список строк.
+
+    Принимаем новую форму (список критериев) и старую (объект с `criteria`) —
+    в Redis Streams остались payload'ы прежнего формата.
+    """
+    if isinstance(raw, list):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    if isinstance(raw, dict):
+        crit = raw.get("criteria")
+        if isinstance(crit, list):
+            return [str(x).strip() for x in crit if str(x).strip()]
+    return []
 
 
 @dataclass
 class Test:
-    __test__ = False  # pytest не должен пытаться собрать dataclass'ы как тесты
-
+    """Сгенерированный тест: title + список вопросов."""
+    __test__ = False  # не pytest-класс
     title: str
     questions: list[TestQuestion]
 
     def to_dict(self) -> dict[str, Any]:
         return {"title": self.title, "questions": [q.to_dict() for q in self.questions]}
 
+    @classmethod
+    def from_dict(cls, d: dict) -> "Test":
+        qs_raw = d.get("questions") or []
+        if not isinstance(qs_raw, list) or not qs_raw:
+            raise ValueError("test.questions must be a non-empty list")
+        return cls(
+            title=str(d.get("title", "")).strip(),
+            questions=[TestQuestion.from_dict(q) for q in qs_raw],
+        )
+
 
 @dataclass
 class CreateTestResult:
     task_id: str
-    status: TaskStatus = "ok"
-    test_id: str | None = None
+    status: TaskStatus
     test: Test | None = None
+    # test_id из задачи — чтобы backend знал, какую запись в tests апдейтить,
+    # не заводя task_id → test_id маппинг и лишнюю колонку.
+    test_id: str | None = None
     error: str | None = None
+
+    def to_json(self) -> str:
+        return json.dumps(self._as_dict(), ensure_ascii=False)
 
     def _as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {"task_id": self.task_id, "status": self.status}
         if self.test_id is not None:
             out["test_id"] = self.test_id
         if self.status == "ok":
-            if self.test is None:
-                raise ContractError("create_test result: status=ok requires test")
+            assert self.test is not None
             out["test"] = self.test.to_dict()
         else:
             out["error"] = self.error or "unknown error"
         return out
 
-    def to_json(self) -> str:
-        return json.dumps(self._as_dict(), ensure_ascii=False)
-
     @classmethod
-    def ok(cls, task_id: str, test_id: str, test: Test) -> "CreateTestResult":
-        return cls(task_id=task_id, status="ok", test_id=test_id, test=test)
+    def ok(
+        cls,
+        task_id: str,
+        test: Test,
+        test_id: str | None = None,
+    ) -> "CreateTestResult":
+        return cls(task_id=task_id, status="ok", test=test, test_id=test_id)
 
     @classmethod
     def err(cls, task_id: str, error: str, test_id: str | None = None) -> "CreateTestResult":
         return cls(task_id=task_id, status="error", error=error, test_id=test_id)
 
 
+# ============================================================================
+#  GRADE ATTEMPT
+# ============================================================================
+
+@dataclass
+class StudentAnswer:
+    """Один ответ студента в attempt'е. Хранится как dict в payload.
+
+    Принимаем три формата:
+      - новый  — `{"question_id": ..., "student_answer": {"index": 2}}`,
+                 `{"question_id": ..., "student_answer": {"indexes": [0, 2]}}` или
+                 `{"question_id": ..., "student_answer": {"text": "..."}}`;
+      - legacy — плоские `student_answer_index` / `student_answer_text`.
+    """
+    question_id: str
+    student_answer_index: int | None = None    # для single_choice (0..N-1)
+    student_answer_indexes: list[int] | None = None  # для multi_choice (2-3 индекса)
+    student_answer_text: str | None = None      # для open_answer
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "StudentAnswer":
+        idx = d.get("student_answer_index")
+        idxs = d.get("student_answer_indexes")
+        txt = d.get("student_answer_text")
+
+        raw = d.get("student_answer")
+        if isinstance(raw, dict):
+            if raw.get("index") is not None:
+                idx = raw["index"]
+            if raw.get("indexes") is not None:
+                idxs = raw["indexes"]
+            if raw.get("text") is not None:
+                txt = raw["text"]
+
+        parsed_idxs: list[int] | None = None
+        if idxs is not None:
+            if not isinstance(idxs, list) or not idxs:
+                raise ValueError(
+                    f"answer for question {d.get('question_id')}: indexes must be a non-empty list"
+                )
+            parsed_idxs = [int(i) for i in idxs]
+
+        if idx is None and parsed_idxs is None and (txt is None or not str(txt).strip()):
+            raise ValueError(f"answer for question {d.get('question_id')}: empty")
+        return cls(
+            question_id=str(d["question_id"]),
+            student_answer_index=int(idx) if idx is not None else None,
+            student_answer_indexes=parsed_idxs,
+            student_answer_text=str(txt) if txt is not None else None,
+        )
+
+
+def _student_answer_payload(a: StudentAnswer) -> dict[str, Any]:
+    """Канонический вид ответа студента в payload задачи.
+
+    Ровно одно из трёх: `index` (single_choice), `indexes` (multi_choice),
+    `text` (open_answer). Backend шлёт именно так — см. MlTaskPublisherImpl.
+    """
+    if a.student_answer_indexes is not None:
+        return {"indexes": list(a.student_answer_indexes)}
+    if a.student_answer_index is not None:
+        return {"index": a.student_answer_index}
+    return {"text": a.student_answer_text or ""}
+
+
+@dataclass
+class GradeAttemptTask:
+    """Оценить attempt: backend присылает test_id + ответы студента, ML достаёт
+    вопросы из БД, проверяет, возвращает per-question score + feedback + total.
+
+    Backend при отправке этой задачи уже создал запись в student_attempts
+    (started_at = NOW()). Наш результат запишет finished_at + score + grade.
+
+    В контракте `user_id` нет: студент и так известен по `attempt_id`, а поле
+    внутри dataclass'а осталось только для логов/идемпотентности и наружу не
+    сериализуется.
+    """
+    task_id: str
+    attempt_id: str                        # uuid попытки
+    test_id: str                           # uuid теста
+    user_id: str = ""                      # внутри кода только; в JSON не сериализуется
+    answers: list[StudentAnswer] = field(default_factory=list)
+    TYPE: ClassVar[str] = "grade_attempt"
+
+    def to_json(self) -> str:
+        return json.dumps(self._as_dict(), ensure_ascii=False)
+
+    def _as_dict(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "attempt_id": self.attempt_id,
+            "test_id": self.test_id,
+            "answers": [
+                {"question_id": a.question_id, "student_answer": _student_answer_payload(a)}
+                for a in self.answers
+            ],
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "GradeAttemptTask":
+        raw = d.get("answers") or []
+        if not isinstance(raw, list) or not raw:
+            raise ValueError("answers must be a non-empty list")
+        return cls(
+            task_id=str(d["task_id"]),
+            attempt_id=str(d["attempt_id"]),
+            test_id=str(d["test_id"]),
+            # user_id в контракте нет, но если backend пришлёт — не считаем
+            # это ошибкой, просто игнорируем.
+            user_id=str(d.get("user_id") or ""),
+            answers=[StudentAnswer.from_dict(a) for a in raw],
+        )
+
+
 @dataclass
 class GradedItem:
-    """Результат по одному вопросу. is_correct backend выводит из score,
-    student_answer_index и correct_index у него уже есть в своих таблицах."""
+    """Per-question результат проверки.
 
+    `correct_answer` — **эталон-объект** того же вида, что `answer_key`
+    вопроса в БД: `{"correct_index": N}` | `{"correct_indexes": [N, M]}` |
+    `{"reference_answer": "…"}`, плюс необязательный `explanation`.
+
+    `student_answer` — ответ студента объектом: `{"index": N}` |
+    `{"indexes": [N, M]}` | `{"text": "…"}`.
+
+    ⚠️ Именно объектом, а не строкой: backend читает `correct_answer` в
+    `Map<String, Object>`, и JSON-строка в этом поле роняет разбор всего
+    вердикта — попытка остаётся неоценённой. Человекочитаемый текст
+    правильного ответа при этом не теряется — он есть в `feedback`.
+
+    None — эталона/ответа нет: backend тогда подставляет `question.answer_key`
+    сам.
+    """
     question_id: str
-    score: float
+    is_correct: bool
+    score: float                           # 0.0..1.0 — доля баллов за вопрос
+    feedback: str = ""
+    correct_answer: dict[str, Any] | None = None
+    student_answer: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"question_id": self.question_id, "score": self.score}
+        return {
+            "question_id": self.question_id,
+            "is_correct": self.is_correct,
+            "score": self.score,
+            "feedback": self.feedback,
+            "correct_answer": self.correct_answer,
+            "student_answer": self.student_answer,
+        }
 
 
 @dataclass
 class GradeAttemptResult:
+    """Результат проверки попытки.
+
+    ⚠️ В контракте заказчика поля `status` НЕТ — ни в ветке успеха, ни в ветке
+    ошибки. Признак ошибки — наличие поля `error`. Поле `status` оставлено
+    внутри dataclass'а для удобства вызывающего кода, но наружу не
+    сериализуется.
+    """
     task_id: str
-    status: TaskStatus = "ok"
-    attempt_id: str | None = None
+    status: TaskStatus
+    attempt_id: str | None = None          # чтобы backend нашёл строку в student_attempts
     test_id: str | None = None
-    score_pct: float | None = None
-    grade: int | None = None
-    overall_feedback: str | None = None
+    score_pct: float | None = None         # 0..100
+    grade: int | None = None               # 2..5
     items: list[GradedItem] = field(default_factory=list)
     error: str | None = None
 
+    def to_json(self) -> str:
+        return json.dumps(self._as_dict(), ensure_ascii=False)
+
     def _as_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {"task_id": self.task_id, "status": self.status}
+        out: dict[str, Any] = {"task_id": self.task_id}
         if self.attempt_id is not None:
             out["attempt_id"] = self.attempt_id
         if self.test_id is not None:
@@ -296,43 +754,30 @@ class GradeAttemptResult:
         if self.status == "ok":
             out["score_pct"] = self.score_pct
             out["grade"] = self.grade
-            out["overall_feedback"] = self.overall_feedback or ""
             out["items"] = [i.to_dict() for i in self.items]
         else:
             out["error"] = self.error or "unknown error"
         return out
 
-    def to_json(self) -> str:
-        return json.dumps(self._as_dict(), ensure_ascii=False)
-
     @classmethod
     def ok(
-        cls,
-        task_id: str,
-        attempt_id: str,
-        test_id: str,
-        score_pct: float,
-        grade: int,
-        overall_feedback: str,
-        items: list[GradedItem],
+        cls, task_id: str, attempt_id: str, test_id: str,
+        score_pct: float, grade: int, items: list[GradedItem],
     ) -> "GradeAttemptResult":
         return cls(
-            task_id=task_id,
-            status="ok",
-            attempt_id=attempt_id,
-            test_id=test_id,
-            score_pct=score_pct,
-            grade=grade,
-            overall_feedback=overall_feedback,
-            items=items,
+            task_id=task_id, status="ok",
+            attempt_id=attempt_id, test_id=test_id,
+            score_pct=score_pct, grade=grade, items=items,
         )
 
     @classmethod
     def err(
-        cls, task_id: str, error: str, attempt_id: str | None = None, test_id: str | None = None
+        cls, task_id: str, error: str,
+        attempt_id: str | None = None, test_id: str | None = None,
     ) -> "GradeAttemptResult":
         return cls(
-            task_id=task_id, status="error", error=error, attempt_id=attempt_id, test_id=test_id
+            task_id=task_id, status="error", error=error,
+            attempt_id=attempt_id, test_id=test_id,
         )
 
 
@@ -340,63 +785,63 @@ class GradeAttemptResult:
 #  DISPATCH
 # ============================================================================
 
-# Имя стрима → класс задачи. Ключ — имя входящего стрима, а не поле в payload.
-TASK_TYPES: dict[str, type] = {
+@dataclass
+class UnknownTask:
+    """Заглушка для нераспознанного типа канала. Не падаем — отдаём ошибку."""
+    task_id: str
+    raw_type: str
+    payload: dict
+
+    def to_error(self) -> dict[str, Any]:
+        return {"task_id": self.task_id, "status": "error",
+                "error": f"unknown task type: {self.raw_type!r}"}
+
+
+TASK_CLASSES: dict[str, type] = {
     "ingest": IngestTask,
+    "rag_question": RAGQuestionTask,
     "create_test": CreateTestTask,
     "grade_attempt": GradeAttemptTask,
 }
 
+# Типы задач — по одному каналу на каждый.
+TASK_TYPES: tuple[str, ...] = tuple(TASK_CLASSES)
 
-def parse_task(channel: str, payload: str | dict[str, Any]) -> IngestTask | CreateTestTask | GradeAttemptTask:
-    """Разобрать payload входящего сообщения.
 
-    Args:
-        channel: имя входящего стрима, определяет тип задачи.
-        payload: JSON-строка или уже распарсенный dict.
+def parse_task(
+    payload: str | dict,
+    task_type: str,
+) -> IngestTask | RAGQuestionTask | CreateTestTask | GradeAttemptTask | UnknownTask:
+    """Разобрать payload из Redis Stream в dataclass по типу задачи.
+
+    Тип приходит из ИМЕНИ КАНАЛА, а не из payload: один тип задачи — один
+    канал, поэтому «положить не туда» невозможно.
 
     Raises:
-        ContractError: неизвестный канал, невалидный JSON, нет обязательных полей.
+        ValueError: если payload не JSON или нет обязательного поля task_id
+            (для ingest task_id не требуется — там корреляция по material_id).
     """
-    cls = TASK_TYPES.get(channel)
-    if cls is None:
-        raise ContractError(f"unknown task channel: {channel!r}")
-
     if isinstance(payload, str):
         try:
             d = json.loads(payload)
         except json.JSONDecodeError as e:
-            raise ContractError(f"payload is not valid JSON: {e}") from e
+            raise ValueError(f"payload is not valid JSON: {e}") from e
     else:
         d = payload
 
     if not isinstance(d, dict):
-        raise ContractError(f"payload must be a JSON object, got {type(d).__name__}")
-    return cls.from_dict(d)  # type: ignore[return-value]
+        raise ValueError(f"payload must be a JSON object, got {type(d).__name__}")
+
+    task_id = str(d.get("task_id") or "")
+    if not task_id and task_type != "ingest":
+        raise ValueError("payload.task_id is required")
+
+    cls = TASK_CLASSES.get(task_type)
+    if cls is None:
+        return UnknownTask(task_id=task_id, raw_type=str(task_type), payload=d)
+    return cls.from_dict(d)
 
 
-def grade_from_pct(score_pct: float) -> int:
-    """Шкала оценок: ≥90 → 5, ≥70 → 4, ≥50 → 3, иначе 2."""
-    if score_pct >= 90:
-        return 5
-    if score_pct >= 70:
-        return 4
-    if score_pct >= 50:
-        return 3
-    return 2
-
-
-def _require(d: dict[str, Any], *keys: str) -> None:
-    missing = [k for k in keys if d.get(k) in (None, "")]
-    if missing:
-        raise ContractError(f"missing required fields: {', '.join(missing)}")
-
-
-def _positive_int(value: Any, name: str) -> int:
-    try:
-        n = int(value)
-    except (TypeError, ValueError) as e:
-        raise ContractError(f"{name} must be an integer, got {value!r}") from e
-    if n < 1:
-        raise ContractError(f"{name} must be >= 1, got {n}")
-    return n
+def all_task_types() -> list[str]:
+    """Список поддерживаемых типов задач (для документации/Swagger)."""
+    return sorted(TASK_CLASSES)

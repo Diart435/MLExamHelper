@@ -109,4 +109,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleTestNotFound(TestNotFoundException ex, WebRequest req) {
         return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
     }
+
+    @ExceptionHandler(AttemptNotFoundException.class)
+    public ResponseEntity<ApiError> handleAttemptNotFound(AttemptNotFoundException ex, WebRequest req) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), req);
+    }
+
+    @ExceptionHandler(TestNotReadyException.class)
+    public ResponseEntity<ApiError> handleTestNotReady(TestNotReadyException ex, WebRequest req) {
+        return build(HttpStatus.CONFLICT, ex.getMessage(), req);
+    }
 }

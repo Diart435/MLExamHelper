@@ -1,6 +1,7 @@
 package com.examassistant.common;
 
 import com.examassistant.common.DTO.ApiError;
+import com.examassistant.common.exception.AttemptNotFoundException;
 import com.examassistant.common.exception.CourseForbiddenException;
 import com.examassistant.common.exception.CourseNotFoundException;
 import com.examassistant.common.exception.FileForbiddenException;
@@ -8,6 +9,7 @@ import com.examassistant.common.exception.FileNotFoundException;
 import com.examassistant.common.exception.FileUploadException;
 import com.examassistant.common.exception.InvalidCredentialsException;
 import com.examassistant.common.exception.InvalidTokenException;
+import com.examassistant.common.exception.TestNotReadyException;
 import com.examassistant.common.exception.UserAlreadyExistException;
 import com.examassistant.common.exception.UserNotFoundException;
 import jakarta.validation.ConstraintViolation;
@@ -181,6 +183,26 @@ class GlobalExceptionHandlerTest {
 
         assertApiError(response, HttpStatus.UNAUTHORIZED,
                 "Password is incorrect", "/api/auth/login");
+    }
+
+    @Test
+    void attemptNotFound_returns404() {
+        ResponseEntity<ApiError> response = handler.handleAttemptNotFound(
+                new AttemptNotFoundException(UUID.randomUUID()), request("/api/attempts/1"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessage()).contains("Attempt not found");
+    }
+
+    @Test
+    void testNotReady_returns409() {
+        ResponseEntity<ApiError> response = handler.handleTestNotReady(
+                new TestNotReadyException(UUID.randomUUID()), request("/api/tests/1/attempts"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessage()).contains("Test is not ready");
     }
 
     @Test

@@ -1,0 +1,543 @@
+{
+  "info": {
+    "_postman_id": "6c5de63d-c4e3-42a5-9b6d-6858ed3ebd32",
+    "name": "Exam Stand — ML ↔ backend (контракт v4.1)",
+    "description": "Полный цикл на живом стенде: регистрация → курс → загрузка материала → генерация теста ML → попытка → проверка.\n\nПОРЯДОК ЗАПУСКА\n1) Выполни запросы 1–4 по одному.\n2) Запрос 5 (Материал готов?) жми ПОВТОРНО, пока statusMaterial = ready (обычно 30–90 с: ML режет PDF на чанки и делает эмбеддинги).\n3) Запрос 6 (Создать тест) — ML генерирует вопросы (1–3 мин).\n4) Запрос 7 (Тест готов?) жми ПОВТОРНО, пока statusTest = created.\n5) Запросы 8–10 подряд.\n\nВсе токены и id кладутся в переменные коллекции автоматически.\nТокен access живёт 60 минут — потом выполни запрос 2 (Вход) заново.\n\nSwagger UI: http://localhost:8000/swagger-ui.html",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Регистрация",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"firstName\": \"Stand\",\n  \"lastName\": \"Tester\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        },
+        "description": "Создаёт пользователя. E-mail генерируется автоматически (метка времени), чтобы повторные прогоны не падали на 409."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const email = 'stand_' + Date.now() + '@example.com';",
+              "pm.collectionVariables.set('email', email);",
+              "console.log('email =', email);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('token', body.accessToken);",
+              "pm.collectionVariables.set('userId', body.userId);",
+              "console.log('token сохранён, userId =', body.userId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Вход",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Нужен, если access-токен протух (60 минут) или после перезапуска backend'а."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('token', body.accessToken);",
+              "console.log('token обновлён');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Создать курс",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Стенд {{email}}\",\n  \"courseDescription\": \"Прогон контракта ML ↔ backend v4.1\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/courses",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "courses"
+          ]
+        },
+        "description": "Курс нужен владельцу материала и теста."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('courseId', body.courseId);",
+              "console.log('courseId =', body.courseId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Загрузить материал",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "courseId",
+              "value": "{{courseId}}",
+              "type": "text"
+            },
+            {
+              "key": "file",
+              "type": "file",
+              "src": "C:\\Users\\sotni\\OneDrive\\Рабочий стол\\ai-exam\\tp_ivt_team5_2026\\ml\\data\\Лекция_№11_Многофакторный_эксперимент_Стратегическое_планирование.pdf"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/materials/upload",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "materials",
+            "upload"
+          ]
+        },
+        "description": "PDF уходит в S3 (seaweedfs), дальше ML забирает его по ключу storage_key, режет на чанки и делает эмбеддинги."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('materialId', body.materialId);",
+              "console.log('materialId =', body.materialId, '| statusMaterial =', body.statusMaterial);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Материал готов?",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/materials/{{materialId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "materials",
+            "{{materialId}}"
+          ]
+        },
+        "description": "Жми ПОВТОРНО, пока statusMaterial = ready."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "console.log('statusMaterial =', body.statusMaterial);",
+              "if (String(body.statusMaterial).toLowerCase() !== 'ready') {",
+              "  console.warn('Ещё не готов — жми Send ещё раз через ~15 с');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Создать тест",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"courseId\": \"{{courseId}}\",\n  \"title\": \"Стенд-тест {{email}}\",\n  \"difficulty\": \"medium\",\n  \"materialIds\": [\"{{materialId}}\"]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tests",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "tests"
+          ]
+        },
+        "description": "difficulty: easy | medium | hard. Количество вопросов не задаётся: его выбирает ML-планировщик по числу проверяемых фактов в материале (1..30). Фактическое число придёт в ответе как amountQuestions = N."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('testId', body.testId);",
+              "console.log('testId =', body.testId, '| statusTest =', body.statusTest);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Тест готов?",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/tests/{{testId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "tests",
+            "{{testId}}"
+          ]
+        },
+        "description": "Жми ПОВТОРНО, пока statusTest = created (значения: creating → created | error)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "console.log('statusTest =', body.statusTest, '| amountQuestions =', body.amountQuestions);",
+              "if (String(body.statusTest).toLowerCase() !== 'created') {",
+              "  console.warn('ML ещё готовит тест — жми Send ещё раз через ~15 с');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Вопросы теста",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/tests/{{testId}}/questions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "tests",
+            "{{testId}}",
+            "questions"
+          ]
+        },
+        "description": "Вопросы без правильных ответов: questionId, questionOrder, type, text, options. Тип нужен, чтобы собрать ответ правильной формы (index / indexes / text)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('questionsJson', JSON.stringify(body));",
+              "console.log('вопросов:', body.length);",
+              "body.forEach(q => console.log(' ', q.questionOrder, q.type, '|', q.text.slice(0, 60), '| options:', (q.options || []).length));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Отправить попытку",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"answers\": [\n    {\n      \"questionId\": \"7e4dab7a-4646-5c6d-9b9a-1237a8f4f597\",\n      \"student_answer\": {\n        \"index\": 1\n      }\n    },\n    {\n      \"questionId\": \"e6af1924-e33f-5560-8ded-296a8c2df1e4\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1\n        ]\n      }\n    },\n    {\n      \"questionId\": \"5d7a4f26-4e96-531e-b087-6d3b6a7710c8\",\n      \"student_answer\": {\n        \"text\": \"Уровень фактора — это одно из нескольких значений, которое фактор может принимать в эксперименте.\"\n      }\n    },\n    {\n      \"questionId\": \"7eb4fecb-22b1-5459-9ad8-eea01f84d44a\",\n      \"student_answer\": {\n        \"index\": 0\n      }\n    },\n    {\n      \"questionId\": \"798ef63d-8ad7-5fa5-a927-33a2a7768139\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1,\n          3\n        ]\n      }\n    },\n    {\n      \"questionId\": \"b4219362-b70a-5f95-8640-95bb02bdf332\",\n      \"student_answer\": {\n        \"text\": \"Функции φ представляют в виде степенных полиномов первого или второго порядка.\"\n      }\n    },\n    {\n      \"questionId\": \"8b6fc42b-97e7-56f0-a1cf-67aa34deee15\",\n      \"student_answer\": {\n        \"index\": 0\n      }\n    },\n    {\n      \"questionId\": \"96e531fa-da33-5a4a-b7eb-27bc8acae92b\",\n      \"student_answer\": {\n        \"index\": 1\n      }\n    },\n    {\n      \"questionId\": \"0b8a19cd-7f92-5c8b-96a2-c002375754fa\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          2\n        ]\n      }\n    },\n    {\n      \"questionId\": \"5a7d0de0-84ca-5757-9a37-40f1240f8c46\",\n      \"student_answer\": {\n        \"text\": \"Затрудняюсь ответить на этот вопрос, единого ответа не вижу.\"\n      }\n    },\n    {\n      \"questionId\": \"2ee018a0-56db-5801-be2a-5d25a5ad4fe5\",\n      \"student_answer\": {\n        \"index\": 1\n      }\n    },\n    {\n      \"questionId\": \"aa77dd0d-d001-5227-a6b0-e374b4cbdc6a\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1\n        ]\n      }\n    },\n    {\n      \"questionId\": \"85ac4a70-334b-5608-9c1f-8ab1a6ff2414\",\n      \"student_answer\": {\n        \"text\": \"Фактор должен непосредственно воздействовать на объект: он не должен являться функцией других факторов.\"\n      }\n    },\n    {\n      \"questionId\": \"2b89aa48-ae7b-5f0d-801d-3e4a325e78cc\",\n      \"student_answer\": {\n        \"index\": 1\n      }\n    },\n    {\n      \"questionId\": \"def47ac6-fe24-5a08-8216-07f24e3282f5\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1\n        ]\n      }\n    },\n    {\n      \"questionId\": \"1e8161d6-3733-5029-aee4-faebba22a166\",\n      \"student_answer\": {\n        \"text\": \"Сначала выбирают наиболее существенные факторы и отклики системы в соответствии с целью эксперимента, затем описывают функциональную зависимость между ними и устанавливают диапазон изменения каждого фактора от xi min до xi max.\"\n      }\n    },\n    {\n      \"questionId\": \"e21b2b93-6154-5e50-aab2-ecb0aef3e491\",\n      \"student_answer\": {\n        \"index\": 3\n      }\n    },\n    {\n      \"questionId\": \"d84ca524-418f-58b1-9f8a-550e2c7cd25e\",\n      \"student_answer\": {\n        \"index\": 2\n      }\n    },\n    {\n      \"questionId\": \"3ad21497-0060-52c2-bd33-a608fccbf7e1\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1,\n          3\n        ]\n      }\n    },\n    {\n      \"questionId\": \"279cde4e-eea9-57bb-9a64-fb120b3fe873\",\n      \"student_answer\": {\n        \"text\": \"Свободный член и факторы в первой степени объединяют, а также объединяют факторы во второй степени и произведения факторов.\"\n      }\n    },\n    {\n      \"questionId\": \"a3806a56-a8cc-5793-aaee-f1dfaf9feafe\",\n      \"student_answer\": {\n        \"index\": 0\n      }\n    },\n    {\n      \"questionId\": \"b9e93b63-14c4-55e0-8c22-4eef6a7efe93\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1,\n          2\n        ]\n      }\n    },\n    {\n      \"questionId\": \"76bc7569-5df6-584f-8912-f58a57a0648c\",\n      \"student_answer\": {\n        \"text\": \"План эксперимента D должен содержать N ≥ C(k+d, d) различных экспериментальных точек.\"\n      }\n    },\n    {\n      \"questionId\": \"c8c8183c-7b88-5e3f-9de3-73f1f0649c36\",\n      \"student_answer\": {\n        \"index\": 1\n      }\n    },\n    {\n      \"questionId\": \"96f1fba7-ff58-5083-9f9e-4655d7ca61ed\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1\n        ]\n      }\n    },\n    {\n      \"questionId\": \"d72032a9-281b-5662-8db4-54bb4ffe193d\",\n      \"student_answer\": {\n        \"text\": \"Затрудняюсь ответить на этот вопрос, единого ответа не вижу.\"\n      }\n    },\n    {\n      \"questionId\": \"e0d30a85-1a7f-5fe1-a628-fc9c1e183253\",\n      \"student_answer\": {\n        \"index\": 1\n      }\n    },\n    {\n      \"questionId\": \"44d6e1a5-6029-5372-a11a-563c777c34d7\",\n      \"student_answer\": {\n        \"index\": 2\n      }\n    },\n    {\n      \"questionId\": \"012a3155-02da-546e-ac13-9817067bd4d8\",\n      \"student_answer\": {\n        \"indexes\": [\n          0,\n          1,\n          3\n        ]\n      }\n    },\n    {\n      \"questionId\": \"14787641-6d92-542f-9de8-3a96ded6f428\",\n      \"student_answer\": {\n        \"text\": \"Затрудняюсь ответить на этот вопрос, единого ответа не вижу.\"\n      }\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/tests/{{testId}}/attempts",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "tests",
+            "{{testId}}",
+            "attempts"
+          ]
+        },
+        "description": "Готовое тело попытки под testId 26cc081c-6919-42eb-bd18-b7e27cc5fc85 (30 вопросов, ~70% верных). Для другого теста — пересобери по шагу 8."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+              "const body = pm.response.json();",
+              "pm.collectionVariables.set('attemptId', body.attemptId);",
+              "console.log('attemptId =', body.attemptId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Результат попытки",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/attempts/{{attemptId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "attempts",
+            "{{attemptId}}"
+          ]
+        },
+        "description": "Жми ПОВТОРНО, пока status = finished. В ответе — по каждому вопросу correct, score и feedback от ML."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "console.log('status =', body.status, '| scorePct =', body.scorePct, '| grade =', body.grade);",
+              "console.log('ответов:', (body.answers || []).length);",
+              "(body.answers || []).forEach(a => console.log(' ', a.questionId, '| correct =', a.correct, '| score =', a.score, '| feedback =', String(a.feedback || '').slice(0, 80)));",
+              "if (body.status !== 'finished') {",
+              "  console.warn('Ещё проверяется — жми Send ещё раз через ~15 с');",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "StandPass123!",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "courseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "materialId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "attemptId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "questionsJson",
+      "value": "[]",
+      "type": "string"
+    },
+    {
+      "key": "answersJson",
+      "value": "[]",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  }
+}

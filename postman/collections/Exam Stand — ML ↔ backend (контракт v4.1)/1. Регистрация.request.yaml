@@ -1,0 +1,31 @@
+$kind: http-request
+description: Создаёт пользователя. E-mail генерируется автоматически (метка времени), чтобы повторные прогоны не падали на 409.
+url: "{{baseUrl}}/api/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "{{email}}",
+      "password": "{{password}}",
+      "firstName": "Stand",
+      "lastName": "Tester"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      const email = 'stand_' + Date.now() + '@example.com';
+      pm.collectionVariables.set('email', email);
+      console.log('email =', email);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('201 Created', () => pm.response.to.have.status(201));
+      const body = pm.response.json();
+      pm.collectionVariables.set('token', body.accessToken);
+      pm.collectionVariables.set('userId', body.userId);
+      console.log('token сохранён, userId =', body.userId);
+    language: text/javascript
+order: 1000

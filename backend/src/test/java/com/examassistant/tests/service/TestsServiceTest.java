@@ -1,6 +1,5 @@
 package com.examassistant.tests.service;
 
-import com.examassistant.common.enums.TestAmountQuestions;
 import com.examassistant.common.enums.TestDifficulty;
 import com.examassistant.common.exception.CourseForbiddenException;
 import com.examassistant.common.exception.TestNotFoundException;
@@ -68,8 +67,10 @@ class TestsServiceTest {
         assertThat(result.getTestId()).isEqualTo(TestFixtures.TEST_ID);
         assertThat(result.getCourseId()).isEqualTo(TestFixtures.COURSE_ID);
         assertThat(result.getTitle()).isEqualTo("Math test");
-        assertThat(result.getAmountQuestions()).isEqualTo(TestAmountQuestions.MEDIUM);
-        assertThat(result.getStatusTest()).isEqualTo(TestStatus.CREATED);
+        assertThat(result.getAmountQuestions()).isEqualTo("0");
+        // CREATING: тест ещё готовит ML, CREATED выставит CreateTestResultService
+        // после применения ответа с вопросами.
+        assertThat(result.getStatusTest()).isEqualTo(TestStatus.CREATING);
         assertThat(result.getDifficulty()).isEqualTo(TestDifficulty.MEDIUM);
         assertThat(result.getCreatedAt()).isNotNull();
 
@@ -91,7 +92,6 @@ class TestsServiceTest {
         assertThat(published.getTestId()).isEqualTo(TestFixtures.TEST_ID);
         assertThat(published.getMaterialIds()).containsExactly(TestFixtures.MATERIAL_ID);
         assertThat(published.getTitle()).isEqualTo("Math test");
-        assertThat(published.getAmountQuestions()).isEqualTo(TestAmountQuestions.MEDIUM);
         assertThat(published.getDifficulty()).isEqualTo("medium");
         assertThat(published.getCourseId()).isEqualTo(TestFixtures.COURSE_ID);
     }
@@ -157,7 +157,7 @@ class TestsServiceTest {
                 TestFixtures.TEST_ID,
                 TestFixtures.COURSE_ID,
                 "Math test",
-                TestAmountQuestions.MEDIUM,
+                "2",
                 TestFixtures.CREATED_AT,
                 TestStatus.CREATED,
                 TestDifficulty.MEDIUM

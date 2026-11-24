@@ -23,13 +23,15 @@ public class RedisConfig {
 
         return redisTemplate;
     }
+
     @Bean
-    public StreamMessageListenerContainer<String, MapRecord<String, String, String>> listenerContainer(
-            RedisConnectionFactory connectionFactory) {
+    StreamMessageListenerContainer<String, MapRecord<String, String, String>> listenerContainer(
+            RedisConnectionFactory connectionFactory, MlStreamsProperties properties) {
 
         var options = StreamMessageListenerContainer
                 .StreamMessageListenerContainerOptions.builder()
                 .pollTimeout(Duration.ofMillis(100))
+                .autoStartup(false)
                 .build();
 
         return StreamMessageListenerContainer.create(connectionFactory, options);

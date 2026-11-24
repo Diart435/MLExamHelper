@@ -4,9 +4,11 @@ import com.examassistant.common.DTO.ApiError;
 import com.examassistant.security.model.CustomUserDetails;
 import com.examassistant.tests.TestDTO;
 import com.examassistant.tests.DTO.CreateTestRequest;
+import com.examassistant.tests.DTO.QuestionResponse;
 import com.examassistant.tests.DTO.TestFilter;
 import com.examassistant.tests.DTO.TestsResponse;
 import com.examassistant.tests.mapper.TestMapper;
+import com.examassistant.tests.service.QuestionsService;
 import com.examassistant.tests.service.TestsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,6 +29,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Tests", description = "Endpoints for managing tests")
@@ -38,6 +41,7 @@ public class TestsController {
 
     private final TestsService testsService;
     private final TestMapper testMapper;
+    private final QuestionsService questionsService;
 
     @Operation(summary = "Create a test", description = "Creates a new test linked to a course.")
     @ApiResponses(value = {
@@ -73,6 +77,23 @@ public class TestsController {
     ) {
         TestDTO testDTO = testsService.getDTOById(id, user.getUserId());
         return ResponseEntity.ok(testDTO);
+    }
+
+    @Operation(summary = "Get test questions", description = "Returns the questions of a test ordered by question order. Answer keys are not exposed.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Questions retrieved successfully"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - access denied",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Test not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    @GetMapping("/{id}/questions")
+    public ResponseEntity<List<QuestionResponse>> getQuestions(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        List<QuestionResponse> questions = questionsService.getByTestId(id, user.getUserId());
+        return ResponseEntity.ok(questions);
     }
 
     @Operation(summary = "Search and filter tests", description = "Returns filtered list of tests with pagination and sorting.")

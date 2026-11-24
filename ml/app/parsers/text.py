@@ -1,10 +1,9 @@
-from app.parsers.base import ParseError
+"""Plain-text parser. UTF-8 with replacement for stray bytes."""
+from __future__ import annotations
 
 
-def parse(data: bytes) -> str:
-    for encoding in ("utf-8", "utf-8-sig", "cp1251"):
-        try:
-            return data.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    raise ParseError("text: cannot decode as utf-8 or cp1251")
+class TextParser:
+    extensions = (".txt",)
+
+    def extract(self, data: bytes, *, source: str) -> str:
+        return data.decode("utf-8", errors="replace")

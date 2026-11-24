@@ -1,0 +1,13 @@
+# Use this workspace to collaborate
+workspace:
+  id: 2913c80f-86ab-4ba0-8c93-1aca4b845e81
+
+localResources:
+  collections:
+    - ../tests/postman/Exam Stand — ML ↔ backend (контракт v4.1)
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../postman/collections/Exam Stand — ML ↔ backend (контракт v4.1): bce059b6-a66f-4479-8ed2-c726ee3bc5b7

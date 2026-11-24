@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-exam:contract:create-test:ml-to-be",
+  "title": "Результат генерации теста — канал create-test:ml-to-be",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "status",
+        "task_id",
+        "test_id",
+        "test"
+      ],
+      "properties": {
+        "status": {
+          "const": "ok"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test": {
+          "$ref": "#/$defs/test"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "status",
+        "error"
+      ],
+      "properties": {
+        "status": {
+          "const": "error"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "test_id": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "test": {
+      "type": "object",
+      "required": [
+        "title",
+        "questions"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/question"
+          }
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "text",
+        "options",
+        "key_points",
+        "answer_key",
+        "source_chunk_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "single_choice",
+            "multi_choice",
+            "open_answer"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "key_points": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "answer_key": {
+          "$ref": "#/$defs/answer_key"
+        },
+        "source_chunk_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "answer_key": {
+      "type": "object",
+      "description": "Эталон правильного ответа. Ключ зависит от типа вопроса: single_choice — correct_index, multi_choice — correct_indexes, open_answer — reference_answer. У всех типов допустимо необязательное explanation.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "correct_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correct_indexes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "reference_answer": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
+      "status": "ok",
+      "test_id": "9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
+      "test": {
+        "title": "Контрольная работа по базам данных",
+        "questions": [
+          {
+            "id": 1,
+            "type": "single_choice",
+            "text": "Какой уровень изоляции транзакций допускает чтение неподтверждённых изменений?",
+            "options": [
+              "READ COMMITTED",
+              "READ UNCOMMITTED",
+              "REPEATABLE READ",
+              "SERIALIZABLE"
+            ],
+            "key_points": [],
+            "answer_key": {
+              "correct_index": 1,
+              "explanation": "READ UNCOMMITTED допускает грязные чтения."
+            },
+            "source_chunk_id": "18c5e91a-2d74-4f60-b839-7e1a5c0d6b42"
+          },
+          {
+            "id": 2,
+            "type": "multi_choice",
+            "text": "Какие ограничения целостности поддерживает реляционная СУБД?",
+            "options": [
+              "Первичный ключ",
+              "Уникальность",
+              "Ссылочная целостность",
+              "Каскадное удаление",
+              "Шифрование"
+            ],
+            "key_points": [],
+            "answer_key": {
+              "correct_indexes": [
+                0,
+                1,
+                2
+              ],
+              "explanation": "Первичный ключ, уникальность и ссылочная целостность являются стандартными ограничениями."
+            },
+            "source_chunk_id": "7a0d3e91-c642-4f88-b125-6d9e2a4c8f31"
+          },
+          {
+            "id": 3,
+            "type": "open_answer",
+            "text": "Объясните назначение транзакции и принцип атомарности.",
+            "options": [],
+            "key_points": [
+              "Транзакция — единая логическая единица работы.",
+              "При ошибке изменения откатываются целиком."
+            ],
+            "answer_key": {
+              "reference_answer": "Транзакция объединяет операции в единую логическую единицу работы; атомарность гарантирует выполнение всех операций либо откат всех изменений.",
+              "explanation": "Ответ должен называть единицу работы и гарантию all-or-nothing."
+            },
+            "source_chunk_id": null
+          }
+        ]
+      }
+    }
+  ]
+}

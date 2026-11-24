@@ -1,0 +1,35 @@
+$kind: http-request
+description: "Тело собирается скриптом из вопросов: single_choice → {index: 0}, multi_choice → {indexes: [0]}, open_answer → {text: ...}. Форму ответа backend проверяет по типу вопроса, поэтому типы обязательны."
+url: "{{baseUrl}}/api/tests/{{testId}}/attempts"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "answers": {{answersJson}}
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      const questions = JSON.parse(pm.collectionVariables.get('questionsJson') || '[]');
+      if (!questions.length) { throw new Error('Сначала выполни запрос 8 (Вопросы теста)'); }
+      const answers = questions.map(q => {
+        let student_answer;
+        if (q.type === 'multi_choice') student_answer = { indexes: [0] };
+        else if (q.type === 'open_answer') student_answer = { text: 'Развёрнутый ответ для проверки контракта ML' };
+        else student_answer = { index: 0 };
+        return { questionId: q.questionId, student_answer: student_answer };
+      });
+      pm.variables.set('answersJson', JSON.stringify(answers));
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('202 Accepted', () => pm.response.to.have.status(202));
+      const body = pm.response.json();
+      pm.collectionVariables.set('attemptId', body.attemptId);
+      console.log('attemptId =', body.attemptId);
+    language: text/javascript
+order: 9000

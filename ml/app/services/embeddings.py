@@ -7,6 +7,8 @@ from app.core.config import get_settings
 class EmbeddingsClient:
     def __init__(self) -> None:
         s = get_settings()
+        # Имя поля `openrouter_api_key` историческое (провайдер теперь RouterAI) —
+        # переименование вне задачи, на него завязаны compose и CI.
         self._client = AsyncOpenAI(api_key=s.openrouter_api_key, base_url=s.base_url)
         self._model = s.embed_model
 

@@ -1,0 +1,22 @@
+$kind: http-request
+description: Нужен, если access-токен протух (60 минут) или после перезапуска backend'а.
+url: "{{baseUrl}}/api/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "{{email}}",
+      "password": "{{password}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200 OK', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.collectionVariables.set('token', body.accessToken);
+      console.log('token обновлён');
+    language: text/javascript
+order: 2000

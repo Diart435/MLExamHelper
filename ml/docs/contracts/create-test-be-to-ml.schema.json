@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-exam:contract:create-test:be-to-ml",
+  "title": "Задача генерации теста — канал create-test:be-to-ml",
+  "type": "object",
+  "required": [
+    "task_id",
+    "test_id",
+    "material_ids",
+    "title"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "material_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "default": "medium"
+    }
+  },
+  "examples": [
+    {
+      "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
+      "test_id": "9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
+      "material_ids": [
+        "5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04"
+      ],
+      "title": "Контрольная работа по базам данных",
+      "difficulty": "medium"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "task_id": "2b8e4c31-6d7a-4f19-a503-9e8c1b4d6f27",
+  "attempt_id": "4d8f2b76-1e35-4c9a-b027-8f6a3d1e5b42",
+  "test_id": "9e3a6d52-8c14-47b0-a2f6-1d8e5c3b4a90",
+  "score_pct": 83.33,
+  "grade": 4,
+  "items": [
+    {
+      "question_id": "18c5e91a-2d74-4f60-b839-7e1a5c0d6b42",
+      "is_correct": true,
+      "score": 1.0,
+      "feedback": "Верно: READ UNCOMMITTED допускает грязные чтения.",
+      "correct_answer": {
+        "correct_index": 1,
+        "explanation": "READ UNCOMMITTED допускает грязные чтения."
+      },
+      "student_answer": {
+        "index": 1
+      }
+    },
+    {
+      "question_id": "7a0d3e91-c642-4f88-b125-6d9e2a4c8f31",
+      "is_correct": true,
+      "score": 1.0,
+      "feedback": "Верно, выбраны все три поддерживаемых ограничения.",
+      "correct_answer": {
+        "correct_indexes": [
+          0,
+          1,
+          2
+        ],
+        "explanation": "Первичный ключ, уникальность и ссылочная целостность являются стандартными ограничениями."
+      },
+      "student_answer": {
+        "indexes": [
+          0,
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "question_id": "c30e8f2a-4b19-4d77-a810-6f3b9c2e5d04",
+      "is_correct": false,
+      "score": 0.33,
+      "feedback": "Верно названа атомарность, но не раскрыто назначение транзакции как единой логической единицы работы.",
+      "correct_answer": {
+        "reference_answer": "Транзакция объединяет операции в единую логическую единицу работы; атомарность гарантирует выполнение всех операций либо откат всех изменений.",
+        "explanation": "Ответ должен называть единицу работы и гарантию all-or-nothing."
+      },
+      "student_answer": {
+        "text": "Транзакция обеспечивает атомарность операций."
+      }
+    }
+  ]
+}

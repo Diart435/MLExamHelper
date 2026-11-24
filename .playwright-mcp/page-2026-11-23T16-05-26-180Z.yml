@@ -1,0 +1,915 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - text: 
+      - link "RouterAI" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "RouterAI" [ref=e6]
+      - navigation [ref=e8]:
+        - list [ref=e9]:
+          - listitem [ref=e10]:
+            - generic [ref=e11]:
+              - generic [ref=e12] [cursor=pointer]: Возможности
+              - generic [ref=e13]: 
+          - listitem [ref=e14]:
+            - link "Модели и цены" [ref=e15] [cursor=pointer]:
+              - /url: /models
+              - generic [ref=e16]: Модели и цены
+          - listitem [ref=e17]:
+            - link "Чат" [ref=e18] [cursor=pointer]:
+              - /url: /chat
+              - generic [ref=e19]: Чат
+          - listitem [ref=e20]:
+            - link "Разработчикам" [ref=e21] [cursor=pointer]:
+              - /url: /docs
+              - generic [ref=e22]: Разработчикам
+      - generic [ref=e23]:
+        - button "Переключить тему" [ref=e24] [cursor=pointer]:
+          - img [ref=e25]
+        - link "Вход" [ref=e28] [cursor=pointer]:
+          - /url: /users/sign_in
+  - text: 
+  - main [ref=e29]:
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - 'heading "Каталог AI моделей и нейросетей: сравнение и цены" [level=1] [ref=e33]'
+          - paragraph [ref=e34]: Каталог нейросетей с описанием возможностей и ценами в рублях. Сравните стоимость токенов и выберите лучшее решение.
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - text: 
+            - textbox "Найти модель..." [ref=e37]
+            - text: 
+          - button "Найти ИИ модель" [ref=e38] [cursor=pointer]:
+            - generic [ref=e39]: Найти ИИ модель
+      - generic [ref=e40]:
+        - complementary [ref=e41]:
+          - generic [ref=e42]:
+            - text: 
+            - generic [ref=e43]:
+              - generic [ref=e45]:
+                - button "Входные данные" [expanded] [ref=e46] [cursor=pointer]
+                - region "Входные данные" [ref=e47]:
+                  - generic [ref=e48]:
+                    - generic [ref=e49] [cursor=pointer]: Текст
+                    - generic [ref=e50] [cursor=pointer]: Изображения
+                    - generic [ref=e51] [cursor=pointer]: Аудио
+                    - generic [ref=e52] [cursor=pointer]: Файлы
+                    - generic [ref=e53] [cursor=pointer]: Видео
+              - button "Цена" [ref=e56] [cursor=pointer]
+              - button "Размер контекста" [ref=e59] [cursor=pointer]
+              - button "Местонахождение" [ref=e62] [cursor=pointer]
+              - button "Поддерживаемые параметры" [ref=e65] [cursor=pointer]
+              - button "Разработчики" [ref=e68] [cursor=pointer]
+              - link " Сбросить все фильтры" [ref=e70] [cursor=pointer]:
+                - /url: /models
+                - generic [ref=e71]:
+                  - generic [ref=e72]: 
+                  - text: Сбросить все фильтры
+        - generic [ref=e73]:
+          - generic [ref=e74]:
+            - generic [ref=e76]:
+              - button " Все 617" [ref=e77] [cursor=pointer]:
+                - generic [ref=e78]: 
+                - generic [ref=e79]: Все
+                - generic [ref=e80]: "617"
+              - button " Текст 366" [ref=e81] [cursor=pointer]:
+                - generic [ref=e82]: 
+                - generic [ref=e83]: Текст
+                - generic [ref=e84]: "366"
+              - button " Изображения 68" [ref=e85] [cursor=pointer]:
+                - generic [ref=e86]: 
+                - generic [ref=e87]: Изображения
+                - generic [ref=e88]: "68"
+              - button " Embeddings 42" [ref=e89] [cursor=pointer]:
+                - generic [ref=e90]: 
+                - generic [ref=e91]: Embeddings
+                - generic [ref=e92]: "42"
+              - button " Аудио 4" [ref=e93] [cursor=pointer]:
+                - generic [ref=e94]: 
+                - generic [ref=e95]: Аудио
+                - generic [ref=e96]: "4"
+              - button " Видео 32" [ref=e97] [cursor=pointer]:
+                - generic [ref=e98]: 
+                - generic [ref=e99]: Видео
+                - generic [ref=e100]: "32"
+              - button " Rerank 15" [ref=e101] [cursor=pointer]:
+                - generic [ref=e102]: 
+                - generic [ref=e103]: Rerank
+                - generic [ref=e104]: "15"
+              - button " Речь 37" [ref=e105] [cursor=pointer]:
+                - generic [ref=e106]: 
+                - generic [ref=e107]: Речь
+                - generic [ref=e108]: "37"
+              - button " Транскрибация 30" [ref=e109] [cursor=pointer]:
+                - generic [ref=e110]: 
+                - generic [ref=e111]: Транскрибация
+                - generic [ref=e112]: "30"
+              - button "Решения 37" [ref=e113] [cursor=pointer]:
+                - generic [ref=e115]: Решения
+                - generic [ref=e116]: "37"
+            - generic [ref=e117]:
+              - text: 
+              - generic [ref=e119]:
+                - button "Сортировка" [ref=e120] [cursor=pointer]:
+                  - text: 
+                  - generic [ref=e121]: Сортировка
+                  - generic [ref=e122]: 
+                - text:           
+          - generic [ref=e123]:
+            - list [ref=e124]:
+              - listitem [ref=e125]:
+                - article [ref=e126]:
+                  - generic [ref=e127]:
+                    - generic [ref=e128]:
+                      - img "Логотип Anthropic" [ref=e130]
+                      - generic [ref=e131]:
+                        - heading "Claude Sonnet 5.5" [level=3] [ref=e133]:
+                          - link "Claude Sonnet 5.5" [ref=e134] [cursor=pointer]:
+                            - /url: /models/anthropic/claude-sonnet-5.5
+                        - generic [ref=e135]:
+                          - generic [ref=e136]: Anthropic
+                          - time [ref=e137]: 28 сентября 2026
+                      - button "Скопировать идентификатор модели anthropic/claude-sonnet-5.5" [ref=e139] [cursor=pointer]:
+                        - generic [ref=e140]: anthropic/claude-sonnet-5.5
+                        - generic [ref=e141]: 
+                    - generic [ref=e142]:
+                      - paragraph [ref=e143]: Claude Sonnet 5.5 — это модель класса Sonnet от Anthropic для хорошо определенной повседневной работы, являющаяся прямым обновлением Claude Sonnet 5. Она особенно сильна в создании функций, исправлении ошибок и подготовке отточенных документов, презентаций и таблиц, а также пишет и излагает мысли более ясно, чем ее предшественник.
+                      - paragraph [ref=e144]: Мышление всегда активно, поэтому усилие является основным рычагом для балансировки глубины, задержки и стоимости, а настройки с меньшими усилиями позволяют ей оставаться отзывчивой для повседневных агентных циклов.
+                    - generic [ref=e145]:
+                      - generic [ref=e146]:
+                        - term [ref=e147]: "Входные данные:"
+                        - definition [ref=e148]:
+                          - list [ref=e149]:
+                            - listitem [ref=e150]: Текст
+                            - listitem [ref=e151]: Изображения
+                            - listitem [ref=e152]: Файл
+                      - generic [ref=e153]:
+                        - term [ref=e154]: "Исходящие данные:"
+                        - definition [ref=e155]:
+                          - list [ref=e156]:
+                            - listitem [ref=e157]: Текст
+                  - complementary [ref=e158]:
+                    - generic [ref=e159]:
+                      - generic [ref=e160]:
+                        - generic [ref=e161]: "Контекст:"
+                        - generic [ref=e162]: 1M
+                      - generic [ref=e163]:
+                        - generic [ref=e164]: "Входящие токены за 1M:"
+                        - generic [ref=e165]: 213 ₽
+                      - generic [ref=e166]:
+                        - generic [ref=e167]: "Исходящие токены за 1M:"
+                        - generic [ref=e168]: 1068 ₽
+                    - generic [ref=e169]:
+                      - link "Чат" [ref=e170] [cursor=pointer]:
+                        - /url: /chat?models=anthropic%2Fclaude-sonnet-5.5
+                        - generic [ref=e171]: 
+                        - text: Чат
+                      - link "Детали" [ref=e172] [cursor=pointer]:
+                        - /url: /models/anthropic/claude-sonnet-5.5
+                        - generic [ref=e173]: 
+                        - text: Детали
+              - listitem [ref=e174]:
+                - article [ref=e175]:
+                  - generic [ref=e176]:
+                    - generic [ref=e177]:
+                      - img "Логотип OpenAI" [ref=e179]
+                      - generic [ref=e180]:
+                        - heading "GPT-6.2 Sol" [level=3] [ref=e182]:
+                          - link "GPT-6.2 Sol" [ref=e183] [cursor=pointer]:
+                            - /url: /models/openai/gpt-6.2-sol
+                        - generic [ref=e184]:
+                          - generic [ref=e185]: OpenAI
+                          - time [ref=e186]: 17 ноября 2026
+                      - button "Скопировать идентификатор модели openai/gpt-6.2-sol" [ref=e188] [cursor=pointer]:
+                        - generic [ref=e189]: openai/gpt-6.2-sol
+                        - generic [ref=e190]: 
+                    - paragraph [ref=e192]: GPT-6.2 Sol — это обновление GPT-6.1 Sol от OpenAI, позиционируемое ниже флагманской модели GPT-6.2 Astra в серии GPT-6.2. Это эффективная универсальная модель для повседневной работы, подходящая для многошаговых агентных рабочих процессов и ясного, естественного письма в технических и нетехнических задачах.
+                    - generic [ref=e193]:
+                      - generic [ref=e194]:
+                        - term [ref=e195]: "Входные данные:"
+                        - definition [ref=e196]:
+                          - list [ref=e197]:
+                            - listitem [ref=e198]: Файл
+                            - listitem [ref=e199]: Изображения
+                            - listitem [ref=e200]: Текст
+                      - generic [ref=e201]:
+                        - term [ref=e202]: "Исходящие данные:"
+                        - definition [ref=e203]:
+                          - list [ref=e204]:
+                            - listitem [ref=e205]: Текст
+                  - complementary [ref=e206]:
+                    - generic [ref=e207]:
+                      - generic [ref=e208]:
+                        - generic [ref=e209]: "Контекст:"
+                        - generic [ref=e210]: 1M
+                      - generic [ref=e211]:
+                        - generic [ref=e212]: "Входящие токены за 1M:"
+                        - generic [ref=e213]: 213 ₽
+                      - generic [ref=e214]:
+                        - generic [ref=e215]: "Исходящие токены за 1M:"
+                        - generic [ref=e216]: 1068 ₽
+                    - generic [ref=e217]:
+                      - link "Чат" [ref=e218] [cursor=pointer]:
+                        - /url: /chat?models=openai%2Fgpt-6.2-sol
+                        - generic [ref=e219]: 
+                        - text: Чат
+                      - link "Детали" [ref=e220] [cursor=pointer]:
+                        - /url: /models/openai/gpt-6.2-sol
+                        - generic [ref=e221]: 
+                        - text: Детали
+              - listitem [ref=e222]:
+                - article [ref=e223]:
+                  - generic [ref=e224]:
+                    - generic [ref=e225]:
+                      - img "Логотип DeepSeek" [ref=e227]
+                      - generic [ref=e228]:
+                        - heading "DeepSeek V4 Pro 0813" [level=3] [ref=e230]:
+                          - link "DeepSeek V4 Pro 0813" [ref=e231] [cursor=pointer]:
+                            - /url: /models/deepseek/deepseek-v4-pro-0813
+                        - generic [ref=e232]:
+                          - generic [ref=e233]: DeepSeek
+                          - time [ref=e234]: 12 августа 2026
+                      - button "Скопировать идентификатор модели deepseek/deepseek-v4-pro-0813" [ref=e236] [cursor=pointer]:
+                        - generic [ref=e237]: deepseek/deepseek-v4-pro-0813
+                        - generic [ref=e238]: 
+                    - paragraph [ref=e240]: DeepSeek V4 Pro 0813 — это крупномасштабная модель смеси экспертов от DeepSeek. Это GA-релиз DeepSeek V4 Pro.
+                    - generic [ref=e241]:
+                      - generic [ref=e242]:
+                        - term [ref=e243]: "Входные данные:"
+                        - definition [ref=e244]:
+                          - list [ref=e245]:
+                            - listitem [ref=e246]: Текст
+                      - generic [ref=e247]:
+                        - term [ref=e248]: "Исходящие данные:"
+                        - definition [ref=e249]:
+                          - list [ref=e250]:
+                            - listitem [ref=e251]: Текст
+                  - complementary [ref=e252]:
+                    - generic [ref=e253]:
+                      - generic [ref=e254]:
+                        - generic [ref=e255]: "Контекст:"
+                        - generic [ref=e256]: 1M
+                      - generic [ref=e257]:
+                        - generic [ref=e258]: "Входящие токены за 1M:"
+                        - generic [ref=e259]: 19 ₽
+                      - generic [ref=e260]:
+                        - generic [ref=e261]: "Исходящие токены за 1M:"
+                        - generic [ref=e262]: 59 ₽
+                    - generic [ref=e263]:
+                      - link "Чат" [ref=e264] [cursor=pointer]:
+                        - /url: /chat?models=deepseek%2Fdeepseek-v4-pro-0813
+                        - generic [ref=e265]: 
+                        - text: Чат
+                      - link "Детали" [ref=e266] [cursor=pointer]:
+                        - /url: /models/deepseek/deepseek-v4-pro-0813
+                        - generic [ref=e267]: 
+                        - text: Детали
+              - listitem [ref=e268]:
+                - article [ref=e269]:
+                  - generic [ref=e270]:
+                    - generic [ref=e271]:
+                      - img "Логотип Google" [ref=e273]
+                      - generic [ref=e274]:
+                        - heading "Gemini 4 Argon" [level=3] [ref=e276]:
+                          - link "Gemini 4 Argon" [ref=e277] [cursor=pointer]:
+                            - /url: /models/google/gemini-4-argon
+                        - generic [ref=e278]:
+                          - generic [ref=e279]: Google
+                          - time [ref=e280]: 13 октября 2026
+                      - button "Скопировать идентификатор модели google/gemini-4-argon" [ref=e282] [cursor=pointer]:
+                        - generic [ref=e283]: google/gemini-4-argon
+                        - generic [ref=e284]: 
+                    - paragraph [ref=e286]: Gemini 4 Argon — это флагманская модель рассуждений от Google, созданная для сложной разработки программного обеспечения, глубокого математического и научного решения задач, а также автономных многоэтапных агентов. Google обучила её сохранять контекст в течение длительных, многоэтапных задач и преобразовывать длинные документы, содержащие текст, таблицы, диаграммы и изображения, в единый обоснованный вывод. Она лидирует в Vals Index в области финансов, юриспруденции, программирования и налоговой работы, и поддерживает длительное декодирование до 1 миллиона выходных токенов в одном ответе.
+                    - generic [ref=e287]:
+                      - generic [ref=e288]:
+                        - term [ref=e289]: "Входные данные:"
+                        - definition [ref=e290]:
+                          - list [ref=e291]:
+                            - listitem [ref=e292]: Аудио
+                            - listitem [ref=e293]: Файл
+                            - listitem [ref=e294]: Изображения
+                            - listitem [ref=e295]: Текст
+                            - listitem [ref=e296]: Видео
+                      - generic [ref=e297]:
+                        - term [ref=e298]: "Исходящие данные:"
+                        - definition [ref=e299]:
+                          - list [ref=e300]:
+                            - listitem [ref=e301]: Текст
+                  - complementary [ref=e302]:
+                    - generic [ref=e303]:
+                      - generic [ref=e304]:
+                        - generic [ref=e305]: "Контекст:"
+                        - generic [ref=e306]: 1M
+                      - generic [ref=e307]:
+                        - generic [ref=e308]: "Входящие токены за 1M:"
+                        - generic [ref=e309]: 213 ₽
+                      - generic [ref=e310]:
+                        - generic [ref=e311]: "Исходящие токены за 1M:"
+                        - generic [ref=e312]: 1068 ₽
+                    - generic [ref=e313]:
+                      - link "Чат" [ref=e314] [cursor=pointer]:
+                        - /url: /chat?models=google%2Fgemini-4-argon
+                        - generic [ref=e315]: 
+                        - text: Чат
+                      - link "Детали" [ref=e316] [cursor=pointer]:
+                        - /url: /models/google/gemini-4-argon
+                        - generic [ref=e317]: 
+                        - text: Детали
+              - listitem [ref=e318]:
+                - article [ref=e319]:
+                  - generic [ref=e320]:
+                    - generic [ref=e321]:
+                      - img "Логотип Thinkingmachines" [ref=e323]
+                      - generic [ref=e324]:
+                        - heading "Inkling 2 Mini" [level=3] [ref=e326]:
+                          - link "Inkling 2 Mini" [ref=e327] [cursor=pointer]:
+                            - /url: /models/thinkingmachines/inkling-2-mini
+                        - generic [ref=e328]:
+                          - generic [ref=e329]: Thinkingmachines
+                          - time [ref=e330]: 21 ноября 2026
+                      - button "Скопировать идентификатор модели thinkingmachines/inkling-2-mini" [ref=e332] [cursor=pointer]:
+                        - generic [ref=e333]: thinkingmachines/inkling-2-mini
+                        - generic [ref=e334]: 
+                    - paragraph [ref=e336]: Inkling 2 Mini — это мультимодальный зацикленный трансформер с открытыми весами от Thinking Machines Lab, с 3,4 млрд активных параметров из 26,4 млрд общих (MoE). Его средние слои прогоняются трижды с общими весами, поэтому он выполняет больше вычислений на токен, чем можно предположить по его размеру, оставаясь при этом достаточно малым, чтобы работать на ноутбуке или одной рабочей GPU. Это самая маленькая модель во втором поколении Inkling, ниже Inkling 2 Small, и она подходит для агентных систем и систем использования инструментов, помощников по программированию, чат-ботов и генерации с дополнением на основе поиска, с поддержкой английского языка и общей многоязычной поддержкой.
+                    - generic [ref=e337]:
+                      - generic [ref=e338]:
+                        - term [ref=e339]: "Входные данные:"
+                        - definition [ref=e340]:
+                          - list [ref=e341]:
+                            - listitem [ref=e342]: Текст
+                            - listitem [ref=e343]: Изображения
+                      - generic [ref=e344]:
+                        - term [ref=e345]: "Исходящие данные:"
+                        - definition [ref=e346]:
+                          - list [ref=e347]:
+                            - listitem [ref=e348]: Текст
+                  - complementary [ref=e349]:
+                    - generic [ref=e350]:
+                      - generic [ref=e351]:
+                        - generic [ref=e352]: "Контекст:"
+                        - generic [ref=e353]: 1M
+                      - generic [ref=e354]:
+                        - generic [ref=e355]: "Входящие токены за 1M:"
+                        - generic [ref=e356]: 8 ₽
+                      - generic [ref=e357]:
+                        - generic [ref=e358]: "Исходящие токены за 1M:"
+                        - generic [ref=e359]: 32 ₽
+                    - generic [ref=e360]:
+                      - link "Чат" [ref=e361] [cursor=pointer]:
+                        - /url: /chat?models=thinkingmachines%2Finkling-2-mini
+                        - generic [ref=e362]: 
+                        - text: Чат
+                      - link "Детали" [ref=e363] [cursor=pointer]:
+                        - /url: /models/thinkingmachines/inkling-2-mini
+                        - generic [ref=e364]: 
+                        - text: Детали
+              - listitem [ref=e365]:
+                - article [ref=e366]:
+                  - generic [ref=e367]:
+                    - generic [ref=e368]:
+                      - img "Логотип Radixark" [ref=e370]
+                      - generic [ref=e371]:
+                        - heading "DaisyRose 27B" [level=3] [ref=e373]:
+                          - link "DaisyRose 27B" [ref=e374] [cursor=pointer]:
+                            - /url: /models/radixark/daisyrose-27b
+                        - generic [ref=e375]:
+                          - generic [ref=e376]: Radixark
+                          - time [ref=e377]: 21 ноября 2026
+                      - button "Скопировать идентификатор модели radixark/daisyrose-27b" [ref=e379] [cursor=pointer]:
+                        - generic [ref=e380]: radixark/daisyrose-27b
+                        - generic [ref=e381]: 
+                    - generic [ref=e382]:
+                      - paragraph [ref=e383]: DaisyRose 27B — это мультимодальная модель рассуждений с открытыми весами от RadixArk, обученная на основе Qwen3.8 27B с использованием только обучения с подкреплением на долгосрочных агентных задачах, без контролируемого дообучения или дистилляции. Она ориентирована на агентное программирование, многошаговые рассуждения и следование инструкциям.
+                      - paragraph [ref=e384]: Это плотная модель с 27,8 млрд параметров, которая принимает на вход текст и изображения, возвращает текст и имеет контекстное окно в 262 тыс. токенов. Режим размышления включён по умолчанию и может быть отключён. Она сохраняет архитектуру, токенизатор и шаблон чата базовой модели и выпущена под лицензией Apache 2.0.
+                    - generic [ref=e385]:
+                      - generic [ref=e386]:
+                        - term [ref=e387]: "Входные данные:"
+                        - definition [ref=e388]:
+                          - list [ref=e389]:
+                            - listitem [ref=e390]: Текст
+                            - listitem [ref=e391]: Изображения
+                      - generic [ref=e392]:
+                        - term [ref=e393]: "Исходящие данные:"
+                        - definition [ref=e394]:
+                          - list [ref=e395]:
+                            - listitem [ref=e396]: Текст
+                  - complementary [ref=e397]:
+                    - generic [ref=e398]:
+                      - generic [ref=e399]:
+                        - generic [ref=e400]: "Контекст:"
+                        - generic [ref=e401]: 262K
+                      - generic [ref=e402]:
+                        - generic [ref=e403]: "Входящие токены за 1M:"
+                        - generic [ref=e404]: 16 ₽
+                      - generic [ref=e405]:
+                        - generic [ref=e406]: "Исходящие токены за 1M:"
+                        - generic [ref=e407]: 200 ₽
+                    - generic [ref=e408]:
+                      - link "Чат" [ref=e409] [cursor=pointer]:
+                        - /url: /chat?models=radixark%2Fdaisyrose-27b
+                        - generic [ref=e410]: 
+                        - text: Чат
+                      - link "Детали" [ref=e411] [cursor=pointer]:
+                        - /url: /models/radixark/daisyrose-27b
+                        - generic [ref=e412]: 
+                        - text: Детали
+              - listitem [ref=e413]:
+                - article [ref=e414]:
+                  - generic [ref=e415]:
+                    - generic [ref=e416]:
+                      - img "Логотип Baseten" [ref=e418]
+                      - generic [ref=e419]:
+                        - heading "Groundhog 1" [level=3] [ref=e421]:
+                          - link "Groundhog 1" [ref=e422] [cursor=pointer]:
+                            - /url: /models/baseten/groundhog-1
+                        - generic [ref=e423]:
+                          - generic [ref=e424]: Baseten
+                          - time [ref=e425]: 20 ноября 2026
+                      - button "Скопировать идентификатор модели baseten/groundhog-1" [ref=e427] [cursor=pointer]:
+                        - generic [ref=e428]: baseten/groundhog-1
+                        - generic [ref=e429]: 
+                    - paragraph [ref=e431]: Groundhog 1 — это модель принятия решений от Base Labs, исследовательской команды Baseten, построенная на Gemma 4 26B A4B — модели mixture-of-experts с 4B активных параметров. Получив состояние (текст, JSON или изображения) и типизированные вопросы (да/нет, с множественным выбором или порядковой оценкой), она возвращает калиброванную вероятность для каждого варианта за один прямой проход, без генерации текста. Она совместима с TypeSafe System One и подходит для высоконагруженной классификации, маршрутизации и проверок guardrail. Её более крупный собрат — Bison 1.
+                    - generic [ref=e432]:
+                      - generic [ref=e433]:
+                        - term [ref=e434]: "Входные данные:"
+                        - definition [ref=e435]:
+                          - list [ref=e436]:
+                            - listitem [ref=e437]: Текст
+                            - listitem [ref=e438]: Изображения
+                      - generic [ref=e439]:
+                        - term [ref=e440]: "Исходящие данные:"
+                        - definition [ref=e441]:
+                          - list [ref=e442]:
+                            - listitem [ref=e443]: Решения
+                  - complementary [ref=e444]:
+                    - generic [ref=e445]:
+                      - generic [ref=e446]:
+                        - generic [ref=e447]: "Контекст:"
+                        - generic [ref=e448]: 16K
+                      - generic [ref=e449]:
+                        - generic [ref=e450]: "Входящие токены за 1M:"
+                        - generic [ref=e451]: 3,74 ₽
+                    - link "Детали" [ref=e453] [cursor=pointer]:
+                      - /url: /models/baseten/groundhog-1
+                      - generic [ref=e454]: 
+                      - text: Детали
+              - listitem [ref=e455]:
+                - article [ref=e456]:
+                  - generic [ref=e457]:
+                    - generic [ref=e458]:
+                      - img "Логотип Baseten" [ref=e460]
+                      - generic [ref=e461]:
+                        - heading "Bison 1" [level=3] [ref=e463]:
+                          - link "Bison 1" [ref=e464] [cursor=pointer]:
+                            - /url: /models/baseten/bison-1
+                        - generic [ref=e465]:
+                          - generic [ref=e466]: Baseten
+                          - time [ref=e467]: 20 ноября 2026
+                      - button "Скопировать идентификатор модели baseten/bison-1" [ref=e469] [cursor=pointer]:
+                        - generic [ref=e470]: baseten/bison-1
+                        - generic [ref=e471]: 
+                    - paragraph [ref=e473]: Bison 1 — это 31B-модель принятия решений от Base Labs, исследовательской команды Baseten, созданная на основе Gemma 4 31B. При подаче состояния (текст, JSON или изображения) и типизированных вопросов (да/нет, множественный выбор или порядковая оценка) она возвращает калиброванную вероятность для каждого варианта за один прямой проход, без генерации текста. Она совместима с TypeSafe System One и подходит для классификации, маршрутизации и скоринга, где точность важнее всего.
+                    - generic [ref=e474]:
+                      - generic [ref=e475]:
+                        - term [ref=e476]: "Входные данные:"
+                        - definition [ref=e477]:
+                          - list [ref=e478]:
+                            - listitem [ref=e479]: Текст
+                            - listitem [ref=e480]: Изображения
+                      - generic [ref=e481]:
+                        - term [ref=e482]: "Исходящие данные:"
+                        - definition [ref=e483]:
+                          - list [ref=e484]:
+                            - listitem [ref=e485]: Решения
+                  - complementary [ref=e486]:
+                    - generic [ref=e487]:
+                      - generic [ref=e488]:
+                        - generic [ref=e489]: "Контекст:"
+                        - generic [ref=e490]: 33K
+                      - generic [ref=e491]:
+                        - generic [ref=e492]: "Входящие токены за 1M:"
+                        - generic [ref=e493]: 10 ₽
+                    - link "Детали" [ref=e495] [cursor=pointer]:
+                      - /url: /models/baseten/bison-1
+                      - generic [ref=e496]: 
+                      - text: Детали
+              - listitem [ref=e497]:
+                - article [ref=e498]:
+                  - generic [ref=e499]:
+                    - generic [ref=e500]:
+                      - img "Логотип Mistral AI" [ref=e502]
+                      - generic [ref=e503]:
+                        - heading "Pixtral Large 2502" [level=3] [ref=e505]:
+                          - link "Pixtral Large 2502" [ref=e506] [cursor=pointer]:
+                            - /url: /models/mistralai/pixtral-large-2502
+                        - generic [ref=e507]:
+                          - generic [ref=e508]: Mistral AI
+                          - time [ref=e509]: 20 ноября 2026
+                      - button "Скопировать идентификатор модели mistralai/pixtral-large-2502" [ref=e511] [cursor=pointer]:
+                        - generic [ref=e512]: mistralai/pixtral-large-2502
+                        - generic [ref=e513]: 
+                    - paragraph [ref=e515]: Pixtral Large 2502 — это февральская версия 2025 года большой мультимодальной модели Mistral AI, следующая за Pixtral Large 2411. Она принимает на вход текст и изображения, включая документы, диаграммы и естественные изображения, и возвращает текст. Она имеет контекстное окно размером 128 000 токенов.
+                    - generic [ref=e516]:
+                      - generic [ref=e517]:
+                        - term [ref=e518]: "Входные данные:"
+                        - definition [ref=e519]:
+                          - list [ref=e520]:
+                            - listitem [ref=e521]: Текст
+                            - listitem [ref=e522]: Изображения
+                      - generic [ref=e523]:
+                        - term [ref=e524]: "Исходящие данные:"
+                        - definition [ref=e525]:
+                          - list [ref=e526]:
+                            - listitem [ref=e527]: Текст
+                  - complementary [ref=e528]:
+                    - generic [ref=e529]:
+                      - generic [ref=e530]:
+                        - generic [ref=e531]: "Контекст:"
+                        - generic [ref=e532]: 128K
+                      - generic [ref=e533]:
+                        - generic [ref=e534]: "Входящие токены за 1M:"
+                        - generic [ref=e535]: 213 ₽
+                      - generic [ref=e536]:
+                        - generic [ref=e537]: "Исходящие токены за 1M:"
+                        - generic [ref=e538]: 641 ₽
+                    - generic [ref=e539]:
+                      - link "Чат" [ref=e540] [cursor=pointer]:
+                        - /url: /chat?models=mistralai%2Fpixtral-large-2502
+                        - generic [ref=e541]: 
+                        - text: Чат
+                      - link "Детали" [ref=e542] [cursor=pointer]:
+                        - /url: /models/mistralai/pixtral-large-2502
+                        - generic [ref=e543]: 
+                        - text: Детали
+              - listitem [ref=e544]:
+                - article [ref=e545]:
+                  - generic [ref=e546]:
+                    - generic [ref=e547]:
+                      - img "Логотип Google" [ref=e549]
+                      - generic [ref=e550]:
+                        - heading "Gemini 4 Neon" [level=3] [ref=e552]:
+                          - link "Gemini 4 Neon" [ref=e553] [cursor=pointer]:
+                            - /url: /models/google/gemini-4-neon
+                        - generic [ref=e554]:
+                          - generic [ref=e555]: Google
+                          - time [ref=e556]: 18 ноября 2026
+                      - button "Скопировать идентификатор модели google/gemini-4-neon" [ref=e558] [cursor=pointer]:
+                        - generic [ref=e559]: google/gemini-4-neon
+                        - generic [ref=e560]: 
+                    - paragraph [ref=e562]:
+                      - text: Gemini 4 Neon — быстрая модель средней ценовой категории в семействе Gemini 4 от Google, созданная для программирования и агентной работы. Она подходит для работы с кодом в репозиториях и терминале, веб-сборок, многоходового использования инструментов и мультимодальных STEM-задач, а также позиционируется как улучшение по сравнению с
+                      - link "Gemini 4 Hydrogen" [ref=e563] [cursor=pointer]:
+                        - /url: /models/google/gemini-4-hydrogen
+                      - text: с ориентацией на качество
+                      - link "Gemini 4 Carbon" [ref=e564] [cursor=pointer]:
+                        - /url: /models/google/gemini-4-carbon
+                      - text: при более высокой скорости и более низкой стоимости. Она поддерживает длинное декодирование до 1M выходных токенов посредством продолжения и управляет глубиной мышления с помощью уровней усилий рассуждения low, medium, high и xhigh.
+                    - generic [ref=e565]:
+                      - generic [ref=e566]:
+                        - term [ref=e567]: "Входные данные:"
+                        - definition [ref=e568]:
+                          - list [ref=e569]:
+                            - listitem [ref=e570]: Аудио
+                            - listitem [ref=e571]: Файл
+                            - listitem [ref=e572]: Изображения
+                            - listitem [ref=e573]: Текст
+                            - listitem [ref=e574]: Видео
+                      - generic [ref=e575]:
+                        - term [ref=e576]: "Исходящие данные:"
+                        - definition [ref=e577]:
+                          - list [ref=e578]:
+                            - listitem [ref=e579]: Текст
+                  - complementary [ref=e580]:
+                    - generic [ref=e581]:
+                      - generic [ref=e582]:
+                        - generic [ref=e583]: "Контекст:"
+                        - generic [ref=e584]: 1M
+                      - generic [ref=e585]:
+                        - generic [ref=e586]: "Входящие токены за 1M:"
+                        - generic [ref=e587]: 320 ₽
+                      - generic [ref=e588]:
+                        - generic [ref=e589]: "Исходящие токены за 1M:"
+                        - generic [ref=e590]: 1602 ₽
+                    - generic [ref=e591]:
+                      - link "Чат" [ref=e592] [cursor=pointer]:
+                        - /url: /chat?models=google%2Fgemini-4-neon
+                        - generic [ref=e593]: 
+                        - text: Чат
+                      - link "Детали" [ref=e594] [cursor=pointer]:
+                        - /url: /models/google/gemini-4-neon
+                        - generic [ref=e595]: 
+                        - text: Детали
+              - listitem [ref=e596]:
+                - article [ref=e597]:
+                  - generic [ref=e598]:
+                    - generic [ref=e599]:
+                      - img "Логотип Heygen" [ref=e601]
+                      - generic [ref=e602]:
+                        - heading "Avatar 6 Turbo" [level=3] [ref=e604]:
+                          - link "Avatar 6 Turbo" [ref=e605] [cursor=pointer]:
+                            - /url: /models/heygen/heygen-avatar-6-turbo
+                        - generic [ref=e606]:
+                          - generic [ref=e607]: Heygen
+                          - time [ref=e608]: 17 ноября 2026
+                      - button "Скопировать идентификатор модели heygen/heygen-avatar-6-turbo" [ref=e610] [cursor=pointer]:
+                        - generic [ref=e611]: heygen/heygen-avatar-6-turbo
+                        - generic [ref=e612]: 
+                    - generic [ref=e613]:
+                      - paragraph [ref=e614]: "HeyGen: Avatar 6 Turbo — более быстрый и менее затратный вариант модели аватарного видео Avatar 6 от HeyGen. Она превращает одну фотографию, короткое референсное видео или и то и другое в говорящее видео с синхронизацией губ, управляемое предоставленной звуковой дорожкой; она считывает тон и ритм речи, чтобы управлять движением головы, мимикой и жестами, и рендерится в 1080p или 2K; длительность видео задаётся аудио."
+                      - paragraph [ref=e615]:
+                        - text: Предоставьте ровно один аудиореференс плюс одно референсное изображение, одно референсное видео или фотографию того же человека вместе с видео. Промпт становится промптом движения, описывающим, как должен двигаться субъект, а сквозной параметр
+                        - code [ref=e616]: motion_expressiveness
+                        - text: может снизить интенсивность движения.
+                    - generic [ref=e617]:
+                      - generic [ref=e618]:
+                        - term [ref=e619]: "Входные данные:"
+                        - definition [ref=e620]:
+                          - list [ref=e621]:
+                            - listitem [ref=e622]: Текст
+                            - listitem [ref=e623]: Изображения
+                            - listitem [ref=e624]: Видео
+                            - listitem [ref=e625]: Аудио
+                      - generic [ref=e626]:
+                        - term [ref=e627]: "Исходящие данные:"
+                        - definition [ref=e628]:
+                          - list [ref=e629]:
+                            - listitem [ref=e630]: Видео
+                  - complementary [ref=e631]:
+                    - generic [ref=e632]:
+                      - generic [ref=e633]:
+                        - generic [ref=e634]: "Контекст:"
+                        - generic [ref=e635]: —
+                      - generic [ref=e636]:
+                        - generic [ref=e637]: "Секунда видео:"
+                        - generic [ref=e638]: от 5,34 ₽
+                    - generic [ref=e639]:
+                      - link "Чат" [ref=e640] [cursor=pointer]:
+                        - /url: /chat?models=heygen%2Fheygen-avatar-6-turbo
+                        - generic [ref=e641]: 
+                        - text: Чат
+                      - link "Детали" [ref=e642] [cursor=pointer]:
+                        - /url: /models/heygen/heygen-avatar-6-turbo
+                        - generic [ref=e643]: 
+                        - text: Детали
+              - listitem [ref=e644]:
+                - article [ref=e645]:
+                  - generic [ref=e646]:
+                    - generic [ref=e647]:
+                      - img "Логотип Heygen" [ref=e649]
+                      - generic [ref=e650]:
+                        - heading "Avatar 6" [level=3] [ref=e652]:
+                          - link "Avatar 6" [ref=e653] [cursor=pointer]:
+                            - /url: /models/heygen/heygen-avatar-6
+                        - generic [ref=e654]:
+                          - generic [ref=e655]: Heygen
+                          - time [ref=e656]: 17 ноября 2026
+                      - button "Скопировать идентификатор модели heygen/heygen-avatar-6" [ref=e658] [cursor=pointer]:
+                        - generic [ref=e659]: heygen/heygen-avatar-6
+                        - generic [ref=e660]: 
+                    - generic [ref=e661]:
+                      - paragraph [ref=e662]: "HeyGen: Avatar 6 — это модель аватарного видео от HeyGen, превращающая одну фотографию, короткое референсное видео или и то и другое в выразительное говорящее видео с синхронизацией губ, управляемое предоставленной аудиодорожкой. Она считывает тон, ритм и эмоции речи, чтобы управлять движением головы, мимикой и жестами, и рендерит в 1080p или 2K; длительность видео определяется аудио."
+                      - paragraph [ref=e663]:
+                        - text: Предоставьте ровно один аудиореференс плюс одно референсное изображение, одно референсное видео или фото того же человека вместе с видео. Промпт становится промптом движения, описывающим, как должен двигаться субъект, а сквозной параметр
+                        - code [ref=e664]: motion_expressiveness
+                        - text: может снизить выразительность движения.
+                    - generic [ref=e665]:
+                      - generic [ref=e666]:
+                        - term [ref=e667]: "Входные данные:"
+                        - definition [ref=e668]:
+                          - list [ref=e669]:
+                            - listitem [ref=e670]: Текст
+                            - listitem [ref=e671]: Изображения
+                            - listitem [ref=e672]: Видео
+                            - listitem [ref=e673]: Аудио
+                      - generic [ref=e674]:
+                        - term [ref=e675]: "Исходящие данные:"
+                        - definition [ref=e676]:
+                          - list [ref=e677]:
+                            - listitem [ref=e678]: Видео
+                  - complementary [ref=e679]:
+                    - generic [ref=e680]:
+                      - generic [ref=e681]:
+                        - generic [ref=e682]: "Контекст:"
+                        - generic [ref=e683]: —
+                      - generic [ref=e684]:
+                        - generic [ref=e685]: "Секунда видео:"
+                        - generic [ref=e686]: от 10 ₽
+                    - generic [ref=e687]:
+                      - link "Чат" [ref=e688] [cursor=pointer]:
+                        - /url: /chat?models=heygen%2Fheygen-avatar-6
+                        - generic [ref=e689]: 
+                        - text: Чат
+                      - link "Детали" [ref=e690] [cursor=pointer]:
+                        - /url: /models/heygen/heygen-avatar-6
+                        - generic [ref=e691]: 
+                        - text: Детали
+              - listitem [ref=e692]:
+                - article [ref=e693]:
+                  - generic [ref=e694]:
+                    - generic [ref=e695]:
+                      - img "Логотип OpenAI" [ref=e697]
+                      - generic [ref=e698]:
+                        - heading "GPT-6.2 Astra Pro" [level=3] [ref=e700]:
+                          - link "GPT-6.2 Astra Pro" [ref=e701] [cursor=pointer]:
+                            - /url: /models/openai/gpt-6.2-astra-pro
+                        - generic [ref=e702]:
+                          - generic [ref=e703]: OpenAI
+                          - time [ref=e704]: 17 ноября 2026
+                      - button "Скопировать идентификатор модели openai/gpt-6.2-astra-pro" [ref=e706] [cursor=pointer]:
+                        - generic [ref=e707]: openai/gpt-6.2-astra-pro
+                        - generic [ref=e708]: 
+                    - generic [ref=e709]:
+                      - paragraph [ref=e710]:
+                        - text: GPT-6.2 Astra Pro — это та же базовая модель, что и GPT-6.2 Astra, но обслуживаемая с
+                        - code [ref=e711]: reasoning.mode
+                        - text: ", установленным в"
+                        - code [ref=e712]: pro
+                        - text: ", для более качественных ответов на сложные задачи."
+                      - paragraph [ref=e713]:
+                        - strong [ref=e714]: "Примечание о стоимости:"
+                        - text: режим pro расходует гораздо больше токенов рассуждений на запрос, поэтому типичный запрос стоит в несколько раз дороже, чем тот же запрос на GPT-6.2 Astra, и выполняется значительно дольше. Он предназначен для сложных, критически важных задач, где дополнительная точность оправдывает затраты. Для повседневного программирования, агентных и чат-нагрузок вместо него используйте GPT-6.2 Astra.
+                      - paragraph [ref=e715]: "Подробнее в документации OpenAI: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode"
+                    - generic [ref=e716]:
+                      - generic [ref=e717]:
+                        - term [ref=e718]: "Входные данные:"
+                        - definition [ref=e719]:
+                          - list [ref=e720]:
+                            - listitem [ref=e721]: Файл
+                            - listitem [ref=e722]: Изображения
+                            - listitem [ref=e723]: Текст
+                      - generic [ref=e724]:
+                        - term [ref=e725]: "Исходящие данные:"
+                        - definition [ref=e726]:
+                          - list [ref=e727]:
+                            - listitem [ref=e728]: Текст
+                  - complementary [ref=e729]:
+                    - generic [ref=e730]:
+                      - generic [ref=e731]:
+                        - generic [ref=e732]: "Контекст:"
+                        - generic [ref=e733]: 1M
+                      - generic [ref=e734]:
+                        - generic [ref=e735]: "Входящие токены за 1M:"
+                        - generic [ref=e736]: 854 ₽
+                      - generic [ref=e737]:
+                        - generic [ref=e738]: "Исходящие токены за 1M:"
+                        - generic [ref=e739]: 4273 ₽
+                    - generic [ref=e740]:
+                      - link "Чат" [ref=e741] [cursor=pointer]:
+                        - /url: /chat?models=openai%2Fgpt-6.2-astra-pro
+                        - generic [ref=e742]: 
+                        - text: Чат
+                      - link "Детали" [ref=e743] [cursor=pointer]:
+                        - /url: /models/openai/gpt-6.2-astra-pro
+                        - generic [ref=e744]: 
+                        - text: Детали
+              - listitem [ref=e745]:
+                - article [ref=e746]:
+                  - generic [ref=e747]:
+                    - generic [ref=e748]:
+                      - img "Логотип OpenAI" [ref=e750]
+                      - generic [ref=e751]:
+                        - heading "GPT-6.2 Astra" [level=3] [ref=e753]:
+                          - link "GPT-6.2 Astra" [ref=e754] [cursor=pointer]:
+                            - /url: /models/openai/gpt-6.2-astra
+                        - generic [ref=e755]:
+                          - generic [ref=e756]: OpenAI
+                          - time [ref=e757]: 17 ноября 2026
+                      - button "Скопировать идентификатор модели openai/gpt-6.2-astra" [ref=e759] [cursor=pointer]:
+                        - generic [ref=e760]: openai/gpt-6.2-astra
+                        - generic [ref=e761]: 
+                    - paragraph [ref=e763]: GPT-6.2 Astra — флагманская модель в серии GPT-6.2 от OpenAI, созданная для самых сложных проектов. Она подходит для реальной инженерии, профессиональной работы и научных исследований, обладая более сильным визуальным рассуждением для веб-сайтов, слайд-шоу и 3D-дизайнов. OpenAI сообщает о новых рекордах в своих оценках при стоимости за задачу менее трети от стоимости за задачу GPT-6 Astra.
+                    - generic [ref=e764]:
+                      - generic [ref=e765]:
+                        - term [ref=e766]: "Входные данные:"
+                        - definition [ref=e767]:
+                          - list [ref=e768]:
+                            - listitem [ref=e769]: Файл
+                            - listitem [ref=e770]: Изображения
+                            - listitem [ref=e771]: Текст
+                      - generic [ref=e772]:
+                        - term [ref=e773]: "Исходящие данные:"
+                        - definition [ref=e774]:
+                          - list [ref=e775]:
+                            - listitem [ref=e776]: Текст
+                  - complementary [ref=e777]:
+                    - generic [ref=e778]:
+                      - generic [ref=e779]:
+                        - generic [ref=e780]: "Контекст:"
+                        - generic [ref=e781]: 1M
+                      - generic [ref=e782]:
+                        - generic [ref=e783]: "Входящие токены за 1M:"
+                        - generic [ref=e784]: 854 ₽
+                      - generic [ref=e785]:
+                        - generic [ref=e786]: "Исходящие токены за 1M:"
+                        - generic [ref=e787]: 4273 ₽
+                    - generic [ref=e788]:
+                      - link "Чат" [ref=e789] [cursor=pointer]:
+                        - /url: /chat?models=openai%2Fgpt-6.2-astra
+                        - generic [ref=e790]: 
+                        - text: Чат
+                      - link "Детали" [ref=e791] [cursor=pointer]:
+                        - /url: /models/openai/gpt-6.2-astra
+                        - generic [ref=e792]: 
+                        - text: Детали
+              - listitem [ref=e793]:
+                - article [ref=e794]:
+                  - generic [ref=e795]:
+                    - generic [ref=e796]:
+                      - img "Логотип OpenAI" [ref=e798]
+                      - generic [ref=e799]:
+                        - heading "GPT-6.2 Sol Pro" [level=3] [ref=e801]:
+                          - link "GPT-6.2 Sol Pro" [ref=e802] [cursor=pointer]:
+                            - /url: /models/openai/gpt-6.2-sol-pro
+                        - generic [ref=e803]:
+                          - generic [ref=e804]: OpenAI
+                          - time [ref=e805]: 17 ноября 2026
+                      - button "Скопировать идентификатор модели openai/gpt-6.2-sol-pro" [ref=e807] [cursor=pointer]:
+                        - generic [ref=e808]: openai/gpt-6.2-sol-pro
+                        - generic [ref=e809]: 
+                    - generic [ref=e810]:
+                      - paragraph [ref=e811]:
+                        - text: GPT-6.2 Sol Pro — это та же базовая модель, что и GPT-6.2 Sol, но с
+                        - code [ref=e812]: reasoning.mode
+                        - text: ", установленным в"
+                        - code [ref=e813]: pro
+                        - text: ", для более качественных ответов на сложных задачах."
+                      - paragraph [ref=e814]:
+                        - strong [ref=e815]: "Примечание о стоимости:"
+                        - text: режим pro расходует значительно больше токенов рассуждения на запрос, поэтому типичный запрос стоит в несколько раз дороже, чем тот же запрос к GPT-6.2 Sol, и выполняется намного дольше. Он предназначен для сложных задач с высокими ставками, где дополнительная точность оправдывает затраты. Для повседневного программирования, агентных и чат-нагрузок вместо него используйте GPT-6.2 Sol.
+                      - paragraph [ref=e816]: "Подробнее в документации OpenAI: https://developers.openai.com/api/docs/guides/reasoning#reasoning-mode"
+                    - generic [ref=e817]:
+                      - generic [ref=e818]:
+                        - term [ref=e819]: "Входные данные:"
+                        - definition [ref=e820]:
+                          - list [ref=e821]:
+                            - listitem [ref=e822]: Файл
+                            - listitem [ref=e823]: Изображения
+                            - listitem [ref=e824]: Текст
+                      - generic [ref=e825]:
+                        - term [ref=e826]: "Исходящие данные:"
+                        - definition [ref=e827]:
+                          - list [ref=e828]:
+                            - listitem [ref=e829]: Текст
+                  - complementary [ref=e830]:
+                    - generic [ref=e831]:
+                      - generic [ref=e832]:
+                        - generic [ref=e833]: "Контекст:"
+                        - generic [ref=e834]: 1M
+                      - generic [ref=e835]:
+                        - generic [ref=e836]: "Входящие токены за 1M:"
+                        - generic [ref=e837]: 213 ₽
+                      - generic [ref=e838]:
+                        - generic [ref=e839]: "Исходящие токены за 1M:"
+                        - generic [ref=e840]: 1068 ₽
+                    - generic [ref=e841]:
+                      - link "Чат" [ref=e842] [cursor=pointer]:
+                        - /url: /chat?models=openai%2Fgpt-6.2-sol-pro
+                        - generic [ref=e843]: 
+                        - text: Чат
+                      - link "Детали" [ref=e844] [cursor=pointer]:
+                        - /url: /models/openai/gpt-6.2-sol-pro
+                        - generic [ref=e845]: 
+                        - text: Детали
+            - generic [ref=e846]:
+              - generic "Показано на странице" [ref=e847]: 1–15 из 617
+              - navigation "Pages" [ref=e848]:
+                - text: 
+                - link "1" [disabled] [ref=e849]
+                - link "2" [ref=e850] [cursor=pointer]:
+                  - /url: /models?page=2
+                - link "3" [ref=e851] [cursor=pointer]:
+                  - /url: /models?page=3
+                - link "4" [ref=e852] [cursor=pointer]:
+                  - /url: /models?page=4
+                - link "5" [ref=e853] [cursor=pointer]:
+                  - /url: /models?page=5
+                - separator [disabled] [ref=e854] [cursor=pointer]: …
+                - link "42" [ref=e855] [cursor=pointer]:
+                  - /url: /models?page=42
+                - link "Next" [ref=e856] [cursor=pointer]:
+                  - /url: /models?page=2
+                  - text:  >
+  - contentinfo [ref=e857]:
+    - generic [ref=e859]:
+      - generic [ref=e860]: © 2026 ООО «Интер»
+      - link " Новости RouterAI в Telegram" [ref=e862] [cursor=pointer]:
+        - /url: https://t.me/routerai_news
+        - generic [ref=e863]:
+          - generic [ref=e864]: 
+          - text: Новости RouterAI в Telegram
+      - generic [ref=e865]:
+        - link "Пользовательское соглашение" [ref=e866] [cursor=pointer]:
+          - /url: /terms
+          - generic [ref=e867]: Пользовательское соглашение
+        - link "Политика конфиденциальности" [ref=e868] [cursor=pointer]:
+          - /url: /terms/privacy
+          - generic [ref=e869]: Политика конфиденциальности
+        - link "Возврат средств" [ref=e870] [cursor=pointer]:
+          - /url: /terms/refund
+          - generic [ref=e871]: Возврат средств
+        - link "Глоссарий" [ref=e872] [cursor=pointer]:
+          - /url: /glossary
+          - generic [ref=e873]: Глоссарий
+  - button [ref=e875] [cursor=pointer]:
+    - img [ref=e876]

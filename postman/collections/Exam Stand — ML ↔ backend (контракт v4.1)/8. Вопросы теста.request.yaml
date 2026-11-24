@@ -1,0 +1,16 @@
+$kind: http-request
+description: "Вопросы без правильных ответов: questionId, questionOrder, type, text, options. Тип нужен, чтобы собрать ответ правильной формы (index / indexes / text)."
+url: "{{baseUrl}}/api/tests/{{testId}}/questions"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('200 OK', () => pm.response.to.have.status(200));
+      const body = pm.response.json();
+      pm.collectionVariables.set('questionsJson', JSON.stringify(body));
+      console.log('вопросов:', body.length);
+      body.forEach(q => console.log(' ', q.questionOrder, q.type, '|', q.text.slice(0, 60), '| options:', (q.options || []).length));
+    language: text/javascript
+order: 8000

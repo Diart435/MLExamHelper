@@ -1,20 +1,18 @@
 package com.examassistant.jobs.listener;
 
+import com.examassistant.jobs.service.MlResultAckSupport;
 import com.examassistant.materials.MaterialService;
 import com.examassistant.support.TestFixtures;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.RecordId;
-import org.springframework.data.redis.core.StreamOperations;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -23,62 +21,68 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ProcessingMaterialListenerTest {
 
-    @Mock
-    private StringRedisTemplate redisTemplate;
-    @Mock
-    private StreamOperations<String, Object, Object> streamOperations;
+    private static final String READY_PAYLOAD =
+            "{\"material_id\":\"" + TestFixtures.MATERIAL_ID + "\",\"status\":\"ready\"}";
+    private static final String ERROR_PAYLOAD =
+            "{\"material_id\":\"" + TestFixtures.MATERIAL_ID + "\",\"status\":\"error\",\"error\":\"boom\"}";
+
     @Mock
     private MaterialService materialService;
+    @Mock
+    private MlResultAckSupport ackSupport;
 
-    @InjectMocks
     private ProcessingMaterialListener listener;
 
+    @BeforeEach
+    void setUp() {
+        listener = new ProcessingMaterialListener(materialService, new ObjectMapper(), ackSupport);
+    }
+
     @Test
-    void onMessage_validMessage_changesStatusAndAcknowledges() {
-        MapRecord<String, String, String> message = message(Map.of(
-                "material_id", TestFixtures.MATERIAL_ID.toString(),
-                "status", "ready"
-        ));
-        RecordId recordId = RecordId.of("1-0");
-        when(message.getId()).thenReturn(recordId);
-        when(redisTemplate.<Object, Object>opsForStream()).thenReturn(streamOperations);
+    void ready_changesStatusAndAcknowledges() {
+        var message = message(READY_PAYLOAD);
 
         listener.onMessage(message);
 
         verify(materialService).changeStatus(TestFixtures.MATERIAL_ID, "ready");
-        verify(streamOperations).acknowledge(
-                "materials:process-response", "material-status-handlers", recordId);
+        verify(ackSupport).ack(message);
     }
 
     @Test
-    void onMessage_missingMaterialId_throwsAndDoesNotAcknowledge() {
-        MapRecord<String, String, String> message = message(Map.of(
-                "status", "ready"
-        ));
+    void error_changesStatusAndAcknowledges() {
+        var message = message(ERROR_PAYLOAD);
 
-        assertThatThrownBy(() -> listener.onMessage(message))
-                .isInstanceOf(NullPointerException.class);
+        listener.onMessage(message);
 
-        verifyNoInteractions(materialService, streamOperations, redisTemplate);
+        verify(materialService).changeStatus(TestFixtures.MATERIAL_ID, "error");
+        verify(ackSupport).ack(message);
     }
 
     @Test
-    void onMessage_malformedMaterialId_throwsAndDoesNotAcknowledge() {
-        MapRecord<String, String, String> message = message(Map.of(
-                "material_id", "not-a-uuid",
-                "status", "ready"
-        ));
+    void malformedJson_isPoisonAndAcknowledged() {
+        var message = message("{");
 
-        assertThatThrownBy(() -> listener.onMessage(message))
-                .isInstanceOf(IllegalArgumentException.class);
+        listener.onMessage(message);
 
-        verifyNoInteractions(materialService, streamOperations, redisTemplate);
+        verify(ackSupport).ackPoison(any(), any(RuntimeException.class));
+        verifyNoInteractions(materialService);
+    }
+
+    @Test
+    void databaseFailure_isNotAcknowledged() {
+        var message = message(READY_PAYLOAD);
+        doThrow(new IllegalStateException("database down")).when(materialService).changeStatus(any(), any());
+
+        listener.onMessage(message);
+
+        verify(ackSupport, org.mockito.Mockito.never()).ack(any());
+        verify(ackSupport, org.mockito.Mockito.never()).ackPoison(any(), any());
     }
 
     @SuppressWarnings("unchecked")
-    private MapRecord<String, String, String> message(Map<String, String> fields) {
+    private MapRecord<String, String, String> message(String payload) {
         MapRecord<String, String, String> message = mock(MapRecord.class);
-        when(message.getValue()).thenReturn(fields);
+        when(ackSupport.payload(message)).thenReturn(payload);
         return message;
     }
 }

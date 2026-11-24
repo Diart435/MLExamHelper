@@ -1,0 +1,23 @@
+$kind: http-request
+description: Курс нужен владельцу материала и теста.
+url: "{{baseUrl}}/api/courses"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: text
+  content: |-
+    {
+      "title": "Стенд {{email}}",
+      "courseDescription": "Прогон контракта ML ↔ backend v4.1"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('201 Created', () => pm.response.to.have.status(201));
+      const body = pm.response.json();
+      pm.collectionVariables.set('courseId', body.courseId);
+      console.log('courseId =', body.courseId);
+    language: text/javascript
+order: 3000

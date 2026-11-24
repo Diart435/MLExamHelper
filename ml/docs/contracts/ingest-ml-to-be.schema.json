@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-exam:contract:ingest:ml-to-be",
+  "title": "Результат индексации материала — канал ingest:ml-to-be",
+  "type": "object",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": [
+        "status",
+        "material_id"
+      ],
+      "properties": {
+        "status": {
+          "const": "ready"
+        },
+        "material_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "status",
+        "error"
+      ],
+      "properties": {
+        "status": {
+          "const": "error"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1
+        },
+        "material_id": {
+          "type": "string"
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "material_id": "5a2c9f10-1c4d-4f7b-9a2e-7d3f6b8c1e04",
+      "status": "ready"
+    }
+  ]
+}

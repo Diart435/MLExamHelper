@@ -1,0 +1,27 @@
+$kind: collection
+description: |-
+  Полный цикл на живом стенде: регистрация → курс → загрузка материала → генерация теста ML → попытка → проверка.
+
+  ПОРЯДОК ЗАПУСКА
+  1) Выполни запросы 1–4 по одному.
+  2) Запрос 5 (Материал готов?) жми ПОВТОРНО, пока statusMaterial = ready (обычно 30–90 с: ML режет PDF на чанки и делает эмбеддинги).
+  3) Запрос 6 (Создать тест) — ML генерирует вопросы (1–3 мин).
+  4) Запрос 7 (Тест готов?) жми ПОВТОРНО, пока statusTest = created.
+  5) Запросы 8–10 подряд.
+
+  Все токены и id кладутся в переменные коллекции автоматически.
+  Токен access живёт 60 минут — потом выполни запрос 2 (Вход) заново.
+
+  Swagger UI: http://localhost:8000/swagger-ui.html
+variables:
+  baseUrl: http://localhost:8000
+  password: StandPass123!
+  email: ""
+  token: ""
+  userId: ""
+  courseId: ""
+  materialId: ""
+  testId: ""
+  attemptId: ""
+  questionsJson: "[]"
+  answersJson: "[]"

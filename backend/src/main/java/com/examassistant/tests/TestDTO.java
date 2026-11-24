@@ -1,6 +1,5 @@
 package com.examassistant.tests;
 
-import com.examassistant.common.enums.TestAmountQuestions;
 import com.examassistant.common.enums.TestDifficulty;
 import com.examassistant.tests.enums.TestStatus;
 import lombok.AllArgsConstructor;
@@ -15,7 +14,7 @@ public class TestDTO {
     private UUID testId;
     private UUID courseId;
     private String title;
-    private TestAmountQuestions amountQuestions;
+    private String amountQuestions;
     private OffsetDateTime createdAt;
     private TestStatus statusTest;
     private TestDifficulty difficulty;
