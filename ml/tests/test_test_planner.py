@@ -38,7 +38,7 @@ def _make_llm(responses) -> LLMClient:
     llm.requests = []  # type: ignore[attr-defined]
     it = iter(responses)
 
-    async def fake_raw(system_prompt, user_message, *, fmt="plain", schema=None, max_tokens=None):
+    async def fake_raw(system_prompt, user_message, *, fmt="plain", schema=None, max_tokens=None, attempt=""):
         llm.requests.append({
             "fmt": fmt, "schema": schema,
             "system": system_prompt, "user": user_message,
