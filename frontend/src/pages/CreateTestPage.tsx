@@ -40,13 +40,8 @@ interface MaterialUI {
 
 type QuestionType = 'single_choice' | 'multi_choice' | 'open_answer';
 
-// interface QuestionConfig {
-//   type: QuestionType;
-//   label: string;
-//   count: number | null; // null = "Своё число" не заполнено
-// }
-
 /* ===================== API МАТЕРИАЛОВ ===================== */
+
 
 const materialsApi = {
   getByCourse: async (courseId: string, page = 0, size = 50): Promise<MaterialPage> => {
@@ -55,7 +50,7 @@ const materialsApi = {
     params.set('page', String(page));
     params.set('size', String(size));
     params.set('sort', 'createdAt,desc');
-    const res = await apiClient.get<MaterialPage>('/api/materials', { params });
+    const res = await apiClient.get<MaterialPage>('/materials', { params }); 
     return res.data;
   },
 };
@@ -65,7 +60,11 @@ const mapMaterialToUI = (api: MaterialResponse): MaterialUI => {
     PDF: 'PDF', TEXT: 'Текст', LINK: 'Ссылка', DOCUMENT: 'Документ', DOCX: 'Документ',
   };
   const statusMap: Record<string, MaterialUI['status']> = {
-    DONE: 'done', PROCESSING: 'progress', ERROR: 'error', QUEUED: 'progress',
+    READY: 'done',        
+    DONE: 'done',
+    PROCESSING: 'progress',
+    QUEUED: 'progress',
+    ERROR: 'error',
   };
   return {
     id: api.materialId,
@@ -81,7 +80,7 @@ const mapMaterialToUI = (api: MaterialResponse): MaterialUI => {
 const CreateTestPage = () => {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  
+
   const [materials, setMaterials] = useState<MaterialUI[]>([]);
   const [loadingMat, setLoadingMat] = useState(true);
   const [testTitle, setTestTitle] = useState('');
@@ -98,8 +97,8 @@ const CreateTestPage = () => {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  // Загрузка курса и материалов
-   const fetchData = useCallback(async () => {
+  // Загрузка материалов курса
+  const fetchData = useCallback(async () => {
     if (!courseId) {
       navigate('/courses');
       return;
@@ -107,7 +106,6 @@ const CreateTestPage = () => {
 
     try {
       setLoadingMat(true);
-      // Загружаем только материалы, название курса теперь берется в CabinetLayout
       const materialsData = await materialsApi.getByCourse(courseId);
       setMaterials(materialsData.content.map(mapMaterialToUI));
     } catch (err) {
@@ -122,7 +120,7 @@ const CreateTestPage = () => {
 
   // Обработчики
   const toggleMaterial = (id: string) => {
-    setMaterials(prev => prev.map(m => 
+    setMaterials(prev => prev.map(m =>
       m.id === id ? { ...m, selected: !m.selected } : m
     ));
   };
@@ -151,8 +149,8 @@ const CreateTestPage = () => {
     }
 
     const totalQuestions = Object.values(questionCounts).reduce(
-        (sum: number, count) => sum + (count || 0), 
-        0
+      (sum: number, count) => sum + (count || 0),
+      0
     );
     if (totalQuestions === 0) {
       setError('Укажите количество вопросов хотя бы для одной категории');
@@ -163,9 +161,7 @@ const CreateTestPage = () => {
     setError('');
 
     try {
-      // Отправляем запрос на создание теста
-      // Пока используем общее количество вопросов, позже можно разделить по типам
-      const response = await apiClient.post(`/api/courses/${courseId}/tests/generate`, {
+      const response = await apiClient.post(`/courses/${courseId}/tests/generate`, { 
         title: testTitle.trim(),
         mode: 'training',
         timeLimitMinutes: 30,
@@ -175,7 +171,7 @@ const CreateTestPage = () => {
       });
 
       console.log('Test created:', response.data);
-      navigate(`/courses/${courseId}`);
+      navigate('/tests'); 
     } catch (err: any) {
       console.error('Failed to create test', err);
       setError(err.response?.data?.message || 'Не удалось создать тест');
@@ -185,7 +181,7 @@ const CreateTestPage = () => {
   };
 
   const handleCancel = () => {
-    navigate(`/courses/${courseId}`);
+    navigate('/tests'); 
   };
 
   const questionTypes: { type: QuestionType; label: string }[] = [
@@ -197,123 +193,123 @@ const CreateTestPage = () => {
   const selectedCount = materials.filter(m => m.selected).length;
   const doneCount = materials.filter(m => m.status === 'done').length;
 
-      return (
-        <div className="create-test-page">
+  return (
+    <div className="create-test-page">
 
-          {/* КОНТЕНТ */}
-          <div className="create-test-content">
-            {/* Левая колонка: Материалы */}
-            <div className="materials-column">
-              <div className="tabbed-section">
-                <h2 className="panel-title tab-header">Материалы</h2>
-                <div className="course-panel tabbed-panel">
-                  <div className="materials-counter">
-                    Выбрано {selectedCount} из {doneCount}
-                  </div>
-
-                  {loadingMat ? (
-                    <div className="skeleton-loader">Загрузка материалов…</div>
-                  ) : materials.length === 0 ? (
-                    <div className="empty-state">Нет материалов. Сначала загрузите материалы в курсе.</div>
-                  ) : (
-                    <div className="materials-list">
-                      {materials.map(m => (
-                        <div key={m.id} className="material-row">
-                          <label className="material-check">
-                            <input
-                              type="checkbox"
-                              checked={m.selected}
-                              onChange={() => toggleMaterial(m.id)}
-                              disabled={m.status !== 'done'}
-                            />
-                            <span className="check-box">
-                              {m.selected && <span className="check-mark">✓</span>}
-                            </span>
-                          </label>
-                          <div className="material-body">
-                            <p className="material-name">{m.name}</p>
-                            <span className="material-type">{m.kind}</span>
-                          </div>
-                          <span className={`badge ${m.status}`}>
-                            {m.status === 'done' && 'Обработан'}
-                            {m.status === 'progress' && 'В процессе'}
-                            {m.status === 'error' && 'Ошибка'}
-                          </span>
-                          {m.status === 'error' && (
-                            <button className="retry-btn" type="button">Повторить</button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+      {/* КОНТЕНТ */}
+      <div className="create-test-content">
+        {/* Левая колонка: Материалы */}
+        <div className="materials-column">
+          <div className="tabbed-section">
+            <h2 className="panel-title tab-header">Материалы</h2>
+            <div className="course-panel tabbed-panel">
+              <div className="materials-counter">
+                Выбрано {selectedCount} из {doneCount}
               </div>
-            </div>
 
-            {/* Правая колонка: Параметры */}
-            <div className="params-column">
-              <div className="tabbed-section">
-                <h2 className="panel-title tab-header">Параметры</h2>
-                <div className="course-panel tabbed-panel">
-                  <h3 className="params-title">Новый тест</h3>
-
-                  <div className="param-field">
-                    <label className="param-label">Название теста</label>
-                    <input
-                      type="text"
-                      className="param-input"
-                      placeholder='Например, "Транзакты и общие знания о Базах Данных"'
-                      value={testTitle}
-                      onChange={(e) => { setTestTitle(e.target.value); if (error) setError(''); }}
-                    />
-                  </div>
-
-                  <div className="questions-section">
-                    <h4 className="questions-title">Вопросы</h4>
-
-                    {questionTypes.map(({ type, label }) => (
-                      <div key={type} className="question-type-block">
-                        <p className="question-type-label">{label}</p>
-                        <div className="question-buttons">
-                          {[5, 15, 20, 25, 30].map(num => (
-                            <button
-                              key={num}
-                              className={`question-btn ${questionCounts[type] === num ? 'active' : ''}`}
-                              onClick={() => selectQuestionCount(type, num)}
-                            >
-                              {num}
-                            </button>
-                          ))}
-                          <div className="custom-input-wrapper">
-                            <input
-                              type="text"
-                              className="custom-input"
-                              placeholder="Своё число"
-                              value={customInputs[type]}
-                              onChange={(e) => handleCustomInput(type, e.target.value)}
-                            />
-                          </div>
-                        </div>
+              {loadingMat ? (
+                <div className="skeleton-loader">Загрузка материалов…</div>
+              ) : materials.length === 0 ? (
+                <div className="empty-state">Нет материалов. Сначала загрузите материалы в курсе.</div>
+              ) : (
+                <div className="materials-list">
+                  {materials.map(m => (
+                    <div key={m.id} className="material-row">
+                      <label className="material-check">
+                        <input
+                          type="checkbox"
+                          checked={m.selected}
+                          onChange={() => toggleMaterial(m.id)}
+                          disabled={m.status !== 'done'}
+                        />
+                        <span className="check-box">
+                          {m.selected && <span className="check-mark">✓</span>}
+                        </span>
+                      </label>
+                      <div className="material-body">
+                        <p className="material-name">{m.name}</p>
+                        <span className="material-type">{m.kind}</span>
                       </div>
-                    ))}
-                  </div>
-
-                  {error && <div className="error-message">{error}</div>}
-
-                  <div className="action-buttons">
-                    <button className="btn-cancel" onClick={handleCancel} disabled={creating}>
-                      Отмена
-                    </button>
-                    <button className="btn-create" onClick={handleCreateTest} disabled={creating}>
-                      {creating ? 'Создание...' : 'Создать тест'}
-                    </button>
-                  </div>
+                      <span className={`badge ${m.status}`}>
+                        {m.status === 'done' && 'Обработан'}
+                        {m.status === 'progress' && 'В процессе'}
+                        {m.status === 'error' && 'Ошибка'}
+                      </span>
+                      {m.status === 'error' && (
+                        <button className="retry-btn" type="button">Повторить</button>
+                      )}
+                    </div>
+                  ))}
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Правая колонка: Параметры */}
+        <div className="params-column">
+          <div className="tabbed-section">
+            <h2 className="panel-title tab-header">Параметры</h2>
+            <div className="course-panel tabbed-panel">
+              <h3 className="params-title">Новый тест</h3>
+
+              <div className="param-field">
+                <label className="param-label">Название теста</label>
+                <input
+                  type="text"
+                  className="param-input"
+                  placeholder='Например, "Транзакты и общие знания о Базах Данных"'
+                  value={testTitle}
+                  onChange={(e) => { setTestTitle(e.target.value); if (error) setError(''); }}
+                />
+              </div>
+
+              <div className="questions-section">
+                <h4 className="questions-title">Вопросы</h4>
+
+                {questionTypes.map(({ type, label }) => (
+                  <div key={type} className="question-type-block">
+                    <p className="question-type-label">{label}</p>
+                    <div className="question-buttons">
+                      {[5, 15, 20, 25, 30].map(num => (
+                        <button
+                          key={num}
+                          className={`question-btn ${questionCounts[type] === num ? 'active' : ''}`}
+                          onClick={() => selectQuestionCount(type, num)}
+                        >
+                          {num}
+                        </button>
+                      ))}
+                      <div className="custom-input-wrapper">
+                        <input
+                          type="text"
+                          className="custom-input"
+                          placeholder="Своё число"
+                          value={customInputs[type]}
+                          onChange={(e) => handleCustomInput(type, e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {error && <div className="error-message">{error}</div>}
+
+              <div className="action-buttons">
+                <button className="btn-cancel" onClick={handleCancel} disabled={creating}>
+                  Отмена
+                </button>
+                <button className="btn-create" onClick={handleCreateTest} disabled={creating}>
+                  {creating ? 'Создание...' : 'Создать тест'}
+                </button>
               </div>
             </div>
           </div>
         </div>
-      );
+      </div>
+    </div>
+  );
 };
 
 export default CreateTestPage;
