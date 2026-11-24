@@ -9,6 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
-    // Порядок вопросов теста — по колонке question_order (миграция 006).
     List<Question> findByTestIdOrderByQuestionOrderAsc(UUID testId);
 }

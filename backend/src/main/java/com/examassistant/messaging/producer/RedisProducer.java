@@ -21,13 +21,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Публикация задач в Redis Streams по контракту v4.1.
- *
- * Конверт один: {@code XADD <канал> * payload '<JSON>'} — ровно одно поле
- * {@code payload}, внутри JSON-объект задачи. Поля {@code type} нет: тип задачи
- * задаёт имя канала.
- */
 @Service
 @RequiredArgsConstructor
 public class RedisProducer implements Producer {
@@ -38,14 +31,10 @@ public class RedisProducer implements Producer {
 
     @Override
     public RecordId publishCreateTest(CreateTestRedisRequest test) {
-        // legacy-таблица query_tasks ждёт enum bucket — размер теста выбирает ML,
-        // поэтому в записи задачи лежит константа MEDIUM.
         TaskDTO taskDTO = new TaskDTO(test.getTestId(), test.getCourseId(), test.getTitle(), OffsetDateTime.now(),
                 null, StatusTask.PROCESSING, TestAmountQuestions.MEDIUM, test.getDifficulty());
         taskService.create(test.getTaskId(), taskDTO);
 
-        // Контракт v4.2: ровно пять полей. course_id нет — корреляция идёт по
-        // task_id/test_id. amount_questions нет — размер теста целиком выбирает ML.
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("task_id", test.getTaskId().toString());
         payload.put("test_id", test.getTestId().toString());
@@ -58,7 +47,6 @@ public class RedisProducer implements Producer {
 
     @Override
     public RecordId publishMaterialProcess(ProcessMaterialRedisRequest material) {
-        // У ingest в контракте ровно два поля — корреляция идёт по material_id.
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("material_id", material.getMaterialId().toString());
         payload.put("storage_key", material.getStorageKey());

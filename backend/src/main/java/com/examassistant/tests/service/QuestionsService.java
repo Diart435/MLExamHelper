@@ -24,8 +24,6 @@ public class QuestionsService implements QuestionService {
     @Override
     public void create(QuestionDTO questionDTO){
         Question question = new Question();
-        // Идентификатор присваивает приложение: у сущности нет генератора,
-        // поэтому id нужно задать явно, иначе в INSERT уйдёт NULL.
         question.setQuestionId(UUID.randomUUID());
         question.setTestId(questionDTO.getTestId());
         question.setTextQuestion(questionDTO.getTextQuestion());
@@ -40,9 +38,6 @@ public class QuestionsService implements QuestionService {
     @Transactional(readOnly = true)
     @Override
     public List<QuestionResponse> getByTestId(UUID testId, UUID userId) {
-        // Права на тест — тем же механизмом, что и в TestsService.getById:
-        // тест ищется по id, владелец курса проверяется через courseService
-        // (CourseNotFoundException -> 404, CourseForbiddenException -> 403).
         testService.getById(testId, userId);
 
         return questionRepository.findByTestIdOrderByQuestionOrderAsc(testId).stream()

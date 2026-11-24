@@ -27,15 +27,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Подписка backend'а на три канала результатов ML.
- *
- * Consumer-группа одна ({@code ml-backend}), но она привязана к одному стриму,
- * поэтому группу создаём на каждом канале отдельно — сырой командой
- * {@code XGROUP CREATE ... 0-0 MKSTREAM}, каналы появляются на лету.
- *
- * XACK не настроен: подтверждает сам listener после успешной обработки.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -74,19 +65,6 @@ public class RedisConsumer implements SmartLifecycle {
         log.info("Subscribed to ML result channels {} as {} / {}", MlChannels.resultChannels(), group, consumerName);
     }
 
-    /**
-     * Создаёт consumer-группу на канале результатов.
-     *
-     * <p>Команда уходит в Redis сырой строкой, а не через
-     * {@code opsForStream().createGroup(...)}: там идентификатор группы
-     * берётся из {@link ReadOffset#lastConsumed()} — это «>», а такой
-     * идентификатор {@code XGROUP CREATE} не принимает («ERR Invalid stream
-     * ID specified as stream command argument»). Плюс нужен {@code MKSTREAM},
-     * чтобы канал создавался на лету, до первого сообщения ML.
-     *
-     * <p>Смещение {@code 0-0} — группа читает поток с самого начала, так что
-     * результаты, опубликованные ML пока backend лежал, не теряются.
-     */
     private void createConsumerGroup(String channel, String group) {
         try {
             redisTemplate.execute((RedisCallback<Object>) conn -> conn.execute("XGROUP", "CREATE".getBytes(),
@@ -98,17 +76,10 @@ public class RedisConsumer implements SmartLifecycle {
                 log.info("Consumer group {} on channel {} already exists", group, channel);
                 return;
             }
-            // Любая другая ошибка — транспорт не работает: логируем громко,
-            // но приложение не роняем, иначе стенд поднять не получится.
             log.error("Failed to create consumer group {} on channel {}: {}", group, channel, e.getMessage(), e);
         }
     }
 
-    /**
-     * Проверяет, что ошибка — это именно BUSYGROUP (группа уже существует),
-     * а не что-то другое. Сообщение Lettuce может быть обёрнуто в несколько
-     * слоёв, поэтому ищем маркер во всей цепочке причин.
-     */
     private boolean isBusyGroup(Throwable error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
             String message = cause.getMessage();
@@ -138,11 +109,6 @@ public class RedisConsumer implements SmartLifecycle {
         return SmartLifecycle.DEFAULT_PHASE - 10;
     }
 
-    /**
-     * Возврат зависших сообщений: забираем pending, которые долго лежат без
-     * обработки. Сообщения, которые не удалось обработать слишком много раз,
-     * считаем poison — подтверждаем и удаляем, не перечитывая.
-     */
     @Scheduled(fixedDelayString = "${ml.streams.reclaim-interval-ms:60000}")
     public void reclaimPending() {
         String group = properties.getConsumerGroup();
@@ -173,8 +139,6 @@ public class RedisConsumer implements SmartLifecycle {
         if (message.getTotalDeliveryCount() >= properties.getReclaimMaxAttempts()) {
             log.error("Dropping poison message channel={} msg_id={} deliveries={}",
                     channel, id, message.getTotalDeliveryCount());
-            // XACKDEL есть только в Redis 8.2+, у нас Redis 7.4 — команда не поддерживается.
-            // Подтверждаем и удаляем отдельно: XACK, затем XDEL (удаление после подтверждения).
             streams.acknowledge(channel, group, id);
             streams.delete(channel, id);
             return;

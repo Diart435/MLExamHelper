@@ -17,7 +17,6 @@ import java.util.UUID;
 @Repository
 public interface TestRepository extends JpaRepository<Test, UUID> {
 
-    // Блокировка строки теста: результат из ML применяется ровно один раз.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT t FROM Test t WHERE t.testId = :testId")
     Optional<Test> findByIdForUpdate(@Param("testId") UUID testId);

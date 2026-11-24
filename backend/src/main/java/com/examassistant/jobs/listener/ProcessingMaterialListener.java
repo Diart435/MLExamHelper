@@ -10,12 +10,6 @@ import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Результат индексации материала с канала {@code ingest:ml-to-be}.
- *
- * В контракте v4.1 результат ingest — это {@code {material_id, status}}, где
- * status = "ready" | "error".
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

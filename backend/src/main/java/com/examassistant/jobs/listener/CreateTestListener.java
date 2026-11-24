@@ -10,13 +10,6 @@ import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Результат генерации теста с канала {@code create-test:ml-to-be}.
- *
- * XACK делается только после успешного применения результата: при исключении
- * сообщение остаётся в pending, его заберёт reclaim. Битый JSON — poison,
- * его подтверждаем и удаляем, чтобы он не крутился по кругу.
- */
 @Component
 @RequiredArgsConstructor
 @Slf4j

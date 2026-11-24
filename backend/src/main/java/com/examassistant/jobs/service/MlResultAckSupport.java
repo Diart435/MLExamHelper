@@ -24,9 +24,6 @@ public class MlResultAckSupport {
 
     public void ack(MapRecord<String, String, String> message) {
         try {
-            // XACKDEL есть только в Redis 8.2+, а у нас Redis 7.4 — команда не поддерживается.
-            // Поэтому подтверждаем и удаляем двумя обычными вызовами: сначала XACK,
-            // затем XDEL (удаление обязательно после подтверждения).
             redisTemplate.opsForStream().acknowledge(
                     message.getStream(),
                     properties.getConsumerGroup(),
