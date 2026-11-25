@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FormEvent, type MouseEvent } from 'react'; 
+import { useState, useEffect, useCallback, type FormEvent, type MouseEvent } from 'react';
 import './CoursesPage.css';
 import { useNavigate } from 'react-router-dom';
 
@@ -31,7 +31,6 @@ interface TestItem {
   grade: number;
 }
 
-// Интерфейсы для API материалов (по Swagger)
 interface MaterialResponse {
   materialId: string;
   courseId: string;
@@ -58,8 +57,6 @@ interface MaterialPage {
 type SortOption = 'newest' | 'progress';
 
 /* ===================== API МАТЕРИАЛОВ ===================== */
-/* ВАЖНО: baseURL в client.ts уже равен '/api',
-   поэтому здесь пути пишутся БЕЗ префикса /api */
 const materialsApi = {
   getByCourse: async (courseId: string, page = 0, size = 50): Promise<MaterialPage> => {
     const params = new URLSearchParams();
@@ -67,22 +64,20 @@ const materialsApi = {
     params.set('page', String(page));
     params.set('size', String(size));
     params.set('sort', 'createdAt,desc');
-
-    const res = await apiClient.get<MaterialPage>('/materials', { params }); 
+    const res = await apiClient.get<MaterialPage>('/materials', { params });
     return res.data;
   },
   upload: async (courseId: string, file: File): Promise<MaterialResponse> => {
     const form = new FormData();
     form.append('file', file);
     const res = await apiClient.post<MaterialResponse>(
-      `/materials/upload?courseId=${courseId}`, 
-      form,
+      `/materials/upload?courseId=${courseId}`, form,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
     return res.data;
   },
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/materials/${id}`); 
+    await apiClient.delete(`/materials/${id}`);
   },
 };
 
@@ -92,11 +87,7 @@ const mapMaterialToUI = (api: MaterialResponse): MaterialItem => {
     PDF: 'PDF', TEXT: 'Текст', LINK: 'Ссылка', DOCUMENT: 'Документ', DOCX: 'Документ',
   };
   const statusMap: Record<string, MaterialStatus> = {
-    READY: 'done',  
-    DONE: 'done',
-    PROCESSING: 'progress',
-    QUEUED: 'progress',
-    ERROR: 'error',
+    READY: 'done', DONE: 'done', PROCESSING: 'progress', QUEUED: 'progress', ERROR: 'error',
   };
   return {
     id: api.materialId,
@@ -181,6 +172,81 @@ const CreateCourseModal = ({ isOpen, onClose, onCreate }: CreateCourseModalProps
   );
 };
 
+/* ===================== МОДАЛКА «ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ» ===================== */
+interface DeleteCourseModalProps {
+  isOpen: boolean;
+  courseTitle: string;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+}
+
+const DeleteCourseModal = ({ isOpen, courseTitle, onClose, onConfirm }: DeleteCourseModalProps) => {
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      console.error('Ошибка удаления:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="modal-overlay is-open"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-modal-title"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="modal-card modal-card-delete" onMouseDown={(e) => e.stopPropagation()}>
+        <h2 className="modal-title" id="delete-modal-title">
+          Подтверждение удаления курса
+        </h2>
+        <p className="modal-delete-text">
+          Вы действительно хотите удалить курс: «{courseTitle}»?
+        </p>
+        <div className="modal-actions modal-actions-delete">
+          <button
+            className="modal-btn modal-btn-cancel"
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+          >
+            Отмена
+          </button>
+          <button
+            className="modal-btn modal-btn-delete"
+            type="button"
+            onClick={handleConfirm}
+            disabled={loading}
+          >
+            {loading ? 'Удаление…' : 'Удалить курс'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ===================== СТРАНИЦА КУРСА (МАТЕРИАЛЫ + ТЕСТЫ) ===================== */
 interface CourseViewProps {
   course: CourseUI;
@@ -211,10 +277,8 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
     <div className="course-page">
       <div className="course-columns">
 
-        {/* ЛЕВАЯ КОЛОНКА: МАТЕРИАЛЫ */}
         <section className="tabbed-section">
           <h2 className="panel-title tab-header">Материалы ({materials.length})</h2>
-
           <div className="course-panel tabbed-panel">
             <button
               className="btn-open-black"
@@ -223,7 +287,6 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
             >
               Открыть материалы
             </button>
-
             <div className="materials-list">
               {loadingMat ? (
                 <div className="skeleton-loader">Загрузка материалов…</div>
@@ -248,10 +311,8 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
           </div>
         </section>
 
-        {/* ПРАВАЯ КОЛОНКА: ТЕСТЫ */}
         <section className="tabbed-section">
           <h2 className="panel-title tab-header">Тесты курса</h2>
-
           <div className="course-panel tabbed-panel">
             <button
               className="btn-open-black"
@@ -260,7 +321,6 @@ const CourseView = ({ course, onBack }: CourseViewProps) => {
             >
               Открыть тесты
             </button>
-
             <div className="tests-list">
               {tests.length === 0 ? (
                 <div className="empty-state">Пока нет созданных тестов</div>
@@ -300,6 +360,9 @@ const CoursesPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [openedCourse, setOpenedCourse] = useState<CourseUI | null>(null);
 
+  // ✅ НОВОЕ: состояние для модалки удаления
+  const [courseToDelete, setCourseToDelete] = useState<CourseUI | null>(null);
+
   // ---- FETCH COURSES ----
   const fetchCourses = useCallback(async () => {
     setLoading(true);
@@ -311,10 +374,8 @@ const CoursesPage = () => {
         size: pageSize,
         sort: sortBy === 'newest' ? 'createdAt,desc' : 'title,asc',
       };
-
       const pageResponse = await coursesApi.getAll(params);
       const uiCourses = pageResponse.content.map((dto) => mapCourseDtoToUI(dto));
-
       setCourses(uiCourses);
       setTotalPages(pageResponse.totalPages);
     } catch (err: any) {
@@ -340,12 +401,18 @@ const CoursesPage = () => {
     }
   };
 
-  const handleDeleteCourse = async (courseId: string, e: MouseEvent) => {
+  // ✅ ИЗМЕНЁН: больше НЕ используем window.confirm — просто открываем модалку
+  const handleDeleteCourse = (course: CourseUI, e: MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Удалить курс безвозвратно?')) return;
+    setCourseToDelete(course);
+  };
+
+  // ✅ НОВЫЙ: реальное удаление вызывается из модалки
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
     try {
-      await coursesApi.delete(courseId);
-      setCourses((prev) => prev.filter((c) => c.id !== courseId));
+      await coursesApi.delete(courseToDelete.id);
+      setCourses((prev) => prev.filter((c) => c.id !== courseToDelete.id));
       if (courses.length === 1 && currentPage > 0) {
         setCurrentPage((p) => p - 1);
       } else {
@@ -354,6 +421,8 @@ const CoursesPage = () => {
     } catch (err: any) {
       console.error('Delete course failed', err);
       alert(err.response?.data?.message || 'Не удалось удалить курс');
+    } finally {
+      setCourseToDelete(null);
     }
   };
 
@@ -408,12 +477,12 @@ const CoursesPage = () => {
                 </div>
                 <div className="card-actions">
                   <button className="btn-open" type="button" onClick={() => handleOpenCourse(course)}>Открыть</button>
-                  <button className="btn-delete" type="button" onClick={(e) => handleDeleteCourse(course.id, e)} title="Удалить курс">Удалить</button>
+                  {/* ✅ Передаём весь объект course вместо courseId */}
+                  <button className="btn-delete" type="button" onClick={(e) => handleDeleteCourse(course, e)} title="Удалить курс">Удалить</button>
                 </div>
               </article>
             ))}
 
-            {/* ПАГИНАЦИЯ */}
             {totalPages > 1 && (
               <nav className="pagination" aria-label="Страницы курсов">
                 <button className="page-btn" onClick={() => setCurrentPage(0)} disabled={currentPage === 0}>««</button>
@@ -438,6 +507,13 @@ const CoursesPage = () => {
       </main>
 
       <CreateCourseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onCreate={handleCreateCourse} />
+
+      <DeleteCourseModal
+        isOpen={courseToDelete !== null}
+        courseTitle={courseToDelete?.title ?? ''}
+        onClose={() => setCourseToDelete(null)}
+        onConfirm={confirmDeleteCourse}
+      />
     </div>
   );
 };

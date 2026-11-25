@@ -557,3 +557,152 @@
   position: relative;
   z-index: 1 !important;
 }
+
+/* ===================== КАРТОЧКА УДАЛЕНИЯ — ПЕРЕБИВАЕМ БАЗОВЫЕ СТИЛИ ===================== */
+.modal-overlay .modal-card-delete {
+  box-sizing: border-box;
+  width: 630px;
+  min-height: 330px;
+  padding: 44px 56px;
+  display: flex;
+  flex-direction: column;
+
+  background:
+    linear-gradient(0deg, rgba(238, 255, 238, 0.37), rgba(238, 255, 238, 0.37)),
+    #ffffff !important;
+
+  border: 11px solid #fec7c7 !important;
+  border-radius: 48px !important;
+  box-shadow: 0 17px 17.6px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* ===================== ЗАГОЛОВОК ===================== */
+.modal-overlay .modal-card-delete .modal-title {
+  margin: 0 0 36px;
+  font-family: 'Tektur', sans-serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 100%;
+  color: #000000;
+  white-space: nowrap;
+}
+
+/* ===================== ТЕКСТ ВОПРОСА ===================== */
+.modal-overlay .modal-card-delete .modal-delete-text {
+  margin: 0 0 auto;
+  font-family: 'Tektur', sans-serif;
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 1.5;
+  color: #000000;
+}
+
+/* ===================== РЯД КНОПОК ===================== */
+.modal-overlay .modal-card-delete .modal-actions-delete {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-top: 46px;
+  width: 100%;
+}
+
+/* ===================== КНОПКА «ОТМЕНА» ===================== */
+.modal-overlay .modal-card-delete .modal-btn-cancel {
+  box-sizing: border-box;
+  width: 156px;
+  height: 46px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #ffffff !important;
+  border: 3px solid #be9ff6 !important;
+  border-radius: 16px !important;
+
+  font-family: 'Tektur', sans-serif;
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 100%;
+  color: #be9ff6 !important;
+
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.modal-overlay .modal-card-delete .modal-btn-cancel:hover:not(:disabled) {
+  background: #f6f1ff !important;
+  border-color: #a98df2 !important;
+}
+
+/* ===================== КНОПКА «УДАЛИТЬ КУРС» — СДВИНУТА ВПРАВО ===================== */
+.modal-overlay .modal-card-delete .modal-btn-delete {
+  box-sizing: border-box;
+  width: 222px;
+  height: 46px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #000000 !important;
+  border: none !important;
+  border-radius: 16px !important;
+
+  font-family: 'Tektur', sans-serif;
+  font-weight: 500;
+  font-size: 25px;
+  line-height: 100%;
+  color: #ffffff !important;
+
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-left: auto;  /* ← это прижимает кнопку вправо */
+}
+
+.modal-overlay .modal-card-delete .modal-btn-delete:hover:not(:disabled) {
+  background: #1d1d2b !important;
+}
+
+.modal-overlay .modal-card-delete .modal-btn-delete:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.modal-overlay .modal-card-delete .modal-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ===================== АДАПТИВ ===================== */
+@media (max-width: 700px) {
+  .modal-overlay .modal-card-delete {
+    width: 92vw;
+    min-height: 0;
+    padding: 28px 24px;
+    border-radius: 32px !important;
+    border-width: 8px !important;
+  }
+
+  .modal-overlay .modal-card-delete .modal-title {
+    white-space: normal;
+    font-size: 22px;
+  }
+
+  .modal-overlay .modal-card-delete .modal-delete-text {
+    font-size: 18px;
+  }
+
+  .modal-overlay .modal-card-delete .modal-actions-delete {
+    gap: 12px;
+  }
+
+  .modal-overlay .modal-card-delete .modal-btn-cancel,
+  .modal-overlay .modal-card-delete .modal-btn-delete {
+    width: auto;
+    min-width: 120px;
+    height: 42px;
+    font-size: 18px;
+    padding: 0 18px;
+  }
+}
